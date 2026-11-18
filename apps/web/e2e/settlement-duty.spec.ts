@@ -58,6 +58,7 @@ const CLAIM: Claim = {
   discard: null,
   policyId: "pol-1",
   customerId: "cust-1",
+  customerLegalName: "Acme Trading Co",
   policyNumber: "POL-2026-0451",
   insuranceLine: "Property All Risks",
   claimNumber: "CLM-2026-0007",

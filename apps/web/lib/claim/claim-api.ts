@@ -67,6 +67,8 @@ export interface Claim {
   id: string;
   policyId: string;
   customerId: string;
+  /** §W4 — whose claim this is, by name. Gated by this record's own read permission. */
+  customerLegalName: string | null;
   policyNumber: string | null;
   insuranceLine: string;
   claimNumber: string | null;

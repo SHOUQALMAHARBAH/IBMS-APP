@@ -30,6 +30,7 @@ import {
   quoteTermValueStyle,
 } from './quotation.styles';
 import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
+import { insurerDisplayName } from '../../lib/i18n/names';
 
 interface Props {
   rfqId: string;
@@ -258,7 +259,7 @@ export function QuotationsSection({
                   flexWrap: 'wrap',
                 }}
               >
-                <strong>{chain.insurer.name}</strong>
+                <strong>{insurerDisplayName(chain.insurer, language)}</strong>
                 <DeactivatedInsurerBadge isActive={chain.insurer.isActive} />
                 <span style={rfqBadgeStyle}>
                   {t(
@@ -455,7 +456,7 @@ export function QuotationsSection({
                 <option value="">{t('quoteSelectInsurerOption')}</option>
                 {capturable.map((s) => (
                   <option key={s.insurerId} value={s.insurerId}>
-                    {s.insurer.name}
+                    {insurerDisplayName(s.insurer, language)}
                   </option>
                 ))}
               </select>

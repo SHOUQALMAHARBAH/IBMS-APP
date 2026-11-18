@@ -24,6 +24,7 @@ import {
   POLICY_STATUS_OPTIONS,
 } from '../../../lib/policy/policy-status';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { lineDisplayName } from '../../../lib/i18n/names';
 
 /**
  * The book-wide policy list.
@@ -47,7 +48,7 @@ const POLICY_LIST_TAKE = 200;
 export default function PoliciesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [policies, setPolicies] = useState<Policy[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -197,7 +198,7 @@ export default function PoliciesPage() {
                       <bdi>{policy.customer?.legalName ?? t('commonNameNotResolved')}</bdi>
                     </div>
                     <div style={cardMetaStyle}>
-                      {t('policiesLineLabel')}: <bdi>{policy.insuranceLine}</bdi>
+                      {t('policiesLineLabel')}: <bdi>{lineDisplayName(policy, language)}</bdi>
                     </div>
                     <div style={cardMetaStyle}>
                       {t('policyStatusLabel')}: {t(POLICY_STATUS_LABEL_KEY[policy.status])}

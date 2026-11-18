@@ -72,6 +72,12 @@ export class DocumentRepository {
     bytes: Buffer;
     contentType: string;
     sha256: string;
+    /**
+     * 🔴 OWNER DECISION 149 — the digest of what this certificate SHOWS (the rendered HTML),
+     * never of the bytes. See the column's own comment in `schema.prisma`; the two digests
+     * answer different questions and conflating them is the defect message 44 shipped once.
+     */
+    issuedFactsSha256: string;
     issuedUnderStudyLicenseId: string | null;
   }): Promise<Document> {
     /*
@@ -103,21 +109,66 @@ export class DocumentRepository {
      * certificate over twice is one issuance or two is the owner's question, not an engineering
      * one; this shape is correct under either answer, because under both there is exactly one
      * stored file per distinct certificate.
+     *
+     * ## 🔴 OWNER DECISION 149 — AND (policy, file name) WAS NOT ENOUGH EITHER
+     *
+     * «إذا تغيّرت الوثيقة ثم طُلبت شهادتها من جديد حُفظت الشهادة الجديدة بجانب القديمة، وإذا لم
+     *  يتغيّر شيء بقيت نسخة واحدة.»
+     *
+     * The key above is stable across a CHANGE to the policy: an endorsement that moves the sum
+     * insured produces the same policy and the same file name, so the customer was handed a new
+     * certificate and the stored copy stayed the first one — a paper in the world with no record
+     * of it here, which is the state decision 142 exists to end.
+     *
+     * ⟶ THE KEY IS (policy, category, file name, FACTS DIGEST), and the facts digest is taken
+     *   over the rendered HTML. Decision 149 §٤ rules out the PDF digest by name, and it is
+     *   right to: the rendered PDF is not byte-stable, so it identifies the render.
+     *
+     * ⛔ AND A MATCH IS STILL RETURNED UNCHANGED — the first copy is never modified and never
+     *   deleted by the second (criterion 3). Each row keeps the stamp it was given at ITS own
+     *   issuance (criterion 4), because the stamp is written once here and there is no update
+     *   path for it anywhere.
+     *
+     * ⚠️ A ROW WHOSE `issuedFactsSha256` IS NULL CANNOT MATCH, BY CONSTRUCTION. NULL means
+     * «stored before decision 149» and nothing recorded what it showed, so the system cannot
+     * prove nothing changed — and this decision's whole subject is that a certificate handed
+     * over has a stored copy. The first download after this lands stores one row beside such a
+     * certificate; every download after that matches. Measured 2026-11-17: dev holds 0 of those
+     * rows and db-test holds 18, all cumulative e2e residue.
      */
     const already = await this.prisma.client.document.findFirst({
       where: {
         policyId: input.policyId,
         category: 'CERTIFICATE_OF_INSURANCE',
         fileName: input.fileName,
+        content: { is: { issuedFactsSha256: input.issuedFactsSha256 } },
       },
     });
     if (already !== null) return already;
+
+    /*
+     * The copy this one stands beside, if any — the LATEST certificate for this policy and file
+     * name. `Document` already carries a version chain (`versionNumber`, `previousVersionId`),
+     * so decision 149's «بجانب القديمة» is recorded in the schema's own shape rather than as two
+     * unrelated rows a reader has to order by `createdAt` and hope.
+     */
+    const latest = await this.prisma.client.document.findFirst({
+      where: {
+        policyId: input.policyId,
+        category: 'CERTIFICATE_OF_INSURANCE',
+        fileName: input.fileName,
+        nextVersion: null,
+      },
+      orderBy: { versionNumber: 'desc' },
+    });
 
     return this.prisma.client.$transaction(async (tx) => {
       const document = await tx.document.create({
         data: {
           policyId: input.policyId,
           category: 'CERTIFICATE_OF_INSURANCE',
+          versionNumber: (latest?.versionNumber ?? 0) + 1,
+          previousVersionId: latest?.id ?? null,
           /*
            * A certificate names the customer, the insurer, the line and the sums insured. It is
            * handed to a third party on purpose, which is NOT the same as being public: the stored
@@ -151,6 +202,7 @@ export class DocumentRepository {
           byteSize: input.bytes.byteLength,
           contentType: input.contentType,
           sha256: input.sha256,
+          issuedFactsSha256: input.issuedFactsSha256,
         },
       });
       return tx.document.update({

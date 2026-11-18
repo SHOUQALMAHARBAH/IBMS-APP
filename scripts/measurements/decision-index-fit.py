@@ -264,6 +264,50 @@ NOT_AN_INDEX_ROW: dict[int, str] = {}
 #     silent overwrite above, now impossible.
 ANNEXES: dict[str, int] = {
     "decision-144-ratified-strings.md": 144,
+    "decision-146-ratified-strings.md": 146,
+    "decision-150-ratified-strings.md": 150,
+}
+
+# A DECISION PAPER THAT STATES ITS RULINGS ONLY AS A TABLE -- 2026-11-17, THE FIRST OF 79.
+#
+# Decision 150 answers two demo-path walks as eight rulings in a table and never states one
+# sentence that governs. Every other multi-ruling paper she has written -- 141, 144, 146 --
+# opens with `## القرار بجملة`, and the index row repeats it. This one has no such section,
+# so `ONE_SENTENCE` finds nothing and the row for 150 would go UNCHECKED in the one direction
+# that matters: whether the index still says what the document says.
+#
+# ⛔ The file is NOT re-headed to suit the gate. A decision paper is copied verbatim; the gate
+#    reads her text, her text is not rewritten to suit a matcher. That rule has held for four
+#    widenings and it holds here.
+# ⛔ AND THIS IS NOT AN AMNESTY. The row is still pinned -- to the ANCHORS below, each of which
+#    is a ruling cell SLICED out of the table. Every anchor must appear in the file and in the
+#    index row, so a row written from memory still fails, and so does a row left behind by an
+#    edit to the paper. Five spans are pinned where the ordinary path pins one.
+#
+# Checked in THREE directions, because a declaration that cannot go stale is a comment:
+#   * an anchor no longer in the file fails -- the paper moved under the row;
+#   * an anchor not in the index row fails -- the row drifted from the paper;
+#   * and the day the paper GAINS a one-sentence section this declaration is STALE and fails,
+#     so the ordinary pin takes over instead of this one quietly outliving its reason.
+#
+# Comparison strips `**` from both sides: a ruling cell may carry its own inner bold (ruling 1
+# does), so an anchor normalised on one side only reports zero occurrences of a span that is
+# plainly there. That was measured while writing this.
+RULINGS_TABLE_ONLY: dict[int, list[str]] = {
+    150: [
+        # ruling 1 -- the three empty screens become lists, and the links come first
+        "تصير مثل «الوثائق» و«المطالبات»، قائمة بكل ما يحقّ للموظف أن يراه ومعها بحث. "
+        "وإن لم يتّسع الوقت قبل نسخة العرض: تُبنى الوصلات الناقصة أولاً، ثم القوائم",
+        # ruling 2 -- «الإحلال» becomes «التنسيب»
+        "«التنسيب» في النصوص الخمسة",
+        # ruling 3 -- the «العملية N —» prefix is deleted
+        "يُحذَف من الخمسة والعشرين، ولا تتغيّر كلمة بعده",
+        # ruling 5 -- «الخط» becomes «فرع التأمين»
+        "«فرع التأمين» في النصوص التسعة عشر، تطبيقاً للقرار ١٤٦، وجدول المواضع يُعرَض "
+        "على الإدارة قبل أن يذهب للمهندس",
+        # the struck exception: `rfqNewRefusalAct` keeps «سعر» against decision 144 ruling 8-أ
+        "تبقى «إنشاء طلب عرض سعر» استثناءً لهذه الجملة وحدها",
+    ],
 }
 
 SLUG_ONLY = {
@@ -655,6 +699,32 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
         with open(os.path.join(docs, on_disk[n]), "rb") as fh:
             body = fh.read().decode("utf-8")
         m = ONE_SENTENCE.search(body)
+        if n in RULINGS_TABLE_ONLY:
+            # Declared above: a paper whose rulings are a table and nothing else. The row is
+            # pinned to every declared anchor, in both directions, and the declaration itself
+            # goes stale the day the paper gains a one-sentence section.
+            if m:
+                errors.append(
+                    f"decision {n} is declared in RULINGS_TABLE_ONLY but docs/{on_disk[n]} "
+                    f"now HAS a one-sentence section -- the ordinary pin applies, so remove "
+                    f"the declaration rather than keeping a weaker check beside a stronger one"
+                )
+                continue
+            body_norm = body.replace("**", "")
+            row_norm = row_text.replace("**", "")
+            for anchor in RULINGS_TABLE_ONLY[n]:
+                if anchor not in body_norm:
+                    errors.append(
+                        f"decision {n}: declared anchor is no longer in docs/{on_disk[n]} -- "
+                        f"the paper moved under the index row: {anchor[:60]}..."
+                    )
+                elif anchor not in row_norm:
+                    errors.append(
+                        f"index row {n} no longer repeats the declared anchor it is pinned "
+                        f"to -- an index that drifts from its files answers wrongly instead "
+                        f"of not answering: {anchor[:60]}..."
+                    )
+            continue
         if not m:
             errors.append(f"docs/{on_disk[n]} has no '## القرار بجملة' section")
             continue
@@ -890,12 +960,34 @@ def _self_test() -> int:
          lambda t: os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
                                exist_ok=True),
          "PHANTOMS is stale"),
+        # RULINGS_TABLE_ONLY -- decision 150's shape, in all three directions. Without these
+        # the declaration is an amnesty with a comment on it, which is the thing this file's
+        # own history says a declaration must never be.
+        ("a rulings-table paper whose declared anchor is gone from the FILE",
+         lambda t: (RULINGS_TABLE_ONLY.clear(),
+                    RULINGS_TABLE_ONLY.__setitem__(7, ["an anchor nothing contains"]),
+                    _patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة", "## الأحكام")),
+         "the paper moved under the index row"),
+        ("a rulings-table paper whose anchor is in the file but NOT in the index row",
+         lambda t: (RULINGS_TABLE_ONLY.clear(),
+                    RULINGS_TABLE_ONLY.__setitem__(7, ["one sentence."]),
+                    _patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة", "## الأحكام"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "no longer repeats the declared anchor"),
+        ("a rulings-table declaration that has gone stale -- the paper gained a sentence",
+         lambda t: (RULINGS_TABLE_ONLY.clear(),
+                    RULINGS_TABLE_ONLY.__setitem__(7, ["one sentence."])),
+         "now HAS a one-sentence section"),
     ]
     # Two plants below mutate ANNEXES, a MODULE-LEVEL dict. Without this snapshot the first
     # of them leaks its ghost entry into every later case, and the self-test stops being a set
     # of independent cases -- which is the kind of order-dependence a self-test exists to rule
     # out, not to acquire.
     annexes_before = dict(ANNEXES)
+    rulings_before = {k: list(v) for k, v in RULINGS_TABLE_ONLY.items()}
     for label, mutate, needle in plants:
         tmp = tempfile.mkdtemp(prefix="dec-index-")
         try:
@@ -918,7 +1010,11 @@ def _self_test() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
             ANNEXES.clear()
             ANNEXES.update(annexes_before)
+            RULINGS_TABLE_ONLY.clear()
+            RULINGS_TABLE_ONLY.update({k: list(v) for k, v in rulings_before.items()})
     assert ANNEXES == annexes_before, "the self-test left ANNEXES mutated"
+    assert RULINGS_TABLE_ONLY == rulings_before, \
+        "the self-test left RULINGS_TABLE_ONLY mutated"
     print(f"\n  self-test: {passed} passed, {failed} failed\n")
     return 1 if failed else 0
 

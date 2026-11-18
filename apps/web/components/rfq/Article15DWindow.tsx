@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '../../lib/i18n/language-context';
-import { formatNumber } from '../../lib/i18n/format';
+import { formatDate, formatNumber } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import { permissionRefusal } from '../../lib/i18n/permission-refusal';
 import type {
@@ -218,9 +218,7 @@ export function Article15DWindow({
                   }
                 />
                 <span>
-                  {new Date(item.sentAt).toLocaleDateString(
-                    language === 'AR' ? 'ar-JO' : 'en-JO',
-                  )}
+                  {formatDate(item.sentAt, language)}
                   {' · '}
                   {t(CHANNEL_LABEL_KEY[item.channel] ?? 'a15dEvidenceLabel')}
                 </span>

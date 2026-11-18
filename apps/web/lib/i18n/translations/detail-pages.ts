@@ -376,7 +376,7 @@ export const DETAIL_PAGES = {
     prosdLoadError: 'تعذّر تحميل بيانات هذا العميل المرتقب — حاول مرة أخرى.',
     prosnHeading: 'تأهيل عميل مرتقب',
     prosnIntro:
-      'العملية 2 — تحويل عميل محتمل مؤهَّل إلى عميل مرتقب، وتسجيل ملف تأهيله (القطاع، النشاط، الحجم، الموقع، جهة الاتصال، المنتجات محل الاهتمام، القسط المتوقع).',
+      'تحويل عميل محتمل مؤهَّل إلى عميل مرتقب، وتسجيل ملف تأهيله (القطاع، النشاط، الحجم، الموقع، جهة الاتصال، المنتجات محل الاهتمام، القسط المتوقع).',
     prosnConverting: 'جارٍ التحويل…',
     prosnConvertError:
       'تعذّر تحويل هذا العميل المحتمل إلى عميل مرتقب — حاول مرة أخرى.',
@@ -444,12 +444,9 @@ export const DETAIL_PAGES = {
     poldStatus: 'الحالة',
     poldInceptionDate: 'تاريخ البداية',
     poldInceptionNotSet: 'لم يُحدَّد بعد — لم تُصدَر الوثيقة',
-    poldEnUs: 'ar-JO',
     poldCustomer: 'العميل',
     poldCreated: 'تاريخ الإنشاء',
-    poldEnUs2: 'ar-JO',
     poldUpdated: 'آخر تحديث',
-    poldEnUs3: 'ar-JO',
     poldCommercialTerms: 'الشروط التجارية',
     poldInsurer: 'شركة التأمين',
     poldPremium: 'القسط',
@@ -489,26 +486,17 @@ export const DETAIL_PAGES = {
     leaddYes: 'نعم',
     leaddNo: 'لا',
     leaddCreated: 'تاريخ الإنشاء',
-    leaddEnUs: 'ar-JO',
     leaddUpdated: 'آخر تحديث',
-    leaddEnUs2: 'ar-JO',
     leaddBack: 'العودة',
     crmIntro:
-      'العملية 10 — تسجيل كل نقطة تواصل مع العميل (اجتماع، مكالمة، بريد ' +
-      'إلكتروني، واتساب، زيارة، عرض، تجديد، مطالبة، شكوى) ورؤية الجدول الزمني ' +
-      'الشامل: التفاعلات حالياً، إضافة إلى الوثائق والمطالبات والشكاوى عند ' +
-      'توفر تلك الوحدات.',
+      'تسجيل كل نقطة تواصل مع العميل (اجتماع، مكالمة، بريد إلكتروني، واتساب، زيارة، عرض، تجديد، مطالبة، شكوى) ورؤية الجدول الزمني الشامل: التفاعلات حالياً، إضافة إلى الوثائق والمطالبات والشكاوى عند توفر تلك الوحدات.',
     crmTimelineEmpty:
       'لا يوجد شيء في الجدول الزمني لهذا العميل بعد. سجّل أول تفاعل أعلاه — ' +
       'وستظهر هنا أيضاً الوثائق والمطالبات والشكاوى عند توفر تلك الوحدات.',
     xsIntro:
-      'العملية 8 — مهمة ليلية تقارن خطوط الوثائق السارية لكل عميل بقائمة خطوط ' +
-      'مرجعية وتحدد الفجوات. حوّل الفرصة للمضي بها إلى طلب عروض أسعار، أو ' +
-      'ارفضها مع ذكر السبب.',
+      'فحص ليلي يقارن فروع التأمين في الوثائق السارية لكل عميل بقائمة فروع تأمين مرجعية ويحدد الفجوات. حوّل الفرصة للمضي بها إلى طلب عروض أسعار، أو ارفضها مع ذكر السبب.',
     upsIntro:
-      'العملية 9 — مهمة ليلية تقارن مبلغ التأمين المصمم للممتلكات لكل عميل ' +
-      'بالقيمة الحالية لأصوله الممسوحة وتقترح زيادة عند وجود فجوة جوهرية. ' +
-      'حوّل التوصية للمضي بالزيادة، أو ارفضها مع ذكر السبب.',
+      'فحص ليلي يقارن مبلغ التأمين المصمم للممتلكات لكل عميل بالقيمة الحالية لأصوله الممسوحة ويقترح زيادة عند وجود فجوة جوهرية. حوّل التوصية للمضي بالزيادة، أو ارفضها مع ذكر السبب.',
     upsEmptyForCustomer:
       'لا توجد توصيات بيع إضافي لهذا العميل. يرفع الفحص الليلي توصية عندما ' +
       'تتجاوز قيمة أصول العميل الممسوحة مبلغ التأمين المصمم للممتلكات بفارق ' +
@@ -970,12 +958,9 @@ export const DETAIL_PAGES = {
     poldStatus: 'Status',
     poldInceptionDate: 'Inception Date',
     poldInceptionNotSet: 'Not set yet — the policy has not been issued',
-    poldEnUs: 'en-US',
     poldCustomer: 'Customer',
     poldCreated: 'Created',
-    poldEnUs2: 'en-US',
     poldUpdated: 'Updated',
-    poldEnUs3: 'en-US',
     poldCommercialTerms: 'Commercial Terms',
     poldInsurer: 'Insurer',
     poldPremium: 'Premium',
@@ -998,9 +983,7 @@ export const DETAIL_PAGES = {
     leaddYes: 'Yes',
     leaddNo: 'No',
     leaddCreated: 'Created',
-    leaddEnUs: 'en-US',
     leaddUpdated: 'Updated',
-    leaddEnUs2: 'en-US',
     leaddBack: 'Back',
     crmIntro:
       'Process 10 — log every customer touchpoint (meeting, call, email, ' +

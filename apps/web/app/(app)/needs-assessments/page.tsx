@@ -101,6 +101,14 @@ export default function NeedsAssessmentsPage() {
                   {t('commonStatusLabel')}{' '}
                   {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
                 </strong>
+                {/* §W4 — see the claims list: the same label, for the same reason. */}
+                <div style={cardMetaStyle}>
+                  {t('policiesCustomerLabel')}:{' '}
+                  <bdi>
+                    {assessment.customer?.legalName ??
+                      t('commonNameNotResolved')}
+                  </bdi>
+                </div>
                 <div style={cardMetaStyle}>
                   {tPlural(
                     'naCoverageLinesRecommended',

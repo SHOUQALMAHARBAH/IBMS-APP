@@ -210,15 +210,38 @@ export class CertificateOfInsuranceDocumentService {
       language,
     );
 
+    /*
+     * 🔴 OWNER DECISION 149 — WHAT THE CERTIFICATE SHOWS, AS ONE DIGEST.
+     *
+     * Taken over the HTML and NOT over the rendered PDF, which §٤ of the decision rules out by
+     * name: «ولا يُعتمَد على بصمة الملف (ملف الـPDF لا يخرج متطابقاً في كل مرة)». That is a
+     * measured fact here, not a worry — Chromium stamps a creation date into the output, so two
+     * renders of one certificate differ and a digest of the bytes identifies the RENDER.
+     *
+     * The HTML is deterministic and is a pure function of every fact above: the customer's legal
+     * name, the insurer's name, the policy number, the insurance line, the inception and expiry
+     * dates, the currency, every sum insured, the template body, and the language.
+     *
+     * ⛔ NOT a hand-written list of those fields. A list has to be revisited the day the template
+     * renders one more fact, and the day it is not, a CHANGED certificate is recognised as the
+     * old one and never stored — this decision's own failure, reintroduced silently. The
+     * template's output cannot fall behind the template.
+     */
+    const issuedFactsSha256 = createHash('sha256').update(html).digest('hex');
+
     const buffer = await this.pdfRenderer.renderHtmlToPdf(html);
     /*
      * 🔴 THE LANGUAGE IS IN THE FILE NAME, and it is load-bearing rather than cosmetic.
      *
-     * It is what makes the stored row identifiable: `storeIssuedCertificate` keys on (policy, file
-     * name), because the rendered PDF is NOT byte-stable — Chromium stamps a creation date, so a
-     * digest identifies the render and not the document. Without the language in the name, the
-     * Arabic and English certificates of one policy would collide into a single row and the second
-     * language would silently return the first.
+     * It is part of what makes the stored row identifiable: `storeIssuedCertificate` keys on
+     * (policy, file name, facts digest) — never on the PDF's digest, which is NOT byte-stable,
+     * because Chromium stamps a creation date and a digest of the bytes identifies the render.
+     * Without the language in the name, the Arabic and English certificates of one policy would
+     * collide and the second language would silently return the first.
+     *
+     * ⚠️ CORRECTED 2026-11-17 (decision 149): this read «keys on (policy, file name)», which was
+     * true for one day. The facts digest is the third part of the key and it is what makes a
+     * certificate issued after an endorsement a SECOND stored copy rather than a silent match.
      *
      * It is also simply truer: both downloads used to arrive called the same thing.
      */
@@ -250,6 +273,7 @@ export class CertificateOfInsuranceDocumentService {
        * different things.
        */
       sha256: createHash('sha256').update(buffer).digest('hex'),
+      issuedFactsSha256,
       issuedUnderStudyLicenseId: stamp.issuedUnderStudyLicenseId,
     });
 

@@ -7294,9 +7294,28 @@ model DocumentContent {
   /// 64 lowercase hex characters. Criterion 1's «يُقرأ كما صدر» is checkable rather than
   /// asserted: hash what comes back and compare.
   sha256         String
-  createdAt      DateTime     @default(now())
+
+  /// 🔴 OWNER DECISION 149 — WHAT THIS CERTIFICATE SHOWED, so a later one can be told apart.
+  ///
+  /// ⛔ THIS IS NOT `sha256` ABOVE AND THE TWO MUST NEVER BE CONFLATED — message 44 made exactly
+  /// that mistake and the e2e caught it. `sha256` is the digest of the stored BYTES: it answers
+  /// «are these the bytes I stored», and it is useless for «is this the same document», because
+  /// the rendered PDF is not byte-stable (Chromium stamps a creation date, so two renders of one
+  /// certificate differ). This column is the digest of the rendered **HTML**, which is a pure
+  /// function of everything the certificate displays — customer, insurer, policy number, line,
+  /// dates, currency, sums insured, template body, language.
+  ///
+  /// Hashing the template's own OUTPUT rather than a hand-written field list is deliberate: a
+  /// list falls behind the template the first time it renders one more fact, and the failure is
+  /// silent — a changed certificate recognised as the old one and never stored.
+  ///
+  /// NULL means «stored before decision 149». Those rows cannot be back-filled, because
+  /// recomputing their HTML needs the policy as it stood at their issuance.
+  issuedFactsSha256 String?
+  createdAt         DateTime @default(now())
 
   @@index([organizationId])
+  @@index([issuedFactsSha256])
 }
 
 // ============================================================================

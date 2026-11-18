@@ -35,6 +35,7 @@ import {
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { AssembleInsuranceProgramDto } from './dto/assemble-insurance-program.dto';
 import { assertWithinRoleScope } from '../../common/role-scope';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 
 /** The derivation inputs echoed back on `GET /insurance-programs/:id` so the
  * Placement Officer can see *why* each line's Sum Insured basis is what it
@@ -55,7 +56,26 @@ export interface InsuranceProgramContext {
   surveyComplete: boolean;
 }
 
-export interface InsuranceProgramView extends InsuranceProgramWithLines {
+/**
+ * ⚠️ `lines` IS NARROWED RATHER THAN INHERITED, and that is the point of overriding it.
+ *
+ * The repository now joins each line to the managed catalogue and to the office's own line, so
+ * `InsuranceProgramWithLines` carries two relation objects per line. Spreading the row would put
+ * those on the wire — the raw-join-as-payload shape that left the RFQ's insurer column blank for
+ * months, because a web type then describes something the API does not promise.
+ *
+ * ⟶ So each line is mapped to ONE resolved field, `insuranceLineAr`, and the joins stay here.
+ */
+export type InsuranceProgramViewLine = Omit<
+  InsuranceProgramWithLines['lines'][number],
+  'insuranceLine_managed' | 'officeInsuranceLine'
+> & { insuranceLineAr: string | null };
+
+export interface InsuranceProgramView extends Omit<
+  InsuranceProgramWithLines,
+  'lines'
+> {
+  lines: InsuranceProgramViewLine[];
   context: InsuranceProgramContext;
 }
 
@@ -255,7 +275,19 @@ export class InsuranceProgramService {
   private async toView(
     program: InsuranceProgramWithLines,
   ): Promise<InsuranceProgramView> {
-    return { ...program, context: await this.buildContext(program) };
+    const context = await this.buildContext(program);
+    return {
+      ...program,
+      lines: program.lines.map((line) => {
+        const { insuranceLine_managed, officeInsuranceLine, ...rest } = line;
+        // See `rfqForWire` — eslint has no `varsIgnorePattern` here, so the two joins are
+        // named and discarded rather than prefixed.
+        void insuranceLine_managed;
+        void officeInsuranceLine;
+        return { ...rest, insuranceLineAr: insuranceLineNameAr(line) };
+      }),
+      context,
+    };
   }
 
   /** Re-reads a program after a lines rewrite / transition. */

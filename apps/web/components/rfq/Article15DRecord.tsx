@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useLanguage } from '../../lib/i18n/language-context';
-import { formatNumber } from '../../lib/i18n/format';
+import { formatDate, formatNumber } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import {
   attachArticle15DEvidence,
@@ -270,9 +270,7 @@ export function Article15DRecord({
                     onChange={() => setChosen(item.id)}
                   />
                   <span>
-                    {new Date(item.sentAt).toLocaleDateString(
-                      language === 'AR' ? 'ar-JO' : 'en-JO',
-                    )}
+                    {formatDate(item.sentAt, language)}
                     {' · '}
                     {t(
                       CHANNEL_LABEL_KEY[item.channel] ??

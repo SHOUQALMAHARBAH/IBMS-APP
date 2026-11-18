@@ -44,6 +44,7 @@ import type { Language, TranslationKey } from '../../../../lib/i18n/translations
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 import { Article15DRecord } from '../../../../components/rfq/Article15DRecord';
+import { insurerDisplayName } from '../../../../lib/i18n/names';
 
 
 // The medium of a broker<->insurer exchange. The API accepts the full
@@ -349,7 +350,7 @@ export default function RfqDetailPage() {
                 {rfq.insurerSubmissions.map((submission) => (
                   <Tr key={submission.id}>
                     <Td>
-                      <bdi>{submission.insurer.name}</bdi>
+                      <bdi>{insurerDisplayName(submission.insurer, language)}</bdi>
                     </Td>
                     <Td>
                       <span style={rfqBadgeStyle}>{t(RFQ_INSURER_STATUS_LABEL_KEY[submission.status])}</span>
@@ -376,7 +377,7 @@ export default function RfqDetailPage() {
                     {isPlacement ? (
                       <Td>
                         <select
-                          aria-label={t('rfqSetStatusAria', { name: submission.insurer.name })}
+                          aria-label={t('rfqSetStatusAria', { name: insurerDisplayName(submission.insurer, language) })}
                           disabled={busyRow === submission.id}
                           value=""
                           onChange={(e) => {
@@ -440,7 +441,7 @@ export default function RfqDetailPage() {
                               }
                             />
                             <span>
-                              <bdi>{insurer.name}</bdi>
+                              <bdi>{insurerDisplayName(insurer, language)}</bdi>
                             </span>
                           </label>
                         ))}
@@ -532,7 +533,7 @@ export default function RfqDetailPage() {
                         : c.channel}
                     </Td>
                     <Td>
-                      <bdi>{c.rfqInsurer?.insurer.name ?? t('rfqPanelWide')}</bdi>
+                      <bdi>{c.rfqInsurer ? insurerDisplayName(c.rfqInsurer.insurer, language) : t('rfqPanelWide')}</bdi>
                     </Td>
                     <Td>
                       {c.subject ? <strong>{c.subject}</strong> : null}
@@ -592,7 +593,7 @@ export default function RfqDetailPage() {
                   <option value="">{t('rfqCommInsurerWholePanel')}</option>
                   {rfq.insurerSubmissions.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.insurer.name}
+                      {insurerDisplayName(s.insurer, language)}
                     </option>
                   ))}
                 </select>

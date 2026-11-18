@@ -13,8 +13,7 @@ export const RFQ = {
     // opportunities/page.tsx
     oppListHeading: 'طلب عروض الأسعار / السوق',
     oppListIntro:
-      'العملية 11 — يُطرح برنامج تأمين معتمد نهائياً في السوق كفرصة تجارية. افتح فرصة ' +
-      'لإصدار طلب عرض أسعار لكل خط تأميني وإرساله إلى قائمة مختصرة من شركات التأمين.',
+      'يُطرح برنامج تأمين معتمد نهائياً في السوق كفرصة تجارية. افتح فرصة لإصدار طلب عرض أسعار لكل فرع تأمين وإرساله إلى قائمة مختصرة من شركات التأمين.',
     oppListRefusalAct: 'عرض الفرص',
     oppCustomerNotFound:
       'تعذر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
@@ -37,11 +36,10 @@ export const RFQ = {
     oppDetailHeading: 'فرصة تجارية {id}',
     oppDetailStatusLine: 'الحالة: {status}',
     oppDetailFromProgramPrefix: 'من برنامج التأمين',
-    oppCreateRfqButton: 'إنشاء طلب عرض أسعار لخط تأميني',
+    oppCreateRfqButton: 'إنشاء طلب عرض أسعار لفرع تأمين',
     oppRfqsHeading: 'طلبات عروض الأسعار',
     oppRfqsNone:
-      'لا توجد طلبات عروض أسعار بعد. أنشئ طلباً لكل خط تأميني وأرسله إلى قائمة مختصرة ' +
-      'من شركات التأمين.',
+      'لا توجد طلبات عروض أسعار بعد. أنشئ طلباً لكل فرع تأمين وأرسله إلى قائمة مختصرة من شركات التأمين.',
     rfqInsurerCountOne: '{count} مؤمِّن',
     rfqInsurerCountOther: '{count} مؤمِّن',
     oppRfqIssuedMeta: 'صدر بتاريخ {date} · {breakdown}',
@@ -62,8 +60,19 @@ export const RFQ = {
     // rfqs/new/page.tsx
     rfqNewHeading: 'طلب عرض أسعار جديد',
     rfqNewIntro:
-      'العملية 11 — إنشاء طلب عرض أسعار واحد لخط تأميني واحد وإرساله إلى قائمة مختصرة ' +
-      'من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
+      'إنشاء طلب عرض أسعار واحد لفرع تأمين واحد وإرساله إلى قائمة مختصرة من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
+    /*
+     * ⛔ OWNER DECISION 150 — «سعر» STAYS HERE, AND IT IS A STRUCK EXCEPTION, NOT AN OVERSIGHT.
+     *
+     * Decision 144 ruling 8-أ settles «طلب عرض أسعار» everywhere else, and the heading two lines
+     * above this one already says «طلب عرض أسعار جديد» — so this sentence disagrees with the
+     * screen it is printed on. The owner was shown exactly that, in those words, and ruled:
+     * «بتضل «سعر» كاستثناء لهالجملة لحالها» — it stays, as an exception for this one string.
+     *
+     * ⛔ So do NOT "align" it, now or when decision 144 is built. Decision 150's own addendum
+     * records the conflict and strikes it knowing: «شطبته الإدارة وهي تعرف التعارض». Changing it
+     * would be overruling a decision taken with the contradiction on the table.
+     */
     rfqNewRefusalAct: 'إنشاء طلب عرض سعر',
     // ART. 15/d's declaration, as an ACT in the language of the work -- which is what the
     // standing refusal vocabulary requires: «the act is described in the language of the work,
@@ -72,10 +81,7 @@ export const RFQ = {
     a15dDeclareRefusalAct:
       'الإعلان بأن طلب عرض السعر ذاهب إلى أقل من ثلاث شركات تأمين بلا إعفاء',
     rfqNewInsurerListLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
-    rfqNewLineLabel: 'الخط التأميني',
-    rfqNewLineHint:
-      'طلب عرض أسعار واحد لكل خط (مثال: "التأمين الشامل على الممتلكات"، "تعطل ' +
-      'الأعمال"). يُرفض الخط إذا كان له طلب عرض أسعار سابق على هذه الفرصة.',
+    rfqNewLineLabel: 'فرع التأمين',
     rfqNewShortlistLegend: 'القائمة المختصرة لشركات التأمين',
     rfqNewShortlistHint: 'اختر شركة تأمين واحدة على الأقل.',
     rfqNewNoInsurersOnFile: 'لا يوجد شركات تأمين مسجلة.',
@@ -140,7 +146,6 @@ export const RFQ = {
     rfqLogExchangeError: 'تعذر تسجيل المراسلة — حاول مرة أخرى.',
     rfqDirectionLabel: 'الاتجاه',
     rfqChannelLabel: 'القناة',
-    rfqLinePlaceholder: 'التأمين على الممتلكات ضد جميع الأخطار',
     rfqNegotiationNotesPlaceholder: 'مثال: طُلب خصم ٥٪ وشطب استثناء الفيضان',
     rfqCommInsurerLabel: 'المؤمِّن (اختياري)',
     rfqCommInsurerWholePanel: 'كل القائمة',
@@ -159,7 +164,7 @@ export const RFQ = {
     oppStatusRecommendationDrafted: 'التوصية مسوَّدة',
     oppStatusSentToClient: 'أُرسلت إلى العميل',
     oppStatusClientDecision: 'قرار العميل',
-    oppStatusPlacement: 'الإحلال',
+    oppStatusPlacement: 'التنسيب',
     oppStatusRenegotiate: 'إعادة تفاوض',
     oppStatusClosedLost: 'مغلقة (خسارة)',
 
@@ -260,7 +265,7 @@ export const RFQ = {
     rfqCommChannelOther: 'أخرى',
 
     // Enum labels — ClientDecisionRoute
-    cdRoutePlacement: 'إحلال',
+    cdRoutePlacement: 'تنسيب',
     cdRouteClosedLost: 'إغلاق (خسارة)',
     cdRouteRenegotiate: 'إعادة تفاوض',
 
@@ -309,7 +314,7 @@ export const RFQ = {
     quoteLiabilityLimitLabel: 'حد المسؤولية',
     quoteBiPeriodLabel: 'فترة تعطل الأعمال (أشهر)',
     quoteCommissionRateLabel: 'نسبة العمولة %',
-    quoteCommissionRateHint: 'إن تُرِك فارغاً فلن يُحسَب ارتجاعُ العمولة، ولا يُعدَّل العرضُ بعد الإحلال.',
+    quoteCommissionRateHint: 'إن تُرِك فارغاً فلن يُحسَب ارتجاعُ العمولة، ولا يُعدَّل العرضُ بعد التنسيب.',
     quoteExclusionsLabel: 'الاستثناءات',
     quoteConditionsLabel: 'الشروط',
     quoteNegotiationNotesLabel: 'ملاحظات التفاوض (ما طُلب / ما تم التنازل عنه في هذه الجولة)',
@@ -405,7 +410,7 @@ export const RFQ = {
     // ClientDecisionSection.tsx
     cdSectionHeading: 'قرار العميل',
     cdSectionIntro:
-      'قرار واحد لكل فرصة تجارية. قبول ← الإحلال، رفض ← إغلاق الطلب، أي "طلب" ← إعادة تفاوض.',
+      'قرار واحد لكل فرصة تجارية. قبول ← التنسيب، رفض ← إغلاق الطلب، أي "طلب" ← إعادة تفاوض.',
     cdLoadError: 'تعذر تحميل قرار العميل — حاول مرة أخرى.',
     cdEvidenceRefRequiredError: 'مرجع الإثبات مطلوب.',
     cdRecordError: 'تعذر تسجيل القرار — حاول مرة أخرى.',
@@ -495,9 +500,6 @@ export const RFQ = {
       'declare that this quote request is going to fewer than three insurance companies with no exemption',
     rfqNewInsurerListLoadError: 'Could not load the insurer list — try again.',
     rfqNewLineLabel: 'Insurance line',
-    rfqNewLineHint:
-      'One RFQ per line (e.g. "Property All Risks", "Business Interruption"). ' +
-      'A line already covered by an RFQ on this opportunity is rejected.',
     rfqNewShortlistLegend: 'Insurer shortlist',
     rfqNewShortlistHint: 'Select at least one insurer.',
     rfqNewNoInsurersOnFile: 'No insurers on file.',
@@ -553,7 +555,6 @@ export const RFQ = {
     rfqLogExchangeError: 'Could not log the exchange — try again.',
     rfqDirectionLabel: 'Direction',
     rfqChannelLabel: 'Channel',
-    rfqLinePlaceholder: 'Property All Risks',
     rfqNegotiationNotesPlaceholder: 'e.g. asked for 5% off and the flood exclusion struck',
     rfqCommInsurerLabel: 'Insurer (optional)',
     rfqCommInsurerWholePanel: 'Whole panel',

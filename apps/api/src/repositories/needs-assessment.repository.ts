@@ -33,6 +33,32 @@ export interface NeedsAssessmentFilter {
 const NEEDS_ASSESSMENT_INCLUDE = {
   reviewerCombinedDutyAct: true,
   approverCombinedDutyAct: true,
+  /*
+   * §W4 — WHICH CUSTOMER THIS ASSESSMENT IS FOR.
+   *
+   * The owner's demo-path walk found `/needs-assessments` rendering a list of cards with
+   * nothing to tell them apart. The policy list solved the identical problem and its comment is
+   * the precedent — IDENTITY ONLY, two columns rather than the `Customer` row, because a list
+   * read must not become a route into a customer's wider file.
+   *
+   * ⚠️ THROUGH THE RISK PROFILE, because `NeedsAssessment` HAS NO CUSTOMER COLUMN — it reaches
+   * one only via `RiskProfile.customerId`. A first attempt wrote `customer:` directly here and
+   * **tsc accepted it**: the include is `as const` and `GetPayload` degraded silently rather
+   * than refusing an unknown field, so the error surfaced only at runtime as a
+   * `PrismaClientValidationError` across five e2e tests.
+   *
+   * 🔴 AND IT UNCOVERED A SECOND DEFECT OF THE SAME CLASS AS §W3's. The web's
+   * `NeedsAssessment` type declares `customerId: string`, and only the DETAIL route ever sent
+   * one — `get()` resolves it off the risk profile by hand, and `list()` did not. So every list
+   * item carried `customerId: undefined` behind a type that promised a string. Including it
+   * here answers both: the list now sends what its own type has always claimed.
+   */
+  riskProfile: {
+    select: {
+      customerId: true,
+      customer: { select: { id: true, legalName: true } },
+    },
+  },
 } as const;
 
 export type NeedsAssessmentWithActs = Prisma.NeedsAssessmentGetPayload<{
@@ -61,8 +87,23 @@ export interface NeedsAssessmentActorNames {
   approvedByName: string | null;
 }
 
-export type NeedsAssessmentWithNames = NeedsAssessmentWithActs &
-  NeedsAssessmentActorNames;
+/**
+ * The assessment AS IT LEAVES THE SERVICE — the risk-profile join replaced by two flat fields.
+ *
+ * §W4: `NeedsAssessment` reaches a customer only through `RiskProfile`, so the repository joins
+ * it. Leaving that join on the wire would be the raw-join-as-payload shape that left the RFQ's
+ * insurer column blank, so `withNames` strips it and this type says so.
+ */
+export type NeedsAssessmentWithNames = Omit<
+  NeedsAssessmentWithActs,
+  'riskProfile'
+> &
+  NeedsAssessmentActorNames & {
+    /** Resolved off the parent risk profile. Null only if the join was not selected. */
+    customerId: string | null;
+    /** Identity only — never the `Customer` row. The policy list's precedent. */
+    customer: { id: string; legalName: string } | null;
+  };
 
 @Injectable()
 export class NeedsAssessmentRepository {

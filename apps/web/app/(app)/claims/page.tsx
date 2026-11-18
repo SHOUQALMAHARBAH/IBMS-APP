@@ -280,6 +280,17 @@ export default function ClaimsQueuePage() {
                     <strong>
                       <bdi>{label}</bdi>
                     </strong>
+                    {/*
+                      §W4 — WHOSE CLAIM THIS IS. The walk found this list rendering cards with
+                      nothing to tell them apart. Label and fallback are the POLICY list's, which
+                      solved the identical problem: one answer to «which client is this», not two.
+                    */}
+                    <div style={cardMetaStyle}>
+                      {t('policiesCustomerLabel')}:{' '}
+                      <bdi>
+                        {claim.customerLegalName ?? t('commonNameNotResolved')}
+                      </bdi>
+                    </div>
                     <div style={cardMetaStyle}>
                       {t('claimsQueuePolicyLabel')}:{' '}
                       <bdi>{claim.policyNumber ?? '—'}</bdi>

@@ -116,6 +116,8 @@ export interface Policy {
   insurer: { id: string; name: string; nameAr: string | null } | null;
   policyNumber: string | null;
   insuranceLine: string;
+  /** §P4 — the line's Arabic name, sent by the server. null when none is known. */
+  insuranceLineAr: string | null;
   status: PolicyStatus;
   inceptionDate: string | null;
   expiryDate: string | null;

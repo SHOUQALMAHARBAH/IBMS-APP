@@ -15,7 +15,7 @@ import type {
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { formatMoney } from '../../../../lib/i18n/format';
+import { formatDate, formatMoney } from '../../../../lib/i18n/format';
 import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import {
@@ -29,6 +29,7 @@ import {
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { insurerDisplayName } from '../../../../lib/i18n/names';
 
 /**
  * DERIVED from the API client's own `Policy`, not re-declared beside it.
@@ -217,9 +218,7 @@ export default function PolicyDetailPage() {
               */}
               <bdi>
                 {policy.inceptionDate
-                  ? new Date(policy.inceptionDate).toLocaleDateString(
-                      t('poldEnUs'),
-                    )
+                  ? formatDate(policy.inceptionDate, language)
                   : t('poldInceptionNotSet')}
               </bdi>
             </div>
@@ -238,7 +237,7 @@ export default function PolicyDetailPage() {
             <div style={profileFieldLabelStyle}>{t('poldCreated')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>
-                {new Date(policy.createdAt).toLocaleDateString(t('poldEnUs2'))}
+                {formatDate(policy.createdAt, language)}
               </bdi>
             </div>
           </div>
@@ -247,7 +246,7 @@ export default function PolicyDetailPage() {
             <div style={profileFieldLabelStyle}>{t('poldUpdated')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>
-                {new Date(policy.updatedAt).toLocaleDateString(t('poldEnUs3'))}
+                {formatDate(policy.updatedAt, language)}
               </bdi>
             </div>
           </div>
@@ -316,7 +315,7 @@ export default function PolicyDetailPage() {
                 <div style={profileFieldLabelStyle}>{t('poldInsurer')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>
-                    {policy.recommendation.recommendedQuotation.insurer.name}
+                    {insurerDisplayName(policy.recommendation.recommendedQuotation.insurer, language)}
                   </bdi>
                 </div>
               </div>

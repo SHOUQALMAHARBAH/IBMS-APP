@@ -1172,6 +1172,202 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       .expect(200);
   }, 45000);
 
+  it('🔴 OWNER DECISION 149 §٥ — a certificate issued after the policy changed is stored too, beside the first', async () => {
+    /* ─────────────────────────────────────────────────────────────────────────────────────
+     * «كل شهادة تأمين سُلِّمت للعميل لها نسخة محفوظة: إذا تغيّرت الوثيقة ثم طُلبت شهادتها من
+     *  جديد حُفظت الشهادة الجديدة بجانب القديمة، وإذا لم يتغيّر شيء بقيت نسخة واحدة.»
+     *
+     * Completes decision 142, which stored ONE copy per (policy, file name). All four criteria
+     * are below, each named by its number.
+     *
+     * The fixture is this file's own proven one. ⛔ A fresh fixture was NOT invented for this:
+     * message 44 lost time to an invented one that rendered a broken screen and looked like a
+     * product defect, and `issuedPolicy` here is the shape the certificate route is already
+     * known to accept.
+     * ───────────────────────────────────────────────────────────────────────────────────── */
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'pol-cert-149-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    const owningSales = await makeUser(
+      app,
+      'pol-cert-149-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const policyId = await issuedPolicy(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'cert-149',
+      'AR',
+    );
+
+    const certificatesNow = () =>
+      prisma.document.findMany({
+        where: { policyId, category: 'CERTIFICATE_OF_INSURANCE' },
+        include: { content: true },
+        orderBy: { versionNumber: 'asc' },
+      });
+
+    /* ── CRITERION 1 — «تنزيلان بلا تغيّر في الوثيقة ⟵ سجلّ واحد» ───────────────────────── */
+    await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+
+    const afterTwoDownloads = await certificatesNow();
+    expect(
+      afterTwoDownloads,
+      'two downloads with NOTHING changed stored more than one certificate — decision 149 §٥ criterion 1. ' +
+        'If this is two rows, the key is keyed on something that moves between renders: the PDF digest is ' +
+        'not byte-stable, which §٤ rules out by name.',
+    ).toHaveLength(1);
+    const first = afterTwoDownloads[0];
+    expect(first.versionNumber).toBe(1);
+    expect(first.previousVersionId).toBeNull();
+    expect(
+      first.content?.issuedFactsSha256,
+      'the stored certificate carries no facts digest, so no later certificate can be told apart from it',
+    ).toMatch(/^[0-9a-f]{64}$/);
+
+    /* ── CRITERION 2 — «تنزيل، ثم ملحق يغيّر ما تعرضه الشهادة، ثم تنزيل ⟵ سجلّان» ────────
+     *
+     * What the certificate SHOWS has to move. The sum insured is her own example (§٣).
+     *
+     * ⚠️ Written straight to the schedule rather than driven through the endorsement flow, and
+     * the reason is scope rather than convenience: `POST /policies/:id/endorsements` is a
+     * four-step maker/checker pipeline belonging to a different module, and routing through it
+     * would make this test fail for reasons that have nothing to do with decision 149. What
+     * this decision turns on is that a DISPLAYED FACT moved — not how it moved. The same
+     * established pattern this file already uses for CANCELLED/EXPIRED above.
+     */
+    const schedule = await prisma.policySchedule.findFirst({
+      where: { policyId },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+    expect(
+      schedule,
+      'the issued policy has no schedule to change',
+    ).not.toBeNull();
+    await prisma.policySchedule.update({
+      where: { id: schedule!.id },
+      data: { sumsInsured: { total: '9900000.000' } },
+    });
+
+    const afterChange = await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+
+    const bothCopies = await certificatesNow();
+    expect(
+      bothCopies,
+      'the policy changed in what the certificate shows and the new certificate was NOT stored — ' +
+        'decision 149 §٥ criterion 2. The customer holds a paper this system has no record of.',
+    ).toHaveLength(2);
+    const second = bothCopies[1];
+
+    // «وكلٌّ يُقرأ كما صدر» — each copy reads back as the document it is, not as the other one.
+    expect(second.content!.issuedFactsSha256).not.toBe(
+      first.content!.issuedFactsSha256,
+    );
+    expect(
+      createHash('sha256')
+        .update(Buffer.from(second.content!.bytes))
+        .digest('hex'),
+      'the second copy’s stored digest is not a digest of its own stored bytes',
+    ).toBe(second.content!.sha256);
+    expect(
+      createHash('sha256')
+        .update(afterChange.body as Buffer)
+        .digest('hex'),
+      'the bytes handed to the customer are not the bytes stored for them',
+    ).toBe(second.content!.sha256);
+
+    // «بجانب القديمة» is recorded in the schema's own version chain, not left to `createdAt`.
+    expect(second.versionNumber).toBe(2);
+    expect(second.previousVersionId).toBe(first.id);
+
+    /* ── CRITERION 3 — «النسخة الأولى لا تُعدَّل ولا تُحذَف بصدور الثانية» ────────────────── */
+    const firstReread = bothCopies[0];
+    expect(
+      firstReread.id,
+      'the first copy is gone — decision 149 §٥ criterion 3',
+    ).toBe(first.id);
+    expect(firstReread.fileName).toBe(first.fileName);
+    expect(firstReread.content!.sha256).toBe(first.content!.sha256);
+    expect(
+      firstReread.content!.issuedFactsSha256,
+      'the first copy’s facts digest was rewritten by the second issuance — criterion 3',
+    ).toBe(first.content!.issuedFactsSha256);
+    expect(firstReread.deletionLocked).toBe(true);
+    expect(
+      Buffer.from(firstReread.content!.bytes).equals(
+        Buffer.from(first.content!.bytes),
+      ),
+      'the first copy’s BYTES changed when the second was issued — criterion 3',
+    ).toBe(true);
+
+    /* ── CRITERION 4 — «كل نسخة تحمل ختمها بحسب وقت صدورها» ─────────────────────────────
+     *
+     * The stamp is decided at each issuance by `assertMayPractise` and written once; there is no
+     * update path for it anywhere. Asserted here as a PROPERTY of the two rows rather than by
+     * moving the licence mid-test: the licence is a db-test-wide singleton, and the file's last
+     * test is the one that owns moving it (see its header). What is checkable without touching
+     * it is that each row carries its OWN value rather than inheriting the first's.
+     */
+    const stampedAtIssuance = await prisma.document.findMany({
+      where: { policyId, category: 'CERTIFICATE_OF_INSURANCE' },
+      select: {
+        id: true,
+        issuedUnderStudyLicenseId: true,
+        versionNumber: true,
+      },
+      orderBy: { versionNumber: 'asc' },
+    });
+    expect(stampedAtIssuance).toHaveLength(2);
+    for (const row of stampedAtIssuance) {
+      // Each row's stamp is whatever the licence said at ITS issuance — today, not under study.
+      expect(
+        row.issuedUnderStudyLicenseId,
+        `certificate v${row.versionNumber} carries a renewal stamp its issuance did not earn — criterion 4`,
+      ).toBeNull();
+    }
+
+    /* ── AND BACK TO ONE: a further download with nothing changed adds nothing ───────────
+     * Criterion 1 again, now that two copies exist — the case that distinguishes «store when it
+     * changed» from «store every time», which is the defect this whole shape exists to avoid.
+     */
+    await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect(
+      await certificatesNow(),
+      'a third download with nothing changed stored a third copy — criterion 1 fails once two exist',
+    ).toHaveLength(2);
+
+    /* ── THE SHAPE CHECK BITES, which the migration deliberately does not probe ───────────
+     * `DocumentContent` has FOREIGN KEYS, so a parentless probe row inside the migration would
+     * be refused by the FK and a handler counting any refusal as a pass would report the CHECK
+     * proven on a run where it was never reached. Here the row is REAL, so the UPDATE below can
+     * only fail on `DocumentContent_issuedFactsSha256_shape`.
+     */
+    await expect(
+      prisma.documentContent.update({
+        where: { documentId: first.id },
+        data: { issuedFactsSha256: 'NOT-A-DIGEST' },
+      }),
+      'a malformed facts digest was accepted — the shape CHECK does not bite',
+    ).rejects.toThrow();
+  }, 60000);
+
   // Process 51 (backlog Part C #51's first checkbox) — "automatically block
   // new business issuance once the license lapses." `BrokerLicense` is a
   // SINGLETON shared by the whole real db-test database, not scoped to this

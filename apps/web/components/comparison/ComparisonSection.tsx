@@ -21,6 +21,7 @@ import {
   comparisonScrollStyle,
 } from './comparison.styles';
 import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
+import { insurerDisplayName } from '../../lib/i18n/names';
 
 interface Props {
   rfqId: string;
@@ -203,7 +204,7 @@ export function ComparisonSection({ rfqId, canBuildComparison }: Props) {
                   return (
                     <tr key={row.id}>
                       <td style={rfqCellStyle}>
-                        {q.insurer.name}
+                        {insurerDisplayName(q.insurer, language)}
                         <DeactivatedInsurerBadge isActive={q.insurer.isActive} />
                         {q.isCurrentVersion ? null : (
                           <span
@@ -300,12 +301,12 @@ export function ComparisonSection({ rfqId, canBuildComparison }: Props) {
                   return (
                     <ScoreRow
                       key={insurerId}
-                      name={row.quotation.insurer.name}
+                      name={insurerDisplayName(row.quotation.insurer, language)}
                       insurerId={insurerId}
                       draft={draft}
                       onChange={setScore}
-                      qualityAriaLabel={t('comparisonQualityScoreAria', { name: row.quotation.insurer.name })}
-                      serviceAriaLabel={t('comparisonServiceScoreAria', { name: row.quotation.insurer.name })}
+                      qualityAriaLabel={t('comparisonQualityScoreAria', { name: insurerDisplayName(row.quotation.insurer, language) })}
+                      serviceAriaLabel={t('comparisonServiceScoreAria', { name: insurerDisplayName(row.quotation.insurer, language) })}
                     />
                   );
                 })}

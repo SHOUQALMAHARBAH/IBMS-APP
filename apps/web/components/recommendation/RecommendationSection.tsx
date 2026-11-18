@@ -39,6 +39,7 @@ import {
   quoteFieldStyle,
 } from "../quotation/quotation.styles";
 import { DeactivatedInsurerBadge } from "../insurer/DeactivatedInsurerBadge";
+import { insurerDisplayName } from '../../lib/i18n/names';
 
 const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
   coverage: "recFactorCoverage",
@@ -304,7 +305,7 @@ export function RecommendationSection({
                 <option value="">{t("recSelectQuoteOption")}</option>
                 {currentQuotes.map((q) => (
                   <option key={q.id} value={q.id}>
-                    {q.insurer.name} —{" "}
+                    {insurerDisplayName(q.insurer, language)} —{" "}
                     {formatMoney(q.premium, language, q.currency)}
                     {q.commissionRatePercent
                       ? t("recCommissionSuffix", {
@@ -381,7 +382,7 @@ export function RecommendationSection({
               flexWrap: "wrap",
             }}
           >
-            <strong>{rec.recommendedQuotation.insurer.name}</strong>
+            <strong>{insurerDisplayName(rec.recommendedQuotation.insurer, language)}</strong>
             <DeactivatedInsurerBadge
               isActive={rec.recommendedQuotation.insurer.isActive}
             />

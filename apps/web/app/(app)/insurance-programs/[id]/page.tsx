@@ -35,6 +35,7 @@ import {
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { lineDisplayName } from '../../../../lib/i18n/names';
 
 export default function InsuranceProgramDetailPage() {
   const { language, t } = useLanguage();
@@ -260,7 +261,7 @@ export default function InsuranceProgramDetailPage() {
                 {program.lines.map((line) => (
                   <tr key={line.id}>
                     <td style={programCellStyle}>
-                      <bdi>{line.insuranceLine}</bdi>
+                      <bdi>{lineDisplayName(line, language)}</bdi>
                     </td>
                     <td style={programCellNumStyle}>
                       {line.sumInsuredBasis ?? 'set at quotation'}

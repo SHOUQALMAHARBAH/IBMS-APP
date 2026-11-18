@@ -57,6 +57,7 @@ import type { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
 import { assertWithinRoleScope } from '../../common/role-scope';
 import { insurerIdentity } from '../../repositories/insurer-identity';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 
 interface PolicyScheduleView {
   id: string;
@@ -130,6 +131,9 @@ export interface PolicyView {
   insurer: { id: string; name: string; nameAr: string | null } | null;
   policyNumber: string | null;
   insuranceLine: string;
+  /** §P4 — the line's Arabic name, or null when none is known. Sent with the record because the
+   *  catalogue route is gated on five codes and `policy.read` is not one of them. */
+  insuranceLineAr: string | null;
   status: PolicyStatus;
   inceptionDate: Date | null;
   expiryDate: Date | null;
@@ -439,6 +443,7 @@ export class PolicyService {
       insurer: policy.insurer === null ? null : insurerIdentity(policy.insurer),
       policyNumber: policy.policyNumber,
       insuranceLine: policy.insuranceLine,
+      insuranceLineAr: insuranceLineNameAr(policy),
       status: policy.status,
       inceptionDate: policy.inceptionDate,
       expiryDate: policy.expiryDate,

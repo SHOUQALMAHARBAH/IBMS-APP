@@ -16,10 +16,13 @@ import type {
 import {
   RfqRepository,
   type RfqCommunicationRow,
+  type RfqInsurerWithInsurer,
   type RfqInsurerWithParents,
   type RfqWithSubmissions,
   type SelectableInsurer,
 } from '../../repositories/rfq.repository';
+import { insurerIdentity } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { OpportunityRepository } from '../../repositories/opportunity.repository';
 import { InsuranceProgramRepository } from '../../repositories/insurance-program.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -48,6 +51,99 @@ import { Article15DService } from '../compliance-risk/article-15-d.service';
 import { PermissionsService } from '../rbac/services/permissions.service';
 import type { Article15DOptions } from '../compliance-risk/article-15-d.service';
 import type { Article15DOptionsQueryDto } from './dto/article-15-d-options-query.dto';
+
+/**
+ * 🔴 THE INSURER'S NAME, RESOLVED BEFORE THE RFQ LEAVES THIS SERVICE — AND IT WAS A LIVE DEFECT.
+ *
+ * ## What was measured, on the owner's demo-path walk of 2026-11-17 (§W3)
+ *
+ * The submissions table on `/rfqs/[id]` showed **three rows with an empty insurer column**, while
+ * the quotations block further down the same page named the same insurers. The cell reads
+ * `submission.insurer.name`, and the web's `SelectableInsurer` type declares `{ id, name, nameAr,
+ * … }`.
+ *
+ * ⟶ **The API side is the wrong one.** `INSURER_IDENTITY_SELECT` returns the RAW identity row —
+ *   `legalName`, `legalNameAr`, and the `insuranceCompany` / `insurerMaster` sources behind them —
+ *   and `insurerIdentity()` is what collapses those into the `{ name, nameAr }` pair the wire has
+ *   always been documented to carry. `findSelectableInsurers` calls it, which is why the PICKER on
+ *   `/rfqs/new` renders names correctly; the three RFQ reads did not, so the same web type met two
+ *   different shapes and `.name` was `undefined`.
+ *
+ * ⚠️ `undefined` renders as NOTHING in React. The screen did not fail, it printed an empty cell —
+ * the same silent shape as the `DocumentCategory` labels message 44 found, and for the same
+ * reason: TypeScript believed a declared type that the runtime did not supply.
+ *
+ * ## Why it is resolved HERE and not in the repository
+ *
+ * `RfqWithSubmissions` is consumed INTERNALLY by the comparison and quotation services, which want
+ * the identity row. Resolving in the repository would change what those callers see in order to
+ * fix what the web sees. This is the wire boundary: the four methods that hand an RFQ to a
+ * controller map through it, and nothing else does.
+ *
+ * ⛔ And the precedence is NOT re-implemented here. `insurerIdentity` picks ONE source (registered
+ * company, then the global catalogue, then the office's own row) and reads BOTH names from it —
+ * its own comment records the drift a per-field `??` caused once. One home, called.
+ *
+ * ⚠️ AND THESE TYPES ARE DELIBERATELY NOT GENERIC. The first version took
+ * `<T extends { insurerSubmissions: … }>` and mapped `Omit` over `T` — which is more general and
+ * cost the whole `apps/api` typecheck: `tsc` died with exit 134, `JavaScript heap out of memory`,
+ * distributing that conditional across the Prisma payload types. Two concrete aliases compile in
+ * seconds and say exactly the same thing about the only two shapes that exist.
+ */
+type ResolvedInsurer = ReturnType<typeof insurerIdentity>;
+
+/** One submission as it leaves this service. */
+export type RfqInsurerForWire = Omit<RfqInsurerWithInsurer, 'insurer'> & {
+  insurer: ResolvedInsurer;
+};
+
+/**
+ * An RFQ as it leaves this service: every submission's insurer resolved to its name pair, and
+ * the insurance line carrying its own Arabic name.
+ *
+ * 🔴 `insuranceLineAr` IS SENT RATHER THAN LOOKED UP ON THE SCREEN, and the reason is a
+ * permission the web cannot have: `GET /insurance-lines` is gated on five codes and `policy.read`
+ * is not one of them, so two roles that may read these records could not resolve a line name.
+ * See `insurance-line-names.ts` for the measurement. ⛔ Widening that gate was not the answer.
+ */
+export type RfqForWire = Omit<
+  RfqWithSubmissions,
+  'insurerSubmissions' | 'insuranceLine_managed' | 'officeInsuranceLine'
+> & {
+  insurerSubmissions: RfqInsurerForWire[];
+  insuranceLineAr: string | null;
+};
+
+function rfqForWire(rfq: RfqWithSubmissions): RfqForWire {
+  /*
+   * ⛔ THE TWO JOINED ROWS ARE STRIPPED, NOT MERELY SUPPLEMENTED — and this batch's own new
+   * assertion caught its author not doing it. Spreading `...rfq` put `insuranceLine_managed`
+   * and `officeInsuranceLine` on the wire beside the resolved `insuranceLineAr`: two ways to
+   * answer one question, which is the raw-join-as-payload shape that left the insurer column
+   * blank in the first place.
+   */
+  const { insuranceLine_managed, officeInsuranceLine, ...rest } = rfq;
+  // `void` because this project's eslint has no `varsIgnorePattern`, so an `_`-prefixed binding
+  // is still an unused variable. Naming them plainly and discarding them says what is happening
+  // more clearly than a prefix convention the linter does not share.
+  void insuranceLine_managed;
+  void officeInsuranceLine;
+  return {
+    ...rest,
+    insuranceLineAr: insuranceLineNameAr(rfq),
+    /*
+     * `s` is ANNOTATED, and it has to be: `RfqWithSubmissions` is an INTERSECTION of the plain
+     * Prisma payload with `{ insurerSubmissions: RfqInsurerWithInsurer[] }`, so the inferred
+     * element type is the plain row — which has `insurerId` and no `insurer` at all.
+     */
+    insurerSubmissions: rfq.insurerSubmissions.map(
+      (s: RfqInsurerWithInsurer) => ({
+        ...s,
+        insurer: insurerIdentity(s.insurer),
+      }),
+    ),
+  };
+}
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
  * `candidates` and `due` are row counts; the tallies below are per-step and
@@ -567,7 +663,7 @@ export class RfqService {
     /** The caller's network address, threaded from the controller by `clientIpForRecord`. An
      *  art. 15/d declaration records it; NULL when there genuinely is none. */
     networkAddress: string | null = null,
-  ): Promise<RfqWithSubmissions> {
+  ): Promise<RfqForWire> {
     /*
      * ز.١ — A NEW QUOTE REQUEST TO INSURERS. Blocked FIRST, before the visibility read, because the
      * licence is the thing the caller cannot change by editing the request — art. 3/a's own
@@ -708,7 +804,7 @@ export class RfqService {
       await this.markOpportunityRfqIssued(opportunity.id, actor.id);
     }
 
-    return this.mustFindRfq(rfq.id);
+    return rfqForWire(await this.mustFindRfq(rfq.id));
   }
 
   /**
@@ -745,11 +841,71 @@ export class RfqService {
     });
   }
 
+  /**
+   * 🔴 THE LINES THIS OPPORTUNITY CAN STILL BE TAKEN TO MARKET ON — §P3.
+   *
+   * ## What was measured on the owner's demo-path walk, 2026-11-17
+   *
+   * `insuranceLine` was a FREE-TEXT box. The server matches it byte-for-byte against the
+   * programme's own line strings (`assertLineInProgramme`), which are the English programme
+   * vocabulary — and the form's own hint offered two ARABIC examples, so a placement officer who
+   * followed the screen's advice was refused by the server every time. The placeholder did the
+   * same thing. ⟶ There is exactly one correct value per line and the system knows all of them,
+   * which makes this a CHOICE rather than a field.
+   *
+   * ## The two things it excludes, and why each is the server's to decide
+   *
+   * 1. **A line not on the programme** — `assertLineInProgramme` refuses it, so offering it would
+   *    be a screen contradicting its own server.
+   * 2. **A line that already has an RFQ** — `@@unique([opportunityId, insuranceLine])` refuses
+   *    the second one with a 409, and the walk found exactly that: an employee told a request they
+   *    could not see already existed.
+   *
+   * ⛔ The SERVER's checks are NOT removed. This narrows what can be asked for; it does not
+   * become the thing that enforces it. A directly-posted request still meets both.
+   *
+   * ⚠️ VISIBILITY FIRST, on the same `assertOpportunityVisible` every other RFQ route uses:
+   * otherwise this would enumerate another owner's designed programme to anybody who guessed an
+   * opportunity id.
+   */
+  async availableLines(
+    opportunityId: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ insuranceLine: string; insuranceLineAr: string | null }[]> {
+    const opportunity = await this.assertOpportunityVisible(
+      opportunityId,
+      actor,
+      'Opportunity not found',
+    );
+    if (!opportunity.insuranceProgramId) return [];
+    const programme = await this.programs.findById(
+      opportunity.insuranceProgramId,
+    );
+    if (!programme) return [];
+
+    /*
+     * The lines already taken to market, read from the RFQs themselves rather than from any
+     * cached flag — the unique constraint is on this exact pair, so this is the same question
+     * the database will be asked.
+     */
+    const taken = new Set(
+      (await this.rfqs.findRfqsByOpportunityId(opportunityId)).map(
+        (r) => r.insuranceLine,
+      ),
+    );
+    return programme.lines
+      .filter((l) => !taken.has(l.insuranceLine))
+      .map((l) => ({
+        insuranceLine: l.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(l),
+      }));
+  }
+
   async addInsurers(
     rfqId: string,
     dto: AddRfqInsurersDto,
     actor: AuthenticatedUser,
-  ): Promise<RfqWithSubmissions> {
+  ): Promise<RfqForWire> {
     /*
      * AND ADDING AN INSURER IS THE SAME ACT, which is why it is gated too rather than left to the
      * creation check. The owner's words name the act as "a new quote request TO INSURERS" — an RFQ
@@ -803,7 +959,7 @@ export class RfqService {
       });
     }
 
-    return this.mustFindRfq(rfqId);
+    return rfqForWire(await this.mustFindRfq(rfqId));
   }
 
   async transitionInsurer(
@@ -856,7 +1012,7 @@ export class RfqService {
   async list(
     query: ListRfqsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<RfqWithSubmissions[]> {
+  ): Promise<RfqForWire[]> {
     const { opportunityId, customerId } = query;
     if ((opportunityId && customerId) || (!opportunityId && !customerId)) {
       throw new UnprocessableEntityException(
@@ -876,7 +1032,9 @@ export class RfqService {
         actor,
         'Opportunity not found',
       );
-      return this.rfqs.findRfqsByOpportunityId(opportunityId);
+      return (await this.rfqs.findRfqsByOpportunityId(opportunityId)).map(
+        rfqForWire,
+      );
     }
 
     /*
@@ -901,7 +1059,7 @@ export class RfqService {
         { rfqCount: rows.length },
       );
     }
-    return rows;
+    return rows.map(rfqForWire);
   }
 
   /**
@@ -935,7 +1093,7 @@ export class RfqService {
     id: string,
     actor: AuthenticatedUser,
   ): Promise<
-    RfqWithSubmissions & {
+    RfqForWire & {
       opportunity: { customerId: string };
       article15DExemption:
         (RfqArticle15DExemption & { lacksEvidence: boolean }) | null;
@@ -975,7 +1133,7 @@ export class RfqService {
       this.article15D.findAlertsForRfq(rfq.id),
     ]);
     return {
-      ...rfq,
+      ...rfqForWire(rfq),
       opportunity: { customerId: opportunityCustomerId },
       /*
        * 🔴 OWNER DECISION 139 ruling 2 — THE MARK «بلا إثبات», DERIVED HERE AND SENT.

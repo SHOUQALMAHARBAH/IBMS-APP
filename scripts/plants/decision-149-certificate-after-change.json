@@ -1,0 +1,26 @@
+{
+  "key-on-the-pdf-digest": {
+    "file": "apps/api/src/repositories/document.repository.ts",
+    "from": "        content: { is: { issuedFactsSha256: input.issuedFactsSha256 } },",
+    "to": "        content: { is: { sha256: input.sha256 } },",
+    "why": "Decision 149 §٤ rules the PDF digest out by name. The render is not byte-stable, so keying identity on it makes every download a new document -- the defect message 44 shipped and its e2e caught."
+  },
+  "revert-to-the-message-44-key": {
+    "file": "apps/api/src/repositories/document.repository.ts",
+    "from": "        fileName: input.fileName,\n        content: { is: { issuedFactsSha256: input.issuedFactsSha256 } },",
+    "to": "        fileName: input.fileName,",
+    "why": "(policy, file name) alone is stable across a CHANGE to the policy, so a certificate issued after an endorsement is mistaken for the first one and never stored. This is exactly the state decision 149 exists to end."
+  },
+  "inherit-the-previous-copys-stamp": {
+    "file": "apps/api/src/repositories/document.repository.ts",
+    "from": "          issuedUnderStudyLicenseId: input.issuedUnderStudyLicenseId,\n        },\n      });\n      await tx.documentContent.create({",
+    "to": "          issuedUnderStudyLicenseId:\n            latest?.issuedUnderStudyLicenseId ?? input.issuedUnderStudyLicenseId,\n        },\n      });\n      await tx.documentContent.create({",
+    "why": "Criterion 4 -- each copy carries the stamp of ITS OWN issuance. A copy that inherited the stamp beside it would tell an inspector the office was under study on a day it was not. The e2e CANNOT catch this (both values are NULL there), which is why the unit spec exists."
+  },
+  "store-the-second-copy-unchained": {
+    "file": "apps/api/src/repositories/document.repository.ts",
+    "from": "          versionNumber: (latest?.versionNumber ?? 0) + 1,\n          previousVersionId: latest?.id ?? null,",
+    "to": "          versionNumber: 1,\n          previousVersionId: null,",
+    "why": "«بجانب القديمة» recorded as two unrelated rows a reader must order by createdAt and hope, rather than in the version chain the schema already carries."
+  }
+}

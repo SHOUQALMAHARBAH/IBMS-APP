@@ -41,6 +41,7 @@ import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { insurerDisplayName } from '../../../../lib/i18n/names';
 
 /**
  * One insurer, and the act of stopping or resuming work with them.
@@ -193,7 +194,7 @@ export default function InsurerDetailPage() {
   return (
     <main style={pageStackStyle}>
       <h1>
-        <bdi>{language === 'AR' ? (insurer.nameAr ?? insurer.name) : insurer.name}</bdi>
+        <bdi>{insurerDisplayName(insurer, language)}</bdi>
         <DeactivatedInsurerBadge isActive={insurer.isActive} />
       </h1>
       {insurer.isOfficeLocal ? (

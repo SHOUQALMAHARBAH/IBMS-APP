@@ -9,7 +9,6 @@ import {
   NeedsAssessmentRepository,
   type NeedsAssessmentFilter,
   type NeedsAssessmentWithActs,
-  type NeedsAssessmentActorNames,
   type NeedsAssessmentWithNames,
 } from '../../repositories/needs-assessment.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
@@ -130,34 +129,44 @@ export class NeedsAssessmentService {
    * a uuid under «راجعه» — and `rendered-identifiers.py` could not see it, because
    * its ternary exclusion treated `??` as a ternary.
    */
-  private async withNames<
-    T extends {
-      reviewedByUserId: string | null;
-      approvedByUserId: string | null;
-    },
-  >(rows: readonly T[]): Promise<(T & NeedsAssessmentActorNames)[]> {
+  private async withNames(
+    rows: readonly NeedsAssessmentWithActs[],
+  ): Promise<NeedsAssessmentWithNames[]> {
     const names = await this.users.displayNamesForUserIds(
       rows.flatMap((r) => [r.reviewedByUserId, r.approvedByUserId]),
     );
-    return rows.map((r) => ({
-      ...r,
-      reviewedByName: r.reviewedByUserId
-        ? (names.get(r.reviewedByUserId) ?? null)
-        : null,
-      approvedByName: r.approvedByUserId
-        ? (names.get(r.approvedByUserId) ?? null)
-        : null,
-    }));
+    return rows.map((r) => {
+      /*
+       * §W4 — the customer is FLATTENED here and the join is stripped.
+       *
+       * `NeedsAssessment` reaches a customer only through `RiskProfile`, so the repository
+       * joins it; leaving that join on the wire would be the raw-join-as-payload shape that
+       * left the RFQ's insurer column blank. ⟶ Two flat fields out, nothing else.
+       *
+       * ⚠️ `customerId` was ALREADY DECLARED by the web's own type and was only ever sent by
+       * the DETAIL route — `get()` resolves it by hand and `list()` did not — so every list
+       * item carried `undefined` behind a type promising a string. It is sent on both now.
+       */
+      const { riskProfile, ...rest } = r;
+      return {
+        ...rest,
+        customerId: riskProfile?.customerId ?? null,
+        customer: riskProfile?.customer ?? null,
+        reviewedByName: r.reviewedByUserId
+          ? (names.get(r.reviewedByUserId) ?? null)
+          : null,
+        approvedByName: r.approvedByUserId
+          ? (names.get(r.approvedByUserId) ?? null)
+          : null,
+      };
+    });
   }
 
   /** The single-row form. Named rather than inlined so no call site spells the
    *  `[0]` and the one-element array in nine places. */
-  private async withName<
-    T extends {
-      reviewedByUserId: string | null;
-      approvedByUserId: string | null;
-    },
-  >(row: T): Promise<T & NeedsAssessmentActorNames> {
+  private async withName(
+    row: NeedsAssessmentWithActs,
+  ): Promise<NeedsAssessmentWithNames> {
     return (await this.withNames([row]))[0];
   }
 
@@ -443,20 +452,21 @@ export class NeedsAssessmentService {
     return this.withNames(await this.assessments.findMany(filter));
   }
 
-  /** `customerId` is resolved off the parent Risk Profile for the web
-   * detail page's consent-capture control (Part D §5.1 touchpoint #3,
-   * needs & risk assessment) — `NeedsAssessment` itself has no direct
-   * customerId, only via `RiskProfile.customerId`. The Risk Profile is
-   * guaranteed to exist once a NeedsAssessment references it (the FK), so
-   * no null-guard is needed here beyond what `findVisible` already did. */
+  /**
+   * `customerId` is resolved off the parent Risk Profile for the web detail page's
+   * consent-capture control (Part D §5.1 touchpoint #3) — `NeedsAssessment` itself has no
+   * direct customerId, only via `RiskProfile.customerId`.
+   *
+   * ⚠️ THE SECOND READ IS GONE, and that is the §W4 change. This method used to fetch the risk
+   * profile again to graft `customerId` on, which is why the DETAIL had one and the LIST did
+   * not — every list item carried `undefined` behind a web type promising a string. The join
+   * is in the repository's include now, so both routes answer from one read and cannot
+   * disagree.
+   */
   async get(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithNames & { customerId: string }> {
-    const assessment = await this.findVisible(id, actor);
-    const riskProfile = await this.riskProfiles.findById(
-      assessment.riskProfileId,
-    );
-    return { ...assessment, customerId: riskProfile!.customerId };
+  ): Promise<NeedsAssessmentWithNames> {
+    return this.findVisible(id, actor);
   }
 }

@@ -63,6 +63,8 @@ const DRAFT_ASSESSMENT = {
   id: 'na-1',
   riskProfileId: 'rp-1',
   customerId: 'cust-1',
+  // §W4 — the list card says WHICH client. Identity only, as the policy list does.
+  customer: { id: 'cust-1', legalName: 'Acme Trading Co' },
   questionnaireAnswers: {
     ownsOrLeasesPremises: true,
     employeeCount: 10,
@@ -523,4 +525,86 @@ test('asks the questions in Arabic at all three render sites, and answers them i
       scope.getByText(english, { exact: true }),
     );
   }
+});
+
+test('🔴 §P2 — an APPROVED assessment that already has a programme LINKS to it', async ({
+  page,
+}) => {
+  /*
+   * ## What the owner's walk found, 2026-11-17
+   *
+   * This control always pushed to `/insurance-programs/new`. The server allows ONE live
+   * programme per risk profile, so on every assessment that had already produced one the only
+   * control on the screen led to a refusal — a placement officer with no way through.
+   *
+   * ⛔ The label is NOT a new Arabic phrase. It is the destination screen's own heading, so a
+   * link named after where it goes needs nothing ratified.
+   */
+  await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
+  await mockQuestionnaire(page);
+  const approved = { ...DRAFT_ASSESSMENT, status: 'APPROVED' };
+  await page.route('http://localhost:4000/needs-assessments/na-1', (route) =>
+    route.fulfill({ status: 200, json: approved }),
+  );
+  await page.route('http://localhost:4000/insurance-programs?**', (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 'prog-9',
+          riskProfileId: 'rp-1',
+          needsAssessmentId: 'na-1',
+          status: 'DRAFT',
+          lines: [],
+          createdAt: '2026-02-02T00:00:00.000Z',
+          updatedAt: '2026-02-02T00:00:00.000Z',
+        },
+      ],
+    }),
+  );
+  await page.route('http://localhost:4000/consent-records**', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route('http://localhost:4000/privacy-notices/current**', (route) =>
+    route.fulfill({ status: 404, json: { message: 'none' } }),
+  );
+
+  await page.goto('/needs-assessments/na-1');
+
+  // The link, by the destination's own name — and the «assemble» button is GONE, which is the
+  // half that matters: offering both would leave the refusal one click away.
+  const open = page.getByRole('button', { name: 'Insurance program' });
+  await expect(open).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Assemble insurance program →' }),
+  ).toHaveCount(0);
+
+  await open.click();
+  await expect(page).toHaveURL('/insurance-programs/prog-9');
+});
+
+test('§P2 — and with NO programme yet, the assemble button is what stands', async ({
+  page,
+}) => {
+  // Non-vacuity for the test above: without this, removing the assemble button entirely would
+  // also pass, and an assessment that has produced nothing would have no way forward at all.
+  await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
+  await mockQuestionnaire(page);
+  await page.route('http://localhost:4000/needs-assessments/na-1', (route) =>
+    route.fulfill({ status: 200, json: { ...DRAFT_ASSESSMENT, status: 'APPROVED' } }),
+  );
+  await page.route('http://localhost:4000/insurance-programs?**', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route('http://localhost:4000/consent-records**', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route('http://localhost:4000/privacy-notices/current**', (route) =>
+    route.fulfill({ status: 404, json: { message: 'none' } }),
+  );
+
+  await page.goto('/needs-assessments/na-1');
+  await expect(
+    page.getByRole('button', { name: 'Assemble insurance program →' }),
+  ).toBeVisible();
 });

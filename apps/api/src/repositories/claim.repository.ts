@@ -59,6 +59,12 @@ const CLAIM_INCLUDE = {
     select: {
       id: true,
       customerId: true,
+      /*
+       * §W4 — WHICH CUSTOMER THIS CLAIM IS FOR. Same precedent as the policy list: identity
+       * only, two columns, never the `Customer` row. The walk found `/claims` rendering cards
+       * with nothing to tell them apart, and a uuid is not a name.
+       */
+      customer: { select: { id: true, legalName: true } },
       policyNumber: true,
       insuranceLine: true,
       expiryDate: true,

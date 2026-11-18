@@ -12,6 +12,8 @@ export interface InsuranceProgramLine {
   id: string;
   insuranceProgramId: string;
   insuranceLine: string;
+  /** §P4 — the line's Arabic name, sent by the server. null when none is known. */
+  insuranceLineAr: string | null;
   sumInsuredBasis: string | null;
 }
 

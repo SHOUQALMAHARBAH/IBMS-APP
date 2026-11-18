@@ -62,3 +62,13 @@ export const queueCellStyle: CSSProperties = {
   textAlign: 'start',
   verticalAlign: 'top',
 };
+
+/**
+ * The secondary paragraph under a card heading on the customer profile.
+ *
+ * It was written inline sixteen times on that one page. Hoisted when §P2's seventh control was
+ * added: `check:screen-pass` caps inline style sites and the cap may only FALL, so a new control
+ * that copied the idiom raised it — and the right answer to that is to stop copying it, not to
+ * raise the number.
+ */
+export const cardIntroStyle: CSSProperties = { color: 'var(--ink-secondary)' };
