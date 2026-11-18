@@ -31,6 +31,7 @@ import {
 } from '../../../components/ui';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionMayBeMissing, permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 
@@ -49,6 +50,20 @@ const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', ga
  * referenced an undefined surface for months and rendered with no background at all, and the
  * same mistake was made again in message 42 inside the comment warning about it.
  * `check:css-properties` is what catches it; run it by name, it is in no chain. */
+/**
+ * 🔴 OWNER DECISION 142 — DOES THIS SYSTEM HOLD THE FILE ITSELF?
+ *
+ * ⛔ `storageRef`, NOT the category. That prefix is what the repository actually writes when it
+ * stores bytes (`db:documentContent/<id>`), so the screen and the server cannot disagree; a
+ * category test would claim a stored file for a certificate row whose bytes failed to write.
+ *
+ * ONE home, because two sites ask it: the download button offers the stored file, and the
+ * deletion controls are withheld from it — ⛔ no route may delete a stored certificate
+ * (criterion 5), so a control that proposes to is a control whose press can only fail.
+ */
+const isStoredHere = (doc: DocumentRecord): boolean =>
+  doc.storageRef.startsWith('db:documentContent/');
+
 const stampStyle: CSSProperties = {
   marginInlineStart: 'var(--space-2)',
   padding: '0 var(--space-1)',
@@ -81,6 +96,8 @@ export default function DocumentsPage() {
   // policy up at all — so «جارٍ التحميل…» stood under an empty field from the
   // moment the screen opened and never cleared. Her walk reported exactly that.
   const [summaryBusy, setSummaryBusy] = useState(false);
+
+  const canOverrideDeletion = hasPermission(user, 'document.delete-override');
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -282,7 +299,7 @@ export default function DocumentsPage() {
                       failed to write — which the transaction makes impossible today and which a
                       later uploader could reintroduce.
                     */}
-                    {doc.storageRef.startsWith('db:documentContent/') ? (
+                    {isStoredHere(doc) ? (
                       <button
                         type="button"
                         data-stored-download=""
@@ -296,15 +313,37 @@ export default function DocumentsPage() {
                         {t('docNewVersionButton')}
                       </button>
                     )}
-                    {doc.deletionLocked ? (
-                      <button type="button" onClick={() => onUnlock(doc.id)}>
-                        {t('docUnlockButton')}
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => onDelete(doc.id)}>
-                        {t('commonDelete')}
-                      </button>
-                    )}
+                    {/*
+                      🔴 TWO REASONS THIS PAIR MAY NOT RENDER, AND THEY ARE DIFFERENT REASONS.
+
+                      (a) THE CALLER. Both `POST /documents/:id/deletion-override` and
+                      `DELETE /documents/:id` carry `document.delete-override`, held by ADMIN and
+                      the DPO and by nobody else — measured in `permissions.ts`. Until now the
+                      pair was gated on NOTHING at all, so the owner's second walk saw «إلغاء
+                      القفل للحذف» offered to a Placement officer, whose press could only 403.
+                      `frontend-ux-directive.md`: a control a role cannot use does not exist on
+                      their screen.
+
+                      (b) THE ROW. A document whose file this system stores can never be
+                      unlocked (decision 142 §٥ criterion 5), so the unlock is refused for every
+                      caller and the delete below it is unreachable — measured, because the
+                      service now refuses before it writes and before it audits.
+
+                      ⛔ Neither test substitutes for the other: (a) hidden alone would still
+                      offer an administrator a button that cannot work, and (b) alone would go
+                      on offering the Placement officer a 403 on every other row.
+                    */}
+                    {canOverrideDeletion && !isStoredHere(doc) ? (
+                      doc.deletionLocked ? (
+                        <button type="button" onClick={() => onUnlock(doc.id)}>
+                          {t('docUnlockButton')}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => onDelete(doc.id)}>
+                          {t('commonDelete')}
+                        </button>
+                      )
+                    ) : null}
                   </Td>
                 </Tr>
               ))}

@@ -283,6 +283,28 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * 🔴 OWNER DECISION 142 §٥ CRITERION 5 — DOES THIS SYSTEM HOLD THE FILE ITSELF?
+   *
+   * The existence question only, never the bytes: a `DocumentContent` row may be up to 2 MiB
+   * and this is a guard, not a read. `findStoredContent` beside it is the read.
+   *
+   * ⛔ THE TEST IS THE CONTENT, NOT THE CATEGORY, and the reason is that the database already
+   * decided it: `DocumentContent_documentId_fkey` is `ON DELETE RESTRICT`, so the row Postgres
+   * refuses to delete is exactly the row that has content — measured 2026-11-18, SQLSTATE 23001
+   * naming that constraint. A category test would refuse a set the database does not and permit
+   * a set it does: the day a second kind of document gains stored bytes (decision 142 §٣ says
+   * the storage service arrives with the hosting decision), the category test would wave it
+   * through and the FK would answer 500.
+   */
+  async hasStoredContent(documentId: string): Promise<boolean> {
+    const content = await this.prisma.client.documentContent.findUnique({
+      where: { documentId },
+      select: { documentId: true },
+    });
+    return content !== null;
+  }
+
   /** A document has a successor once some row's `previousVersionId` points
    * at it — `previousVersionId` is `@unique`, so at most one exists. */
   async hasSuccessor(id: string): Promise<boolean> {

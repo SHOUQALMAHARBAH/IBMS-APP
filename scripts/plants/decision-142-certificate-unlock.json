@@ -1,0 +1,14 @@
+{
+  "the-certificate-can-be-unlocked-again": {
+    "file": "apps/api/src/modules/supporting-operations/document.service.ts",
+    "from": "    if (await this.documents.hasStoredContent(id)) {\n      throw new ConflictException(\n        `Document ${id} holds a file stored in this system and cannot be unlocked for deletion.`,\n      );\n    }\n\n",
+    "to": "",
+    "why": "DECISION 142 §٥ CRITERION 5 REVERSED, in the state it was actually in until 2026-11-18 — the guard simply absent, which is how it shipped. Measured against db-test before the fix: the override answered 201, committed `deletionLocked = false`, stamped `deletionOverrideByUserId` and audited an UPDATE; the DELETE after it answered 500 from `DocumentContent_documentId_fkey`'s `ON DELETE RESTRICT` (SQLSTATE 23001). The certificate survived — which is precisely why this lived — but «لا مسار يحذف الشهادة» did not. Expected to kill the unit test `🔴 criterion 5 — refuses a document whose file this system holds, writing and auditing nothing` by name, and the api e2e's new override assertions inside `policy.e2e-spec.ts`. ⛔ It must NOT kill `still unlocks a document this system does NOT store the file for`: that test is the non-vacuity half, and a plant that killed both would mean the guard was refusing everything rather than refusing certificates."
+  },
+  "the-screen-offers-the-unlock-to-anyone-again": {
+    "file": "apps/web/app/(app)/documents/page.tsx",
+    "from": "                    {canOverrideDeletion && !isStoredHere(doc) ? (",
+    "to": "                    {true ? (",
+    "why": "BOTH HALVES OF THE SCREEN GATE REMOVED AT ONCE, which is the shape the defect really had: the pair was gated on nothing at all, so the owner's second walk was offered «إلغاء القفل للحذف» on a stored certificate as a Placement officer. Expected to kill BOTH new Playwright tests — `a stored certificate offers no deletion control…` (the count goes 1 → 2) and `the deletion controls are withheld from a caller who does not hold document.delete-override` (the button comes back) — and to leave `unlocks and deletes a document` green, since that caller legitimately holds the code on a row with no stored file."
+  }
+}

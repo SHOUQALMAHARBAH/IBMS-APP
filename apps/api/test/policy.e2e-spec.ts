@@ -1092,6 +1092,60 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       'the certificate was deleted',
     ).toBe(1);
 
+    /*
+     * 🔴 CRITERION 5, THE HALF THAT WAS MISSING — AND THE LOCK CANNOT BE LIFTED EITHER.
+     *
+     * The 409 above proves the delete refuses WHILE LOCKED. It says nothing about the route
+     * whose whole purpose is to unlock, and that route is reached by the same code this caller
+     * holds. Measured here on 2026-11-18 before the guard existed: it answered **201**, committed
+     * `deletionLocked = false`, stamped `deletionOverrideByUserId`, and audited an UPDATE — and
+     * the delete that followed answered **500**, from `DocumentContent_documentId_fkey`'s
+     * `ON DELETE RESTRICT` (SQLSTATE 23001). The certificate itself survived, which is exactly
+     * why this went unseen; what did not survive was «لا مسار يحذف الشهادة».
+     *
+     * ⚠️ THE CALLER IS THE SAME DPO AS ABOVE, DELIBERATELY — one of the two roles holding
+     * `document.delete-override`. A caller without it would answer 403 and prove nothing.
+     */
+    const unlockRefused = await request(app.getHttpServer())
+      .post(`/documents/${certRow.id}/deletion-override`)
+      .set(bearer(noPerm.accessToken))
+      .expect(409);
+    expect(
+      (unlockRefused.body as { message: string }).message,
+      'the override refused for some OTHER reason than the stored file',
+    ).toMatch(/stored in this system/i);
+
+    /*
+     * AND THE ROW DID NOT MOVE. A guard that threw after writing would still answer 409 here,
+     * so the refusal is checked against the DATABASE and not against the status code.
+     */
+    const afterUnlockAttempt = await prisma.document.findUniqueOrThrow({
+      where: { id: certRow.id },
+      select: { deletionLocked: true, deletionOverrideByUserId: true },
+    });
+    expect(
+      afterUnlockAttempt.deletionLocked,
+      'the certificate was unlocked for deletion — decision 142 §٥ criterion 5',
+    ).toBe(true);
+    expect(
+      afterUnlockAttempt.deletionOverrideByUserId,
+      'somebody is on record as having overridden a certificate’s deletion lock',
+    ).toBeNull();
+
+    /* AND THE DELETE IS THEREFORE UNREACHABLE: it still refuses, and it refuses BY THE LOCK —
+     * named, because the point is that the 500 above can no longer be reached at all. */
+    const deleteStillRefused = await request(app.getHttpServer())
+      .delete(`/documents/${certRow.id}`)
+      .set(bearer(noPerm.accessToken))
+      .expect(409);
+    expect((deleteStillRefused.body as { message: string }).message).toMatch(
+      /locked/i,
+    );
+    expect(
+      await prisma.document.count({ where: { id: certRow.id } }),
+      'the certificate was deleted',
+    ).toBe(1);
+
     // explicit override: AR customer, ask for EN anyway
     const overridden = await request(app.getHttpServer())
       .get(`/policies/${arPolicyId}/certificate?language=EN`)

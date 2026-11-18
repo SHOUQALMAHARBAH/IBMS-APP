@@ -39,6 +39,7 @@ function makeService(
     findById: vi.fn().mockResolvedValue(baseDocument()),
     findMany: vi.fn().mockResolvedValue([baseDocument()]),
     hasSuccessor: vi.fn().mockResolvedValue(false),
+    hasStoredContent: vi.fn().mockResolvedValue(false),
     hasClaimLink: vi.fn().mockResolvedValue(false),
     createVersion: vi.fn().mockResolvedValue(
       baseDocument({
@@ -167,6 +168,51 @@ describe('DocumentService.overrideDeletionLock', () => {
     await expect(
       service.overrideDeletionLock('nope', 'admin-1'),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  /*
+   * 🔴 OWNER DECISION 142 §٥ CRITERION 5 — «لا مسار يحذف الشهادة».
+   *
+   * The refusal asserted here is the one that was MISSING: measured on db-test 2026-11-18, this
+   * route answered 201 on a stored certificate and committed the unlock, and only the DELETE
+   * after it failed — with a 500 from `DocumentContent_documentId_fkey`'s `ON DELETE RESTRICT`
+   * (SQLSTATE 23001). The file survived, which is why nobody noticed; what did not survive was
+   * the claim that no route unlocks a certificate.
+   */
+  it('🔴 criterion 5 — refuses a document whose file this system holds, writing and auditing nothing', async () => {
+    const { service, docs, audit } = makeService({
+      docs: { hasStoredContent: vi.fn().mockResolvedValue(true) },
+    });
+
+    await expect(
+      service.overrideDeletionLock('doc-1', 'admin-1'),
+    ).rejects.toThrow(ConflictException);
+
+    /*
+     * BOTH HALVES, because «refuses» alone would pass against a version that unlocked the row,
+     * audited the change and then threw — which is the state this guard exists to prevent. An
+     * audit row claiming a lock moved when it did not is worse than no row at all.
+     */
+    expect(
+      docs.setDeletionOverride,
+      'the lock was flipped before the refusal — decision 142 §٥ criterion 5',
+    ).not.toHaveBeenCalled();
+    expect(
+      audit.record,
+      'an UPDATE was audited for a change that never happened',
+    ).not.toHaveBeenCalled();
+  });
+
+  /* NON-VACUITY, the other direction: the guard must not refuse an ORDINARY document. Without
+   * this, a `hasStoredContent` stubbed to always-true would pass the test above and silently
+   * close the route for the uploaded documents it was never about. */
+  it('still unlocks a document this system does NOT store the file for', async () => {
+    const { service, docs } = makeService({
+      docs: { hasStoredContent: vi.fn().mockResolvedValue(false) },
+    });
+    const result = await service.overrideDeletionLock('doc-1', 'admin-1');
+    expect(result.deletionLocked).toBe(false);
+    expect(docs.setDeletionOverride).toHaveBeenCalledWith('doc-1', 'admin-1');
   });
 
   it('409s when already unlocked (a concurrent override lost the status-conditional write)', async () => {
