@@ -33,11 +33,13 @@ import { RENEWAL_AWAITING_DECLARATION_REFUSAL_AR } from '../src/modules/complian
  * then landed on a DIFFERENT term from the one the restore put back — residue that made the second
  * run fail with a 409 on a write-once route, which is how it was found.
  *
- * ⟶ So the whole SERIES is shifted by one fixed interval and shifted back by the same one. Two
+ * ⟶ So the whole SERIES is shifted by one interval and shifted back by the same one. Two
  * statements, exactly reversible, and the relative order of all 51 terms is preserved — which
  * matters, because `pickCurrentTerm` is what decides which term the filing lands on. DAYS rather
  * than years: Postgres clamps a Feb-29 date to Feb 28 when the target year is not a leap year, so
- * a year interval is NOT exactly reversible and a day interval is.
+ * a year interval is NOT exactly reversible and a day interval is. The interval itself is
+ * DERIVED from the data rather than fixed — see `shiftDaysFor`, and the CI-only incoherence a
+ * fixed hundred years would have produced on a from-empty database.
  *
  * Every later spec in the run reads this series. A series left in the past would refuse every
  * policy placement, every quote request and every certificate in the whole suite, surfacing as a
@@ -63,15 +65,33 @@ const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 const RUN = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DECLARE_CODE = 'license-renewal.declare';
 
+/** How far past its expiry the office should land. */
+const PAST_EXPIRY_DAYS = 30;
+
 /**
- * How far back the whole licence series moves, and back again.
+ * 🔴 THE SHIFT IS DERIVED FROM THE DATA, NOT A FIXED HUNDRED YEARS.
  *
- * 100 years in DAYS. The seeded terms expire from 2091 to 2105, so this puts every one of them
- * comfortably in the past and leaves their relative order untouched. ⛔ Not `interval '100 years'`:
- * Postgres clamps 29 February to the 28th when the target year is not a leap year, so a year
- * interval is not exactly reversible and this restore has to be.
+ * The first version subtracted a flat 36,525 days, which works on THIS machine — db-test is
+ * cumulative and its 51 terms run out to 2105 — and is wrong in CI, which builds from empty.
+ * There the base seed writes ONE term, `issuedAt` 1 January this year and `expiresAt` 31
+ * December two years on; a hundred-year shift would leave it issued in 2026 and expiring in
+ * 1928. No CHECK refuses that (measured: `BrokerLicense` carries one CHECK and it is about the
+ * renewal proof), but a term whose issuance follows its expiry is incoherent data, and a
+ * derivation that behaved differently on it would do so ONLY in CI — which is the one place
+ * this cannot be iterated on cheaply.
+ *
+ * ⟶ So the shift is whatever puts the LATEST expiry {@link PAST_EXPIRY_DAYS} in the past, and
+ * BOTH date columns move by it: every term stays internally coherent, the series keeps its
+ * order (which is what `pickCurrentTerm` reads), and the restore adds back the same integer.
+ *
+ * ⛔ DAYS, never `interval 'N years'`: Postgres clamps 29 February to the 28th when the target
+ * year is not a leap year, so a year interval is not exactly reversible and this restore has to
+ * be.
  */
-const SHIFT_DAYS = 36_525;
+function shiftDaysFor(latestExpiry: Date): number {
+  const target = Date.now() - PAST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  return Math.ceil((latestExpiry.getTime() - target) / (24 * 60 * 60 * 1000));
+}
 
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };
@@ -201,6 +221,18 @@ describe('an office past expiry that filed and has not declared', () => {
       select: { id: true },
     });
 
+    // The shift, computed from what is actually there. db-test holds 51 terms running to 2105;
+    // a from-empty CI database holds ONE expiring two years out. Both land 30 days past expiry.
+    const latest = await prisma.brokerLicense.findFirstOrThrow({
+      orderBy: { expiresAt: 'desc' },
+      select: { expiresAt: true },
+    });
+    const shiftDays = shiftDaysFor(latest.expiresAt);
+    expect(
+      shiftDays,
+      'the series is already past expiry — nothing to shift',
+    ).toBeGreaterThan(0);
+
     let proofDocumentId: string | undefined;
     let testError: unknown = null;
     try {
@@ -211,7 +243,8 @@ describe('an office past expiry that filed and has not declared', () => {
       // column-to-column update Prisma's typed API cannot express; scoped to the one office
       // explicitly, since raw SQL does not go through `tenantScopeExtension`.
       await prisma.$executeRawUnsafe(
-        `UPDATE "BrokerLicense" SET "expiresAt" = "expiresAt" - interval '${SHIFT_DAYS} days' WHERE "organizationId" = $1`,
+        `UPDATE "BrokerLicense" SET "expiresAt" = "expiresAt" - interval '${shiftDays} days', ` +
+          `"issuedAt" = "issuedAt" - interval '${shiftDays} days' WHERE "organizationId" = $1`,
         TEST_ORGANIZATION_ID,
       );
 
@@ -317,7 +350,8 @@ describe('an office past expiry that filed and has not declared', () => {
       });
       // The same interval, back. Exactly reversible by construction.
       await prisma.$executeRawUnsafe(
-        `UPDATE "BrokerLicense" SET "expiresAt" = "expiresAt" + interval '${SHIFT_DAYS} days' WHERE "organizationId" = $1`,
+        `UPDATE "BrokerLicense" SET "expiresAt" = "expiresAt" + interval '${shiftDays} days', ` +
+          `"issuedAt" = "issuedAt" + interval '${shiftDays} days' WHERE "organizationId" = $1`,
         TEST_ORGANIZATION_ID,
       );
       if (proofDocumentId) {
