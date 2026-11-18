@@ -284,6 +284,8 @@ jobs:
         run: npx turbo run typecheck --filter=api...
 
       - name: Lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npx turbo run lint --filter=api...
 
       - name: Unit tests
