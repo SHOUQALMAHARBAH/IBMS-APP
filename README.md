@@ -434,6 +434,20 @@ Three things worth knowing before touching any of it:
 - **`npm run check:decision-index` gates it in both directions** and is part of
   `npm run check:docs`, so it runs in CI. A number cited with no file is a defect, not a
   backlog item.
+- **A decision paper may state its rulings ONLY as a table, with no `## القرار بجملة`
+  section — two do now (150 and 151), and such a paper is declared in
+  `RULINGS_TABLE_ONLY` with the spans its index row is pinned to.** ⛔ Her heading is
+  never edited to suit the matcher, ⛔ the declaration does not go in `SLUG_ONLY` (that
+  set is for a decision file with no NUMBER), and ⛔ it is not an amnesty: the row is
+  pinned harder than the ordinary path pins one, and the declaration itself goes stale
+  the day the paper gains a sentence. **🔴 And that pin had a hole until 2026-11-18: it
+  stripped `**` from the body and from the index row and left the ANCHOR as written**, so
+  a declared span carrying the owner's own inner bold could never be found in a body that
+  had just had every `**` removed — the gate reported *zero occurrences of a span plainly
+  in the file*. Decision 150's five anchors happen to carry none; **four of decision 151's
+  seven do, and all four were reported missing from a file they are in.** ⛔ The fix is
+  not to declare the anchors with their bold stripped out — a declared span would then be
+  one the paper does not contain. `--self-test` is **24** conditions.
 - **Decision 33 had no file for the whole life of the register, and the reason was a matcher's shape rather than anybody's oversight.** It is cited in **ten places** and appears ONLY inside the phrase `decisions 32 and 33`, never once on its own — so every matcher anchored on the word `decision` immediately before a number read the `32` and was blind to the `33`. **Never narrow `CITE_TAIL` back to the first number.** Its file landed 2026-11-08 (the owner's words; it is register content, not engineering), and the gate then went red naming its own `KNOWN_MISSING` declaration as stale, which is the one proof a declaration list cannot rot. **And one of those ten sites hid the same way, one level down**: `retention-notice.config.ts` breaks the citation across a line inside a block comment, so every literal search finds nine. **Its file's figure of ٩ is therefore CORRECT and not a typo** — nine is what the method it declares finds — and
   `WRAPPED_CITATIONS` declares the tenth site and asserts it, so joining that line makes
   the ٩ a real error and the gate names it. `CITED_ONLY_JOINTLY` carries the method itself,
