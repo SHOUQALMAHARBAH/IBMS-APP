@@ -14,6 +14,12 @@ import {
   type LanguagePreference,
 } from '@ibms/db';
 import { createTestApp } from '../test/utils/test-app';
+import {
+  DEMO_OFFICE_NAMES,
+  HALTED_STAGES,
+  haltedChainSchedule,
+  type HaltedStage,
+} from './demo-chain-plan';
 
 /**
  * Demo/dummy-data seed script — NOT part of the automated test suite.
@@ -143,13 +149,29 @@ const DEMO_PASSWORD = (() => {
  * `test/tenant-prisma.ts`. */
 const ORG_A_ID = '00000000-0000-0000-0000-000000000001';
 const ORG_A_SLUG = 'office-a';
-const ORG_A_LABEL = 'Default Brokerage Office';
 
 const ORG_B_ID = '00000000-0000-0000-0000-0000000000b1';
 const ORG_B_SLUG = 'office-b';
 const ORG_B_SUBDOMAIN = 'demo-office-b';
-const ORG_B_LEGAL_NAME = 'Rawabi Insurance Brokerage (demo)';
-const ORG_B_LEGAL_NAME_AR = 'شركة الروابي لوساطة التأمين (تجريبي)';
+
+/*
+ * 🔴 BOTH OFFICES ARE NAMED BY OWNER DECISION 150 RULING 6 — message 46 §2.3.
+ *
+ * Office A was `Default Brokerage Office` (the base seed's own placeholder, visible on every
+ * screen of a demonstration) and office B was `Rawabi Insurance Brokerage (demo)`, which this
+ * script invented. Neither is hers; both are now.
+ *
+ * ⛔ The strings live in `demo-chain-plan.ts` and are SLICED from `docs/decision-150-ratified-
+ * strings.md` §٦, re-sliced byte-for-byte by `demo-chain-plan.spec.ts`. Nothing is retyped here.
+ *
+ * ⛔ DEMO DATA ONLY, which is her own instruction («لبيانات العرض وحدها»). `packages/db/prisma/
+ * seed.ts` is untouched, so a real install still gets its own default office name — renaming an
+ * office for a demonstration must never reach a real one.
+ */
+const ORG_A_LEGAL_NAME = DEMO_OFFICE_NAMES['office-a'].en;
+const ORG_A_LEGAL_NAME_AR = DEMO_OFFICE_NAMES['office-a'].ar;
+const ORG_B_LEGAL_NAME = DEMO_OFFICE_NAMES['office-b'].en;
+const ORG_B_LEGAL_NAME_AR = DEMO_OFFICE_NAMES['office-b'].ar;
 
 /** Both offices in one place: the MFA release and its post-condition check run
  * after any office-level abort, so they cannot read the loop variable that
@@ -285,6 +307,22 @@ async function patchAs<T = Record<string, unknown>>(
   if (res.status < 200 || res.status >= 300) {
     throw new Error(
       `PATCH ${urlPath} -> ${res.status}: ${JSON.stringify(res.body)}`,
+    );
+  }
+  return res.body as T;
+}
+
+async function getAs<T = Record<string, unknown>>(
+  app: INestApplication<App>,
+  token: string,
+  urlPath: string,
+): Promise<T> {
+  const res = await request(app.getHttpServer())
+    .get(urlPath)
+    .set(bearer(token));
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(
+      `GET ${urlPath} -> ${res.status}: ${JSON.stringify(res.body)}`,
     );
   }
   return res.body as T;
@@ -776,6 +814,14 @@ interface Actor {
   email: string;
   token: string;
   label: string;
+  /** The four parts of THIS person's name — so the `Employee` row linked to this account is the
+   *  same person rather than a second one. See `ensureActor`'s header. */
+  nameParts: {
+    given: string;
+    father: string;
+    grandfather: string;
+    family: string;
+  };
 }
 type Actors = Record<ActorKey, Actor>;
 
@@ -913,18 +959,71 @@ async function ensureOfficeAdministrator(orgId: string): Promise<void> {
  * Old `MfaCredential` rows are deleted rather than reused because their secret
  * is encrypted at rest and cannot be recovered here to generate a code from.
  */
+/**
+ * 🔴 ONE PERSON, ONE NAME — message 46 §2.4, and the mechanism is not what the brief says.
+ *
+ * ## What was actually measured, 2026-11-18
+ *
+ * The brief reports that the seed «writes a fresh random `fullName` on every run». It does not:
+ * that write is inside the `if (!user)` branch below, and the update that follows re-hashes the
+ * password and clears the MFA state without touching `fullName`. An actor's user row keeps the
+ * name it was created with, across every re-run.
+ *
+ * The real defect is one layer over: **`seedEmployees` called `personName()` AGAIN** for each
+ * Employee row and then linked that row to an actor through `userId`. So one account carried two
+ * independently generated people — a three-part name on `User.fullName` and a different
+ * four-part name on the linked `Employee`.
+ *
+ * ⚠️ AND THE SPLIT THE BRIEF POINTS AT IS A DECISION, NOT A DEFECT. `common/display-name.util.ts`
+ * says in its own words that a register showing «who did this» resolves through the HR record
+ * while an AUDIT ROW keeps the name as stored — *«rewriting them through a display rule would
+ * make the trail disagree with the row it describes»* — and both halves are pinned by a test
+ * with two committed plants. ⛔ So nothing in the product is touched here. The two names are made
+ * to AGREE in the demo data, which is the seed's own bug and is where the brief's requirement
+ * lands: *«the same name in every place a screen reads one»*.
+ *
+ * ⟶ `User.fullName` carries the FULL four-part composition, the same string `composeFullName`
+ * builds server-side from the parts handed to `POST /employees`, so the two are byte-identical.
+ *
+ * Re-runs heal rather than drift: an account created by an earlier version holds a three-part
+ * name, which is re-split and completed instead of being left disagreeing forever. No name part
+ * in this script's pools contains a space (measured: 20/20/10/20 entries, zero), so splitting a
+ * composed name back into its parts is unambiguous for data this script wrote.
+ */
+function namePartsFromStoredFullName(
+  stored: string,
+): ReturnType<typeof personName> | undefined {
+  const parts = stored.trim().split(/\s+/);
+  if (parts.length !== 4) return undefined;
+  return {
+    given: parts[0],
+    father: parts[1],
+    grandfather: parts[2],
+    family: parts[3],
+    gender: 'M',
+  };
+}
+
 async function ensureActor(
   orgId: string,
   orgSlug: string,
   def: ActorRoleDef,
-): Promise<{ id: string; email: string; label: string }> {
+): Promise<{
+  id: string;
+  email: string;
+  label: string;
+  nameParts: ReturnType<typeof personName>;
+}> {
   const email = actorEmail(orgSlug, def.key);
   let user = await rawPrisma.user.findFirst({
     where: { organizationId: orgId, email },
   });
+  let nameParts: ReturnType<typeof personName> | undefined = user
+    ? namePartsFromStoredFullName(user.fullName)
+    : undefined;
   if (!user) {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
-    const actorName = personName();
+    nameParts = personName();
     user = await rawPrisma.user.create({
       data: {
         organizationId: orgId,
@@ -932,11 +1031,25 @@ async function ensureActor(
         // `Demo ${def.label}` — so every demo account showed "Demo Sales
         // Relationship Officer" in the navbar, with initials to match, while
         // the linked Employee row held the real four-part Arabic name.
-        fullName: `${actorName.given} ${actorName.father} ${actorName.family}`,
+        //
+        // ALL FOUR PARTS, so this is the same string `composeFullName` will build for the
+        // Employee row linked to this account. Three parts here is what made one person two.
+        fullName: `${nameParts.given} ${nameParts.father} ${nameParts.grandfather} ${nameParts.family}`,
         email,
         passwordHash,
         mustChangePassword: false,
         languagePreference: 'AR' as LanguagePreference,
+      },
+    });
+  }
+  if (!nameParts) {
+    // An account from before this change: a three-part name, or one edited by hand. Give it a
+    // whole person rather than leaving the two records disagreeing for the life of the database.
+    nameParts = personName();
+    user = await rawPrisma.user.update({
+      where: { id: user.id },
+      data: {
+        fullName: `${nameParts.given} ${nameParts.father} ${nameParts.grandfather} ${nameParts.family}`,
       },
     });
   }
@@ -972,7 +1085,7 @@ async function ensureActor(
       data: { organizationId: orgId, userId: user.id, roleId: role.id },
     });
   }
-  return { id: user.id, email, label: def.label };
+  return { id: user.id, email, label: def.label, nameParts };
 }
 
 async function loginActor(
@@ -1148,6 +1261,7 @@ async function ensureActors(
         email: created.email,
         token,
         label: created.label,
+        nameParts: created.nameParts,
       };
     });
     if (actor) actors[def.key] = actor;
@@ -1397,6 +1511,152 @@ async function ensureBrokerLicenseTermForOffice(
         'working — the missing term is the defect, not the refusal.',
     );
   }
+}
+
+/**
+ * 🔴 OFFICE B'S LICENCE HAS EXPIRED, THE RENEWAL IS FILED AND PROVEN, AND NOBODY HAS DECLARED —
+ * message 46 §2.2.
+ *
+ * ## The state this reaches, and why it is the interesting one
+ *
+ * `deriveRenewalUnderStudy` returns `AWAITING_DECLARATION` when four things hold: the term is past
+ * its printed expiry, the renewal was filed on time (art. 11's 45 days), the filing proof and the
+ * Central Bank's reference are both attached, and no deficiency notice or renewal refusal has
+ * landed since. The ONLY thing missing is the standing declaration — and `license-renewal.declare`
+ * is held by NO role, by OWNER DECISION 131.
+ *
+ * So every issuance in office B is refused with decision 136(ب)'s own sentence, which tells the
+ * employee what is missing and who to see rather than «your licence expired». The presenter then
+ * creates a role, grants the code in front of the brokers, assigns it and declares — and issuance
+ * opens. ⛔ **No seeded role holds that code** (decision 151 ruling 6: «لا يُزرَع دور يحملها»);
+ * the live grant IS the demonstration, and seeding it would delete the thing being shown.
+ *
+ * ## Why it runs AFTER office B is seeded, and why office A is untouched
+ *
+ * An office past expiry with no declaration issues nothing — so running this before the pipelines
+ * would refuse every one of them and leave office B with no policies, no invoices and no claims.
+ * That is the exact failure `ensureBrokerLicenseTermForOffice`'s own header records from the other
+ * direction. Office A keeps a valid term so the rest of the demonstration is not blocked.
+ *
+ * ## What is written through Prisma, and why
+ *
+ * The EXPIRY is moved directly. There is no route that expires a licence and there should not be:
+ * a term expires by the passage of time, not by anybody's act, and an endpoint that could expire
+ * one on demand would be a way to disable an office. This script's documented rule applies — HTTP
+ * where an endpoint exists, Prisma where none does, with the reason named.
+ *
+ * The FILING and its proof go through `POST /broker-license/renewal-requested`, the real route, on
+ * the real `license.manage` permission. The proof `Document` is written through Prisma because no
+ * endpoint creates a bare document either — the same reason every `Insurer` row here is.
+ */
+async function expireOfficeLicenceAwaitingDeclaration(
+  app: INestApplication<App>,
+  summary: OrgSeedSummary,
+  tally: Tally,
+): Promise<void> {
+  const compliance = summary.actors.compliance;
+  if (!compliance) {
+    tally.errors.push(
+      `[expiredLicence] ${summary.orgSlug} has no compliance actor, so its licence could not be ` +
+        'put past expiry — the whole §2.2 demonstration is missing from this run.',
+    );
+    return;
+  }
+
+  /*
+   * ⚠️ EVERY TERM MOVES, NOT JUST THE LATEST — the lesson `license-renewal-awaiting-declaration.
+   * e2e-spec.ts` paid for.
+   *
+   * `pickCurrentTerm` chooses among ALL of an office's terms, so expiring one only promotes the
+   * next. Measured 2026-11-18, dev holds exactly ONE term per office and db-test holds 51 for its
+   * one office — so the single-term assumption is true here today and is not a property of the
+   * schema. The whole series is SHIFTED by one interval, which keeps its relative order intact
+   * and therefore keeps `pickCurrentTerm`'s answer predictable whatever the count.
+   */
+  const terms = await rawPrisma.brokerLicense.findMany({
+    where: { organizationId: summary.orgId },
+    orderBy: { expiresAt: 'desc' },
+  });
+  if (terms.length === 0) {
+    tally.errors.push(
+      `[expiredLicence] ${summary.orgSlug} has no licence term to expire.`,
+    );
+    return;
+  }
+
+  // Already in the state: a re-run must not try to file twice (the route is write-once and
+  // answers 409), and must not move the expiry again.
+  if (terms.some((t) => t.renewalProofDocumentId !== null)) {
+    bump(tally, 'created', 'expiredLicenceAlreadyInPlace');
+    return;
+  }
+
+  const expiredAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const shiftMs = terms[0].expiresAt.getTime() - expiredAt.getTime();
+  if (shiftMs <= 0) {
+    // Already past expiry with nothing filed — leave the dates alone and just file.
+    bump(tally, 'created', 'expiredLicenceAlreadyPastExpiry');
+  } else {
+    for (const t of terms) {
+      await rawPrisma.brokerLicense.update({
+        where: { id: t.id },
+        data: { expiresAt: new Date(t.expiresAt.getTime() - shiftMs) },
+      });
+    }
+  }
+
+  // Art. 11 measures its 45 days from THIS term's expiry, so the filing date comes off the
+  // shifted expiry rather than off today — 60 days before it, which is on time under any legal
+  // figure up to 60.
+  const currentExpiry = new Date(
+    Math.max(
+      ...terms.map((t) =>
+        shiftMs > 0 ? t.expiresAt.getTime() - shiftMs : t.expiresAt.getTime(),
+      ),
+    ),
+  );
+  const filedAt = new Date(currentExpiry.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  const proof = await rawPrisma.document.create({
+    data: {
+      organizationId: summary.orgId,
+      /*
+       * CORRESPONDENCE, not REGULATORY_DECISION. The proof is the stamped copy of OUR application
+       * or the Central Bank's acknowledgement of receiving it — a receipt, not a decision. That
+       * enum member's own comment reserves it for «a regulator's own DECISION LETTER», and filing
+       * an acknowledgement under it would make «show me the decisions about this office» return a
+       * document in which the regulator decided nothing.
+       */
+      category: 'CORRESPONDENCE',
+      classification: 'INTERNAL',
+      fileName: `not-a-real-cbj-document--renewal-filing-proof-${summary.orgSlug}.pdf`,
+      storageRef: `demo-seed/${summary.orgSlug}/renewal-filing-proof`,
+      uploadedByUserId: compliance.id,
+    },
+  });
+
+  const filed = await attempt(tally, 'licenceRenewalFiled', () =>
+    postAs(app, compliance.token, '/broker-license/renewal-requested', {
+      requestedAt: filedAt.toISOString().slice(0, 10),
+      proofDocumentId: proof.id,
+      referenceNumber: `CBJ-IN-${summary.orgSlug.toUpperCase()}-${filedAt.getUTCFullYear()}-0417`,
+    }),
+  );
+  if (!filed) {
+    tally.errors.push(
+      `[expiredLicence] ${summary.orgSlug}: the term is past expiry but the renewal filing was ` +
+        'not recorded, so the office reads EXPIRED rather than awaiting its declaration — which ' +
+        'is a different screen and a different sentence.',
+    );
+    return;
+  }
+
+  /*
+   * ⛔ AND NOTHING DECLARES. `POST /broker-license/renewal-declaration` exists, is enforced on
+   * `license-renewal.declare`, and is deliberately not called: calling it here would finish the
+   * demonstration before the presenter starts it.
+   */
+  bump(tally, 'created', 'expiredLicenceAwaitingDeclaration');
 }
 
 async function deactivateOneInsurerWithCommitments(
@@ -1669,9 +1929,24 @@ async function seedEmployees(
   );
   for (let i = 0; i < count; i += 1) {
     await attempt(tally, 'employee', async () => {
-      const name = personName();
       const linkUser =
         i < linkableActors.length ? linkableActors[i] : undefined;
+      /*
+       * 🔴 ONE PERSON, ONE NAME — message 46 §2.4.
+       *
+       * This used to call `personName()` unconditionally, so an Employee row LINKED to an actor
+       * carried a completely different randomly generated person from the one on `User.fullName`.
+       * The account then read as two people: the HR record named one, the audit trail — which
+       * keeps the stored `User.fullName` BY DECISION, see `common/display-name.util.ts` — named
+       * the other.
+       *
+       * ⛔ The product rule is untouched. The two names simply AGREE now, which is the seed's
+       * own bug to fix and not the resolver's.
+       *
+       * An UNLINKED employee is still a fresh person: there is no account for them to disagree
+       * with, and an office of nine people all named after its nine logins would be worse data.
+       */
+      const name = linkUser ? linkUser.nameParts : personName();
       return postAs(app, actors.admin.token, '/employees', {
         givenName: name.given,
         fatherName: name.father,
@@ -1919,6 +2194,33 @@ interface PipelineResult {
   inceptionDaysAgo: number;
 }
 
+/**
+ * 🔴 A CHAIN THAT STOPPED BECAUSE IT WAS TOLD TO — message 46 §2.1.
+ *
+ * ⚠️ Distinguished from one that stopped because it FAILED, and that distinction is the whole
+ * reason this type exists. The existing loop prints `(stopped early, see errors)` for a failure,
+ * and in the DATA the two look identical: a customer with an approved needs assessment and no
+ * programme is the same row either way. A presenter who cannot tell them apart cannot use either.
+ *
+ * So a halt is RETURNED rather than inferred, the run's report names the customer sitting at each
+ * stage, and the run asserts it produced the plan it declared.
+ */
+interface HaltedChain {
+  halted: HaltedStage;
+  customerId: string;
+  customerLabel: string;
+  /** Only `rfqIssuedAwaitingEvidence` fills these — what the presenter opens. */
+  rfqId?: string;
+  insurerCount?: number;
+  evidenceWaiting?: boolean;
+}
+
+function isHalted(
+  r: PipelineResult | HaltedChain | undefined,
+): r is HaltedChain {
+  return r !== undefined && 'halted' in r;
+}
+
 /** The Risk Profile / Policy schedule figures — built once per pipeline run
  * and reused for BOTH the issued schedule and the checking step's requested
  * coverage, so they match exactly (a mismatch drives the policy into
@@ -1942,7 +2244,18 @@ async function runFullPipeline(
   insurers: OrgInsurer[],
   customerId: string,
   tally: Tally,
-): Promise<PipelineResult | undefined> {
+  /**
+   * Stop here ON PURPOSE and return a `HaltedChain`. Omit for a chain that runs to an issued,
+   * checked, delivered policy — which is what every chain did before message 46 §2.1.
+   */
+  stopAfter?: HaltedStage,
+  /** The customer's own name, so the run's report can tell the presenter where to look. */
+  customerLabel = '',
+): Promise<PipelineResult | HaltedChain | undefined> {
+  const halt = (stage: HaltedStage, extra: Partial<HaltedChain> = {}) => {
+    bump(tally, 'created', `halted:${stage}`);
+    return { halted: stage, customerId, customerLabel, ...extra };
+  };
   const riskProfile = await attempt(tally, 'riskProfile', () =>
     postAs<{ id: string }>(app, actors.sales.token, '/risk-profiles', {
       customerId,
@@ -1984,6 +2297,11 @@ async function runFullPipeline(
   });
   if (!naOk) return undefined;
 
+  // STAGE 1 — an APPROVED needs assessment that no programme was built from.
+  if (stopAfter === 'needsAssessmentApproved') {
+    return halt('needsAssessmentApproved');
+  }
+
   const program = await attempt(tally, 'insuranceProgram', () =>
     postAs<{ id: string; lines: { insuranceLine: string }[] }>(
       app,
@@ -2014,12 +2332,26 @@ async function runFullPipeline(
   );
   if (!programFinalized) return undefined;
 
+  // STAGE 2 — a FINALIZED programme that no opportunity was opened on.
+  if (stopAfter === 'programmeFinalized') return halt('programmeFinalized');
+
   const opportunity = await attempt(tally, 'opportunity', () =>
     postAs<{ id: string }>(app, actors.placement.token, '/opportunities', {
       insuranceProgramId: program.id,
     }),
   );
   if (!opportunity) return undefined;
+
+  /*
+   * STAGE 3 — an opportunity still at `NEEDS_CONFIRMED`, with no quote request.
+   *
+   * Before the renewal mark below, deliberately: a renewal opportunity is a different thing to
+   * demonstrate, and a halted chain that is also randomly a renewal one time in four would make
+   * the stage inconsistent between runs for no gain.
+   */
+  if (stopAfter === 'opportunityNeedsConfirmed') {
+    return halt('opportunityNeedsConfirmed');
+  }
 
   /*
    * 🔴 SOME OPPORTUNITIES ARE RENEWALS — AND THIS IS THE ONLY WAY TO SAY SO, BECAUSE
@@ -2103,18 +2435,84 @@ async function runFullPipeline(
   }
   const insuranceLine = pick([...writersByLine.keys()]);
   const lineWriters = writersByLine.get(insuranceLine) ?? [];
-  // Up to FOUR, so a well-served line reaches the statutory three with one to spare and
-  // the comparison has something to compare. `pickN` caps at what exists, so a line with
-  // one or two writers yields one or two — the minority, unforced.
-  const shortlist = pickN(lineWriters, Math.min(4, lineWriters.length));
+  /*
+   * 🔴 STAGE 4 — AN RFQ THAT WENT TO FEWER THAN THREE, MARKED «بلا إثبات» — message 46 §2.1.
+   *
+   * ## Nothing here bends a rule, and the §2 instruction says to stop if it would
+   *
+   * Art. 15/d is ENFORCED on this route. A request to fewer than three companies needs an
+   * exemption or a declaration, and the exemption this stage uses is the fifth —
+   * `AT_CUSTOMER_REQUEST`, art. 15/d/5 — sent with **no evidence at all**.
+   *
+   * OWNER DECISION 139 is what makes that legitimate rather than a hole: the exemption is
+   * ACCEPTED and the row is MARKED «بلا إثبات», because the harm falls on the office and is
+   * repaired by attaching the message, so refusing at the last step punished an employee for
+   * not having logged a phone call yet. The mark is derived from the row (`exemptionLacksEvidence`),
+   * never stored, and ⛔ no permission can clear it — `RfqArticle15DExemption` permits exactly
+   * one transition, evidence NULL ⟶ NOT NULL, by trigger.
+   *
+   * ⟶ So this is the ordinary, intended path through the product, driven over real HTTP by an
+   * actor holding the ordinary `rfq.create`. No role is widened, no code is minted, no check is
+   * skipped and no row is written behind the API's back.
+   *
+   * ## And the shortlist is capped rather than hunted for
+   *
+   * The full-pipeline branch below takes up to FOUR writers so a well-served line reaches the
+   * statutory three with one to spare. This branch takes at most TWO, from the same pool — which
+   * is what puts the request under the article in the first place. ⛔ It does not search for a
+   * thin line: that would make the stage depend on the insurer/line structure and silently
+   * produce nothing on a run where every designed line happened to be well served.
+   */
+  const haltingAtRfq = stopAfter === 'rfqIssuedAwaitingEvidence';
+  const shortlist = haltingAtRfq
+    ? pickN(lineWriters, Math.min(2, lineWriters.length))
+    : pickN(lineWriters, Math.min(4, lineWriters.length));
   const rfq = await attempt(tally, 'rfq', () =>
     postAs<{ id: string }>(app, actors.placement.token, '/rfqs', {
       opportunityId: opportunity.id,
       insuranceLine,
       insurerIds: shortlist.map((i) => i.id),
+      ...(haltingAtRfq && shortlist.length < 3
+        ? { article15D: { exemption: 'AT_CUSTOMER_REQUEST' } }
+        : {}),
     }),
   );
   if (!rfq) return undefined;
+
+  if (haltingAtRfq) {
+    /*
+     * The message the presenter attaches. INBOUND, from THIS customer, by an approved means —
+     * decision 139's four conditions, unchanged by decision 143. ⛔ Never `WHATSAPP`, which
+     * decision 44 excludes, and the route sets `customerId` from the opportunity itself so the
+     * log lands where `findApprovedInboundForCustomer` will find it.
+     *
+     * Created AFTER the request, which is the honest order: the whole point of the stage is a
+     * request that was accepted WITHOUT evidence and a message still waiting to be attached.
+     * `rfq.communication.log` is the placement officer's — the same code the attach itself
+     * carries, so nothing is granted to make this work.
+     */
+    const evidence = await attempt(tally, 'haltedRfqEvidenceWaiting', () =>
+      postAs(app, actors.placement.token, `/rfqs/${rfq.id}/communications`, {
+        direction: 'INBOUND',
+        channel: 'EMAIL',
+        subject: 'Request to approach a specific insurer',
+        body:
+          'The customer wrote asking that this line be placed with one named company. ' +
+          'Attach this message to the art. 15/d/5 exemption to clear the «بلا إثبات» mark.',
+        // ⚠️ `occurredAt`, NOT `sentAt`. The first version sent `sentAt` — the COLUMN's name on
+        // `CommunicationLog` — and the DTO forbids unknown properties, so all four of these
+        // answered `400 property sentAt should not exist`: every halted RFQ shipped with nothing
+        // for the presenter to attach, while the run itself stayed green. Found only by running
+        // the seeder and reading its own failure tally.
+        occurredAt: isoDateDaysAgo(randomInt(2, 20)),
+      }),
+    );
+    return halt('rfqIssuedAwaitingEvidence', {
+      rfqId: rfq.id,
+      insurerCount: shortlist.length,
+      evidenceWaiting: evidence !== undefined,
+    });
+  }
 
   /*
    * ONE QUOTATION PER SHORTLISTED INSURER, and the cheapest is what gets recommended.
@@ -2293,19 +2691,64 @@ async function maybeInvoicePolicy(
   policyId: string,
   premium: number,
   tally: Tally,
-): Promise<void> {
+): Promise<{ id: string; totalAmount: string } | undefined> {
   // taxAmount and feesAmount must both be `<= premiumAmount` (server-enforced
   // against Policy.issuedPremium) — keep both as small fractions of the
   // premium rather than an unrelated fixed range, so this never 422s on a
   // small policy.
-  await attempt(tally, 'invoice', () =>
-    postAs(app, actors.finance.token, '/invoices', {
-      policyId,
-      taxAmount: money(Math.max(1, Math.round(premium * 0.16))),
-      feesAmount: money(Math.max(1, Math.round(premium * 0.02))),
-      dueDate: isoDateDaysFromNow(30),
+  return attempt(tally, 'invoice', () =>
+    postAs<{ id: string; totalAmount: string }>(
+      app,
+      actors.finance.token,
+      '/invoices',
+      {
+        policyId,
+        taxAmount: money(Math.max(1, Math.round(premium * 0.16))),
+        feesAmount: money(Math.max(1, Math.round(premium * 0.02))),
+        dueDate: isoDateDaysFromNow(30),
+      },
+    ),
+  );
+}
+
+/**
+ * 🔴 THE MONEY ACTUALLY ARRIVES ON A SHARE OF INVOICES — message 46 §2.5.
+ *
+ * The seed invoiced and never collected, so every invoice sat at `INVOICED` for ever, the client
+ * funds ledger held no `in` entry at all, and the commission-income figure on four dashboards
+ * read zero. Not because the computation is wrong — ⛔ nothing about how commission is computed
+ * is touched here — but because nothing had ever been paid.
+ *
+ * Through `POST /invoices/:id/receipt`, the product's own route, as the FINANCE actor, who is the
+ * only seeded role holding `receipt.record`. The full invoiced total in one instalment, so the
+ * invoice reaches `COLLECTED` and `reconcile` can take it to `RECONCILED`: a part payment is a
+ * different demonstration and this one is about the figure being non-zero.
+ *
+ * `reference` is MANDATORY and doubles as the endpoint's idempotency key, so it carries the
+ * invoice id — a re-run cannot book the same money twice.
+ */
+async function collectInvoice(
+  app: INestApplication<App>,
+  actors: Actors,
+  invoice: { id: string; totalAmount: string },
+  tally: Tally,
+): Promise<boolean> {
+  const receipt = await attempt(tally, 'receipt', () =>
+    postAs(app, actors.finance.token, `/invoices/${invoice.id}/receipt`, {
+      amount: invoice.totalAmount,
+      method: pick(['bank_transfer', 'cheque', 'card']),
+      receivedAt: isoDateDaysAgo(randomInt(1, 20)),
+      reference: `DEMO-RCPT-${invoice.id}`,
     }),
   );
+  if (!receipt) return false;
+  // INVOICED -> COLLECTED -> RECONCILED. The second step is what the finance screens call
+  // settled, and leaving it out would show money received against an invoice that still reads
+  // as outstanding.
+  await attempt(tally, 'invoiceReconciled', () =>
+    postAs(app, actors.finance.token, `/invoices/${invoice.id}/reconcile`, {}),
+  );
+  return true;
 }
 
 async function maybeClaimPolicy(
@@ -2314,7 +2757,8 @@ async function maybeClaimPolicy(
   policyId: string,
   inceptionDaysAgo: number,
   tally: Tally,
-): Promise<void> {
+): Promise<{ id: string; estimatedLoss: number } | undefined> {
+  const estimatedLoss = randomInt(500, 30_000);
   const claim = await attempt(tally, 'claim', () =>
     postAs<{ id: string }>(app, actors.claims.token, '/claims', {
       policyId,
@@ -2328,11 +2772,11 @@ async function maybeClaimPolicy(
         'Fire damage to office equipment.',
       ]),
       lossLocation: pick(CITIES),
-      estimatedLoss: money(randomInt(500, 30_000)),
+      estimatedLoss: money(estimatedLoss),
     }),
   );
-  if (!claim) return;
-  await attempt(tally, 'claimRegistration', () =>
+  if (!claim) return undefined;
+  const registered = await attempt(tally, 'claimRegistration', () =>
     postAs(app, actors.claims.token, `/claims/${claim.id}/registration`, {
       insurerClaimReference: `INS-REF-${Date.now()}-${nextSeq()}`,
       adjuster: {
@@ -2341,6 +2785,150 @@ async function maybeClaimPolicy(
       },
     }),
   );
+  return registered ? { id: claim.id, estimatedLoss } : undefined;
+}
+
+/**
+ * 🔴 A SHARE OF CLAIMS IS ACTUALLY SETTLED — message 46 §2.5.
+ *
+ * The seed recorded claims and never settled one, so every loss ratio on every dashboard read
+ * zero: a loss ratio is settlements over premium, and the numerator had never been written. ⛔ How
+ * it is computed is untouched here — what changes is that there is something to compute it from.
+ *
+ * Through `POST /claims/:id/settlement` as the CLAIMS actor, who holds `claim.settle.approve`.
+ *
+ * ⚠️ AND THE SECOND APPROVAL IS HONOURED RATHER THAN AVOIDED. A settlement at or above
+ * `CLAIM_LARGE_THRESHOLD_JOD` (25,000) needs a second approver who is NOT the first — the seeded
+ * losses run to 30,000, so some land there. Those are second-approved by the MANAGER, a different
+ * person holding `claim.settle.second-approve`. ⛔ Capping every approved amount below the
+ * threshold to keep this simple would seed a demo in which the maker/checker rule never fires,
+ * and a rule nobody can see working is a rule nobody believes.
+ */
+async function settleClaim(
+  app: INestApplication<App>,
+  actors: Actors,
+  claim: { id: string; estimatedLoss: number },
+  tally: Tally,
+): Promise<boolean> {
+  /*
+   * 🔴 SETTLING IS FOUR ACTS, NOT ONE — measured by running the seeder, not by reading the route.
+   *
+   * The first version posted straight to `/settlement` and every attempt answered
+   * «Claim … is REGISTERED; record the insurer's assessment verdict … before settling.» The real
+   * chain is documentation ⟶ submit for assessment ⟶ the insurer's verdict ⟶ settlement, and
+   * each step is a separate route with its own guard. That is the product being right: a payout
+   * recorded against a claim nobody assessed is the thing those guards exist to refuse.
+   *
+   * ⟶ So the seeder walks it, which also means the demo file holds claims at SEVERAL stages
+   * rather than two — the ones that stop here are as useful to a presenter as the ones that
+   * finish.
+   *
+   * ⛔ THE MANDATORY DOCUMENT LIST IS READ BACK, NEVER COPIED. `mandatoryDocTypesFor` is a
+   * per-line matrix (`claim_form` always, plus a police report for a third party, plus the line
+   * family's own); restating it here would be a second home for it, free to disagree the day the
+   * matrix moves. `GET /claims/:id` already answers `missingMandatoryDocuments`.
+   */
+  const view = await attempt(tally, 'claimChecklistRead', () =>
+    getAs<{ missingMandatoryDocuments: string[] }>(
+      app,
+      actors.claims.token,
+      `/claims/${claim.id}`,
+    ),
+  );
+  if (!view) return false;
+
+  if (view.missingMandatoryDocuments.length > 0) {
+    const attached = await attempt(tally, 'claimDocuments', () =>
+      postAs(app, actors.claims.token, `/claims/${claim.id}/documents`, {
+        documents: view.missingMandatoryDocuments.map((docType) => ({
+          docType,
+          /*
+           * A MEDICAL REPORT IS SENSITIVE PERSONAL DATA under PDPL and the service refuses any
+           * other classification for it by name. The rest are CONFIDENTIAL — a claim file is
+           * not public, and INTERNAL would understate it.
+           */
+          classification:
+            docType === 'medical_report'
+              ? 'HIGHLY_CONFIDENTIAL'
+              : 'CONFIDENTIAL',
+          fileName: `not-a-real-document--demo-seed-${docType}-${nextSeq()}.pdf`,
+          storageRef: `demo-seed/claims/${claim.id}/${docType}`,
+        })),
+      }),
+    );
+    if (!attached) return false;
+  }
+
+  const submitted = await attempt(tally, 'claimAssessmentSubmit', () =>
+    postAs(
+      app,
+      actors.claims.token,
+      `/claims/${claim.id}/assessment/submit`,
+      {},
+    ),
+  );
+  if (!submitted) return false;
+
+  /*
+   * ⚠️ AND A FIFTH ACT, found the same way: «the loss adjuster has not completed the survey and
+   * investigation — record those … before the assessment verdict». The verdict is not the
+   * insurer's opinion out of nowhere; it rests on somebody having been to look, and the route
+   * refuses to let a demo pretend otherwise. Write-once per field.
+   */
+  const surveyed = await attempt(tally, 'claimAdjusterProgress', () =>
+    postAs(
+      app,
+      actors.claims.token,
+      `/claims/${claim.id}/assessment/adjuster-progress`,
+      {
+        surveyCompletedAt: isoDateDaysAgo(randomInt(2, 10)),
+        investigationCompletedAt: isoDateDaysAgo(randomInt(1, 2)),
+      },
+    ),
+  );
+  if (!surveyed) return false;
+
+  // APPROVED rather than PARTIALLY_APPROVED: the partial case carries its own conversation with
+  // the customer, and a demo that only ever shows the disputed path misrepresents the ordinary one.
+  const decided = await attempt(tally, 'claimAssessmentDecision', () =>
+    postAs(
+      app,
+      actors.claims.token,
+      `/claims/${claim.id}/assessment/decision`,
+      {
+        outcome: 'APPROVED',
+      },
+    ),
+  );
+  if (!decided) return false;
+
+  // `approvedAmount` must be > 0 and <= estimatedLoss; `deductible` >= 0 and <= approvedAmount.
+  const approved = Math.max(1, Math.round(claim.estimatedLoss * 0.85));
+  const deductible = Math.max(0, Math.round(approved * 0.1));
+  const settled = await attempt(tally, 'claimSettlement', () =>
+    postAs<{ settlement?: { secondApproverRequired?: boolean } }>(
+      app,
+      actors.claims.token,
+      `/claims/${claim.id}/settlement`,
+      {
+        approvedAmount: money(approved),
+        deductible: money(deductible),
+        brokerProcessedPayment: false,
+      },
+    ),
+  );
+  if (!settled) return false;
+  if (settled.settlement?.secondApproverRequired === true) {
+    await attempt(tally, 'claimSettlementSecondApproval', () =>
+      postAs(
+        app,
+        actors.manager.token,
+        `/claims/${claim.id}/settlement/second-approve`,
+        {},
+      ),
+    );
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -2492,6 +3080,11 @@ interface OrgSeedSummary {
   fullPipelinesCompleted: number;
   invoicesCreated: number;
   claimsCreated: number;
+  /** Message 46 §2.1 — the chains that stop on purpose, so the report can name who sits where. */
+  haltedChains: HaltedChain[];
+  /** Message 46 §2.5 — how many of each were taken the rest of the way. */
+  receiptsRecorded: number;
+  claimsSettled: number;
 }
 
 async function seedOrganization(
@@ -2590,18 +3183,72 @@ async function seedOrganization(
       pipelineTargets[i].id,
       tally,
     );
-    if (result) policies.push(result);
+    if (result && !isHalted(result)) policies.push(result);
     console.log(
-      `  ...pipeline ${i + 1}/${pipelineTargets.length}${result ? ' -> ' + result.policyNumber : ' (stopped early, see errors)'}`,
+      `  ...pipeline ${i + 1}/${pipelineTargets.length}${result && !isHalted(result) ? ' -> ' + result.policyNumber : ' (stopped early, see errors)'}`,
     );
+  }
+
+  /*
+   * 🔴 THE CHAINS THAT STOP ON PURPOSE — message 46 §2.1.
+   *
+   * AFTER the full pipelines, on their OWN customers, taken from the far end of the standalone
+   * list so the two sets cannot overlap: a customer who is both halfway through one chain and
+   * the holder of a delivered policy is a worse demonstration than either, and a presenter
+   * looking for "the one with no programme" would find a programme.
+   */
+  const haltedChains: HaltedChain[] = [];
+  const schedule = haltedChainSchedule();
+  const haltTargets = standaloneCustomers.slice(
+    NUM.fullPipelinePerOrg,
+    NUM.fullPipelinePerOrg + schedule.length,
+  );
+  if (haltTargets.length < schedule.length) {
+    tally.errors.push(
+      `[haltedChains] ${orgSlug} has ${haltTargets.length} customers free for ${schedule.length} ` +
+        `halted chains — raise DEMO_CUSTOMERS_PER_ORG or lower HALTED_CHAINS_PER_OFFICE. The ` +
+        `stages that got no customer are missing from the demo, which is what this says out loud.`,
+    );
+  }
+  console.log(`- ${haltTargets.length} chains halted on purpose...`);
+  for (let i = 0; i < haltTargets.length; i += 1) {
+    const stage = schedule[i];
+    const result = await runFullPipeline(
+      app,
+      actors,
+      orgSlug,
+      insurers,
+      haltTargets[i].id,
+      tally,
+      stage,
+      haltTargets[i].legalName,
+    );
+    if (isHalted(result)) {
+      haltedChains.push(result);
+      console.log(`  ...halted at ${stage} -> ${haltTargets[i].legalName}`);
+    } else {
+      /*
+       * It ran past its stop, or it failed before reaching it. Either way the stage has one
+       * fewer chain than the plan says, and a presenter told to look for it would find nothing.
+       * ⛔ Counted and NAMED rather than silently absorbed — a halted-chain seeder whose output
+       * nobody checks is indistinguishable from one that never ran.
+       */
+      bump(tally, 'failed', `halted:${stage}`);
+      tally.errors.push(
+        `[haltedChains] ${orgSlug}: the chain meant to stop at ${stage} did not — ` +
+          `${haltTargets[i].legalName} is not sitting at that stage`,
+      );
+    }
   }
 
   console.log(`- invoices/claims on ${policies.length} issued policies...`);
   let invoicesCreated = 0;
   let claimsCreated = 0;
+  let receiptsRecorded = 0;
+  let claimsSettled = 0;
   for (let i = 0; i < policies.length; i += 1) {
     if (Math.random() < 0.75) {
-      await maybeInvoicePolicy(
+      const invoice = await maybeInvoicePolicy(
         app,
         actors,
         policies[i].policyId,
@@ -2609,9 +3256,21 @@ async function seedOrganization(
         tally,
       );
       invoicesCreated += 1;
+      /*
+       * MESSAGE 46 §2.5 — about two thirds of invoices are actually paid.
+       *
+       * Not all of them: an ageing report with nothing outstanding has nothing to report, and
+       * `/collections` exists to show what has NOT been collected. Two thirds puts a real figure
+       * on the commission-income tiles and leaves a real figure on the ageing one.
+       */
+      if (invoice && Math.random() < 0.65) {
+        if (await collectInvoice(app, actors, invoice, tally)) {
+          receiptsRecorded += 1;
+        }
+      }
     }
     if (Math.random() < 0.4) {
-      await maybeClaimPolicy(
+      const claim = await maybeClaimPolicy(
         app,
         actors,
         policies[i].policyId,
@@ -2619,6 +3278,17 @@ async function seedOrganization(
         tally,
       );
       claimsCreated += 1;
+      /*
+       * MESSAGE 46 §2.5 — about half of claims settle.
+       *
+       * The rest stay open, which is what the claims dashboard and the SLA screens are for. A
+       * file where every claim is closed shows neither.
+       */
+      if (claim && Math.random() < 0.5) {
+        if (await settleClaim(app, actors, claim, tally)) {
+          claimsSettled += 1;
+        }
+      }
     }
   }
 
@@ -2660,6 +3330,9 @@ async function seedOrganization(
     fullPipelinesCompleted: policies.length,
     invoicesCreated,
     claimsCreated,
+    haltedChains,
+    receiptsRecorded,
+    claimsSettled,
   };
 }
 
@@ -2711,9 +3384,22 @@ it(
         await ensureOfficeAdministrator(orgId);
       }
 
-      const orgAName =
-        (await rawPrisma.organization.findUnique({ where: { id: ORG_A_ID } }))
-          ?.legalName ?? ORG_A_LABEL;
+      /*
+       * Both demo offices take the owner's names (decision 150 ruling 6). Idempotent and
+       * unconditional: office A already existed under the base seed's placeholder, so this is a
+       * rename rather than a creation, and it must run on every pass for the same reason every
+       * other step here does.
+       */
+      for (const [orgId, legalName, legalNameAr] of [
+        [ORG_A_ID, ORG_A_LEGAL_NAME, ORG_A_LEGAL_NAME_AR],
+        [ORG_B_ID, ORG_B_LEGAL_NAME, ORG_B_LEGAL_NAME_AR],
+      ] as const) {
+        await rawPrisma.organization.update({
+          where: { id: orgId },
+          data: { legalName, legalNameAr },
+        });
+      }
+      const orgAName = ORG_A_LEGAL_NAME;
 
       // Each Organization is seeded independently — a hard failure in Office A
       // (e.g. its actor accounts could not be provisioned) must not prevent
@@ -2732,6 +3418,19 @@ it(
           console.error(`\n!!! ${orgLabel} FAILED entirely: ${message}\n`);
           tally.errors.push(`[org:${orgSlug}] ${message}`);
         }
+      }
+
+      /*
+       * MESSAGE 46 §2.2 — office B's licence goes past expiry LAST, once everything it was going
+       * to produce has been produced. See `expireOfficeLicenceAwaitingDeclaration`'s header for
+       * why the order is load-bearing and why office A keeps a valid term.
+       */
+      const officeB = summaries.find((s) => s.orgSlug === ORG_B_SLUG);
+      if (officeB) {
+        console.log(
+          "Putting Office B's licence past expiry, awaiting its declaration...",
+        );
+        await expireOfficeLicenceAwaitingDeclaration(app, officeB, tally);
       }
 
       // ------------------------------------------------------------------
@@ -2756,8 +3455,35 @@ it(
           `  full pipelines completed (ACTIVE-track policies): ${summary.fullPipelinesCompleted}`,
         );
         console.log(
-          `  invoices: ${summary.invoicesCreated}, claims: ${summary.claimsCreated}`,
+          `  invoices: ${summary.invoicesCreated} (${summary.receiptsRecorded} collected), ` +
+            `claims: ${summary.claimsCreated} (${summary.claimsSettled} settled)`,
         );
+        /*
+         * 🔴 WHICH CUSTOMER SITS AT WHICH STAGE — message 46 §2.1 asks for this by name.
+         *
+         * A presenter needs to be able to FIND the half-finished work, and a count cannot tell
+         * them where to click. Customer names are seed data (generated here, from this script's
+         * own pools) so printing them discloses nothing about anybody.
+         */
+        console.log('  chains halted on purpose:');
+        for (const stage of HALTED_STAGES) {
+          const at = summary.haltedChains.filter((c) => c.halted === stage);
+          if (at.length === 0) {
+            console.log(
+              `    ${stage.padEnd(28)} NONE — the presenter has nothing to open at this stage`,
+            );
+            continue;
+          }
+          for (const chain of at) {
+            const extra =
+              chain.halted === 'rfqIssuedAwaitingEvidence'
+                ? `  (${chain.insurerCount} insurer(s), evidence waiting: ${chain.evidenceWaiting ? 'yes' : 'NO'})`
+                : '';
+            console.log(
+              `    ${stage.padEnd(28)} ${chain.customerLabel}${extra}`,
+            );
+          }
+        }
         console.log(`  demo login (password for all: ${DEMO_PASSWORD}):`);
         for (const actor of Object.values(summary.actors)) {
           console.log(`    ${actor.label.padEnd(32)} ${actor.email}`);
@@ -2802,6 +3528,31 @@ it(
               fullPipelinesCompleted: s.fullPipelinesCompleted,
               invoicesCreated: s.invoicesCreated,
               claimsCreated: s.claimsCreated,
+              receiptsRecorded: s.receiptsRecorded,
+              claimsSettled: s.claimsSettled,
+              /*
+               * 🔴 THE STAGE TABLE GOES IN THE FILE, NOT ONLY IN THE CONSOLE — message 46 §2.1
+               * asks for the run to name which customer sits at which stage.
+               *
+               * Measured 2026-11-18: vitest SWALLOWS the seeder's `console.log` output, so the
+               * summary printed at the end of a successful run reaches nobody. The report file is
+               * what a presenter can actually open — and it is the one place the stage table is
+               * guaranteed to survive the runner.
+               *
+               * Customer names are seed data, generated by this script's own pools, so writing
+               * them here discloses nothing about anybody.
+               */
+              haltedChains: s.haltedChains.map((c) => ({
+                stage: c.halted,
+                customer: c.customerLabel,
+                ...(c.halted === 'rfqIssuedAwaitingEvidence'
+                  ? {
+                      rfqId: c.rfqId,
+                      insurerCount: c.insurerCount,
+                      evidenceWaiting: c.evidenceWaiting,
+                    }
+                  : {}),
+              })),
               actors: Object.fromEntries(
                 Object.entries(s.actors).map(([key, actor]) => [
                   key,
