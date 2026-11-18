@@ -93,23 +93,33 @@ async function openAt(
  *   byte-for-byte against that annex by `lib/i18n/decision-150.strings.test.ts`; what this file
  *   needs is only something stable to prove the prose REACHED THE SCREEN before it screenshots.
  *
- * ⚠️ THE ENGLISH ANCHORS ARE UNCHANGED, AND THAT IS MEASURED RATHER THAN ASSUMED. Ruling 3-أ and
- * the annex are about the ARABIC — every row of the annex's §١ table names an Arabic span, and
- * §٥ gives Arabic text only. The English descriptions still open «Process N — », so they still
- * anchor here. Whether the English should lose its prefix too is an empty cell: she has not
- * ruled on it, and ⛔ removing it because the Arabic lost it would be deciding for her.
+ * ⚠️ AND THE ENGLISH ANCHORS WERE LEFT ALONE, MEASURED RATHER THAN ASSUMED — ruling 3-أ and the
+ * annex name ARABIC spans only, so «Process N — » still opened the English and still anchored
+ * here. Whether the English should lose its prefix too was recorded as an EMPTY CELL, because
+ * ⛔ removing it because the Arabic lost it would have been deciding for her.
+ *
+ * 🔴 SHE RULED IT — OWNER DECISION 152 §٢, and this file is the creditor being paid. The prefix
+ * is gone from the twenty-five English values too, so the five English anchors below have moved
+ * to a DISTINCTIVE PHRASE THAT SURVIVES the ruling, exactly as the Arabic ones did a batch ago.
+ * Each was proven present in the shipping text before it was written here, and
+ * `check:process-prefix` now holds BOTH languages at budget zero.
+ *
+ * ⛔ `access-recertification`'s «البند 5.1» / «Part 5.1» pair is NOT touched. Decision 151
+ * ruling 2 deletes those internal clause references, but 151 is COPY ONLY this batch — the
+ * strings move when it is built, and re-anchoring ahead of the change would leave this file
+ * asserting the absence of something still on the screen.
  */
 // screen -> [path, a phrase that must be on it in AR, and in EN]
 const SCREENS: Array<[string, string, string, string]> = [
-  ["cross-sell", "/cross-sell", "بقائمة فروع تأمين مرجعية", "Process 8"],
-  ["up-sell", "/up-sell", "مبلغ التأمين المصمم للممتلكات", "Process 9"],
-  ["crm", "/crm", "تسجيل كل نقطة تواصل مع العميل", "Process 10"],
-  ["needs-assessments", "/needs-assessments", "استبيان مخاطر منظّم", "Process 5"],
+  ["cross-sell", "/cross-sell", "بقائمة فروع تأمين مرجعية", "benchmark line list"],
+  ["up-sell", "/up-sell", "مبلغ التأمين المصمم للممتلكات", "designed property Sum Insured"],
+  ["crm", "/crm", "تسجيل كل نقطة تواصل مع العميل", "Log every customer touchpoint"],
+  ["needs-assessments", "/needs-assessments", "استبيان مخاطر منظّم", "A structured risk questionnaire"],
   [
     "insurance-programs",
     "/insurance-programs",
     "برنامج تأمين متعدد فروع التأمين",
-    "Process 7",
+    "A multi-line Insurance Program",
   ],
   ["access-recertification", "/access-recertification", "البند 5.1", "Part 5.1"],
   ["claims-analytics", "/claims-analytics", "معدّل الخسارة", "Loss Ratio"],

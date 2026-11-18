@@ -892,7 +892,7 @@ export const DETAIL_PAGES = {
     prosdLoadError: 'Could not load this prospect — try again.',
     prosnHeading: 'Qualify prospect',
     prosnIntro:
-      'Process 2 — convert a qualified lead into a prospect and capture its qualification profile (sector, activity, size, location, contact, products of interest, expected premium).',
+      'Convert a qualified lead into a prospect and capture its qualification profile (sector, activity, size, location, contact, products of interest, expected premium).',
     prosnConverting: 'Converting…',
     prosnConvertError: 'Could not convert this lead to a prospect — try again.',
     prosnIndustryPlaceholder: 'e.g. Manufacturing',
@@ -986,7 +986,7 @@ export const DETAIL_PAGES = {
     leaddUpdated: 'Updated',
     leaddBack: 'Back',
     crmIntro:
-      'Process 10 — log every customer touchpoint (meeting, call, email, ' +
+      'Log every customer touchpoint (meeting, call, email, ' +
       'WhatsApp, visit, proposal, renewal, claim, complaint) and see the 360° ' +
       'timeline: interactions today, plus policies, claims and complaints ' +
       'once those modules land.',
@@ -995,12 +995,12 @@ export const DETAIL_PAGES = {
       'above — policies, claims and complaints will appear here too once ' +
       'those modules exist.',
     xsIntro:
-      "Process 8 — a nightly job compares each customer's in-force policy " +
+      "A nightly job compares each customer's in-force policy " +
       'lines against a benchmark line list and flags the gaps. Convert an ' +
       'opportunity to take it forward into an RFQ, or dismiss it with a ' +
       'reason.',
     upsIntro:
-      "Process 9 — a nightly job compares each customer's designed property " +
+      "A nightly job compares each customer's designed property " +
       'Sum Insured against the current value of their surveyed assets and ' +
       'proposes an increase where the gap is material. Convert a ' +
       'recommendation to take the increase forward, or dismiss it with a ' +

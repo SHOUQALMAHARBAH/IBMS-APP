@@ -1055,7 +1055,7 @@ export const OPERATIONS = {
       'The figure a multi-site client’s single Insurance Program is built from. Program assembly itself is Process 7.',
     rpSitesHeading: 'Sites / locations',
     rpSurveysIntro:
-      'Process 6 — the detailed asset survey per location, deriving the Sum Insured and indemnity period, consolidated across sites for a multi-site client.',
+      'The detailed asset survey per location, deriving the Sum Insured and indemnity period, consolidated across sites for a multi-site client.',
     rpIndemnityPeriod: 'Indemnity period (months)',
     rpAnnualGrossProfit: 'Annual gross profit (JOD)',
     rpDeclaredValue: 'Declared value (JOD)',
@@ -1064,9 +1064,9 @@ export const OPERATIONS = {
     rpAssetType: 'Asset type',
     rpNoAssetsYet: 'No assets surveyed yet for this location.',
     rpSurveyIntro:
-      'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location.',
+      'The detailed building / equipment / stock / annual-profit / fleet survey for this location.',
     rsSurveyIntro:
-      'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location. The Sum Insured and indemnity period below are derived from it.',
+      'The detailed building / equipment / stock / annual-profit / fleet survey for this location. The Sum Insured and indemnity period below are derived from it.',
     rpPriorClaimsField: 'Prior claims history summary (optional)',
     rpSiteLabelField: 'Site label (optional)',
     rpNoProfileYet:
@@ -1118,7 +1118,7 @@ export const OPERATIONS = {
     prosNone: 'No prospects yet.',
     prosRefusalAct: 'view prospects',
     prosIntro:
-      'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
+      'Qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
     prosViewProfileAria: 'View profile — {name}',
 
     homeLeadsBlurb:
@@ -1265,11 +1265,11 @@ export const OPERATIONS = {
       "revoke, or flag each item below; a System/Security Administrator's own " +
       "access is included and reviewed the same as anyone else's.",
     iprogIntro:
-      'Process 7 — a multi-line Insurance Program assembled from an approved ' +
+      'A multi-line Insurance Program assembled from an approved ' +
       "needs assessment's coverage list and the risk survey's derived Sum " +
       'Insured, then finalized to feed an RFQ.',
     naIntro:
-      'Process 5 — a structured risk questionnaire that recommends a coverage ' +
+      'A structured risk questionnaire that recommends a coverage ' +
       "list, then a review and approval gate. Start one from a customer's " +
       'profile.',
     secHardwareKeyPending:

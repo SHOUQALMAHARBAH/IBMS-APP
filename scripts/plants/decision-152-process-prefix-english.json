@@ -1,0 +1,14 @@
+{
+  "put-the-english-process-number-back": {
+    "file": "apps/web/lib/i18n/translations/rfq.ts",
+    "from": "      'Create one RFQ for one insurance line and send it to a ' +",
+    "to": "      'Process 11 — create one RFQ for one insurance line and send it to a ' +",
+    "why": "Owner decision 152 §٢ deletes the «Process N — » prefix from the twenty-five ENGLISH descriptions, as decision 150 ruling 3-أ deleted «العملية N —» from the Arabic. Budget zero, because there is no correct instance: a screen never needs to tell its reader which backlog item built it, in either language. ⚠️ The anchor is a WRAPPED entry on purpose — `rfqNewIntro`'s English value is split across lines by prettier, which is exactly the shape the gate's first version could not see; a plant on a single-line entry would prove less."
+  },
+  "blind-the-english-plural": {
+    "file": "scripts/measurements/process-number-prefix.py",
+    "from": "r\"^\\s*(?:العمل(?:ية|يات)\\s+[0-9٠-٩]|Process(?:es)?\\s+[0-9])\"",
+    "to": "r\"^\\s*(?:العمل(?:ية|يات)\\s+[0-9٠-٩]|Process\\s+[0-9])\"",
+    "why": "Proves the PLURAL half of the English matcher is load-bearing. `claimIntro` opens «Processes 23–30 — » and `Process\\s` does not match `Processes` at all — measured while writing this, a singular-only sweep counted TWENTY-FOUR English values when the real figure is twenty-five. With the plural dropped, the self-test case `the English PLURAL` must fail by name. That is the same Arabic number-agreement blindness this gate's header already records, reappearing in a language that has nothing to do with Arabic agreement."
+  }
+}

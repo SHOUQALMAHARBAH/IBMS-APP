@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""NO ARABIC STRING OPENS BY NUMBERING A BACKLOG PROCESS — OWNER DECISION 150 RULING 3.
+"""NO SHIPPED STRING OPENS BY NUMBERING A BACKLOG PROCESS — DECISIONS 150 (AR) AND 152 (EN).
 
     python scripts/measurements/process-number-prefix.py             # report
     python scripts/measurements/process-number-prefix.py --check      # gate, budget zero
@@ -14,6 +14,13 @@ the top of the paragraph that is supposed to tell them what the screen is for.
 
 Her ruling (150, 3-أ): «يُحذَف من الخمسة والعشرين، ولا تتغيّر كلمة بعده» — delete it from all
 twenty-five, and change no word after it.
+
+🔴 AND THE ENGLISH FOLLOWED A BATCH LATER, WHICH IS WHY THIS GATE WAS HALF A GATE. Ruling 3
+could only reach the ARABIC: every row of decision 150's annex names an Arabic span and its §٥
+gives Arabic text only. So twenty-five English values went on opening «Process 11 — » beside
+Arabic twins that no longer did — reported as an EMPTY CELL rather than decided for her, in
+`bilingual-prose-screenshots.spec.ts`'s own comment. **Decision 152 §٢ rules it**, and the
+matcher covers both languages now.
 
 ## Why the budget is ZERO rather than a ratchet
 
@@ -52,7 +59,24 @@ QUOTED = re.compile(r"'((?:[^'\\]|\\.)*)'" + "|" + r'"((?:[^"\\]|\\.)*)"')
 
 # «العملية» or «العمليات», then a digit (Western or Eastern) within a few characters -- the
 # space-digit shape of `العملية 11 —`, allowing the digits to be a range like `23-30`.
-PREFIX = re.compile(r"^\s*العمل(?:ية|يات)\s+[0-9٠-٩]")
+#
+# 🔴 AND THE ENGLISH, ADDED 2026-11-18 FOR OWNER DECISION 152 §٢.
+#
+# Decision 150 ruling 3 deleted the prefix from twenty-five ARABIC descriptions and could not
+# reach the English: every row of its annex names an Arabic span and §٥ gives Arabic only. So
+# the twenty-five English values went on opening «Process 11 — » while their Arabic twins no
+# longer did — which `bilingual-prose-screenshots.spec.ts` recorded in its own comment as an
+# EMPTY CELL rather than deciding for her. Decision 152 §٢ rules it: *«تُحذَف البادئة منها
+# أيضاً، ولا تتغيّر كلمة بعدها»*.
+#
+# ⚠️ BOTH ENGLISH FORMS, for the reason the Arabic pair is already matched here: `claimIntro`
+# opens «Processes 23–30 — », the PLURAL, and a `Process\s` matcher does not match `Processes`
+# at all. Measured while writing this: a singular-only sweep counted TWENTY-FOUR and the real
+# figure is twenty-five. That is the same Arabic-agreement blindness this file's header already
+# records, reappearing in a language that has nothing to do with Arabic agreement.
+PREFIX = re.compile(
+    r"^\s*(?:العمل(?:ية|يات)\s+[0-9٠-٩]|Process(?:es)?\s+[0-9])"
+)
 
 
 def _files(root: str) -> list[str]:
@@ -124,13 +148,14 @@ def measure(root: str) -> tuple[list[str], list[str]]:
                 findings.append(
                     f"{rel}:{n}: `{m.group(1)}` opens by numbering a backlog process -- "
                     f"{text[:40]}... Owner decision 150 ruling 3-أ deletes that prefix from "
-                    f"all twenty-five, and changes no word after it. The backlog's index means "
-                    f"nothing to the person reading the screen"
+                    f"all twenty-five Arabic descriptions and decision 152 §٢ from the "
+                    f"twenty-five English ones, and neither changes a word after it. The "
+                    f"backlog's index means nothing to the person reading the screen"
                 )
     lines = [
         f"  dictionary files scanned                     {scanned}",
         f"  first-line values examined                   {values}",
-        f"  «العملية N —» prefixes (budget 0)            {len(findings)}",
+        f"  process-number prefixes, AR + EN (budget 0)  {len(findings)}",
     ]
     return findings, lines
 
@@ -202,6 +227,34 @@ def _self_test() -> int:
         ("and wrapped across several lines joined with +",
          plant("h.ts", "    hIntro:\n      'العمليات 23-30 — المطالبات ' +\n      'من الإشعار.',\n"),
          "opens by numbering a backlog process"),
+        # 🔴 THE ENGLISH HALF — OWNER DECISION 152 §٢, added 2026-11-18.
+        ("the English singular «Process 11 — »",
+         plant("i.ts", "    iIntro: 'Process 11 — create one RFQ.',\n"),
+         "opens by numbering a backlog process"),
+        # ⚠️ `claimIntro`'s own shape, and the one a `Process\s` matcher cannot see at all. A
+        # singular-only sweep counted 24 English values; the real figure is 25.
+        ("the English PLURAL «Processes 23–30 — »",
+         plant("j.ts", "    jIntro: 'Processes 23–30 — notify claim.',\n"),
+         "opens by numbering a backlog process"),
+        ("the English value WRAPPED onto the next line",
+         plant("k.ts", "    kIntro:\n      'Process 7 — a multi-line Insurance Program.',\n"),
+         "opens by numbering a backlog process"),
+        # The WORD is ordinary English and appears in real copy. Only the NUMBERED PREFIX is the
+        # defect — without this case the matcher could be widened to `Process` alone and nothing
+        # would say so.
+        ("«Process» as an ordinary word is NOT a finding",
+         plant("l.ts", "    lIntro: 'Process the application before the deadline.',\n"),
+         None),
+        ("a process number in the MIDDLE of a sentence is not this defect",
+         plant("m.ts", "    mIntro: 'Covered by Process 11 once approved.',\n"),
+         None),
+        # ⛔ A permission DESCRIPTION carrying a parenthetical «(Process 17)» is a different
+        # thing and decision 152 §٢ does not touch it: the ruling is about the PREFIX on the
+        # twenty-five screen descriptions. Without this case, tightening the matcher later could
+        # quietly start failing six `permissions.ts` entries nobody ruled on.
+        ("a parenthetical «(Process 17)» inside a description is NOT a finding",
+         plant("n.ts", "    nIntro: 'Capture the decision (Process 17) on a recommendation.',\n"),
+         None),
     ]
     passed = failed = 0
     for label, mutate, needle in plants:
