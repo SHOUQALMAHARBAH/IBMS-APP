@@ -266,6 +266,7 @@ ANNEXES: dict[str, int] = {
     "decision-144-ratified-strings.md": 144,
     "decision-146-ratified-strings.md": 146,
     "decision-150-ratified-strings.md": 150,
+    "decision-151-ratified-strings.md": 151,
 }
 
 # A DECISION PAPER THAT STATES ITS RULINGS ONLY AS A TABLE -- 2026-11-17, THE FIRST OF 79.
@@ -307,6 +308,40 @@ RULINGS_TABLE_ONLY: dict[int, list[str]] = {
         "على الإدارة قبل أن يذهب للمهندس",
         # the struck exception: `rfqNewRefusalAct` keeps «سعر» against decision 144 ruling 8-أ
         "تبقى «إنشاء طلب عرض سعر» استثناءً لهذه الجملة وحدها",
+    ],
+    # Decision 151 is the SECOND paper of this shape, which is why the block above says "the
+    # first of 79" and this entry exists rather than that comment being rewritten. It answers a
+    # second walk as seven rulings in a table and never states one sentence that governs.
+    #
+    # All SEVEN are pinned, not a chosen five: on a paper whose rulings are its whole content
+    # there is no principled way to call one ruling less load-bearing than another, and the one
+    # left unpinned would be the one a row could drift on. Ruling 6 is the only one this batch
+    # builds against (no seeded role holds `license-renewal.declare`); the other six are copy.
+    #
+    # ⚠️ Her own continuation — `## تكملة القرار ١٥١` — was appended BELOW this table, so every
+    # line under it has already moved once. The slicer that produced these anchors is keyed on
+    # CONTENT and never on a line number, for exactly that reason.
+    151: [
+        # ruling 1 -- the dead sentence on the users screen is deleted
+        "تُحذَف «يُنشئ التسجيل الذاتي حساباً بلا أي دور — ومن ثمّ بلا أي صلاحية.» ويبقى "
+        "الباقي. يُغلق الخانة الفارغة التي تركها المهندس بعد القرار ١٤٠",
+        # ruling 2 -- the seven internal clause references go; the ISO one stays
+        "يُحذَف المرجع من سبعة نصوص. ويبقى «البند 8.1 من معيار ISO 27001» لأنه معيار "
+        "خارجي",
+        # ruling 3 -- Arabic mandatory, English optional; built AFTER the demo build
+        "في القسم وفرع المكتب العربي إجباري والإنجليزي اختياري. الدور يبقى كما هو. "
+        "**يُبنى بعد نسخة العرض.**",
+        # ruling 4 -- «الالتزام» everywhere, and the table goes to her before the engineer
+        "«الالتزام» في كل اسم شاشة أو دور أو قسم، **وجدول المواضع يُعرَض على الإدارة "
+        "قبل المهندس.**",
+        # ruling 5 -- the two spans on the licence screen that talk about the code
+        "يُحذَف «، وليست محفوظةً كحقل» و«وقد حلَّ هذا محلَّ زرٍّ واحدٍ … بلا ما يُستندُ "
+        "إليه.» ولا تتغيّر كلمة غيرهما",
+        # ruling 6 -- the new permission is granted LIVE; no seeded role holds it (decision 131)
+        "محمد ينشئ الدور ويمنحه الصلاحية أمام الوسطاء. **لا يُزرَع دور يحملها.** القرار "
+        "١٣١ يبقى بلا استثناء حتى في بيانات العرض",
+        # ruling 7 -- the two «المحاربه» customers stay; they are hers
+        "يبقيان. هما تجربة من الإدارة وليسا بيانات أحد. **لا يُحذَف شيء.**",
     ],
 }
 
@@ -713,6 +748,24 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
             body_norm = body.replace("**", "")
             row_norm = row_text.replace("**", "")
             for anchor in RULINGS_TABLE_ONLY[n]:
+                # 🔴 THE ANCHOR IS THE THIRD SIDE OF THIS COMPARISON AND IT WAS NOT STRIPPED.
+                #
+                # The comment above this table says "comparison strips `**` from both sides",
+                # and it did -- from the body and from the row. The anchor itself was left as
+                # written, so a declared span carrying her own inner bold could never be found
+                # in a body that had just had every `**` removed: the gate reported *0
+                # occurrences of a span plainly in the file*, which is the exact failure mode
+                # the slicing rule exists to prevent, one layer further in.
+                #
+                # Invisible until 2026-11-18 because decision 150's five anchors happen to
+                # carry no inner bold. Decision 151's rulings 3, 4, 6 and 7 all do -- four of
+                # seven -- and every one of them was reported missing from a file it is in.
+                #
+                # ⛔ The alternative was to declare the anchors with their `**` stripped out.
+                # That is worse: a declared anchor would then be a span that is NOT in the
+                # paper, and "every span is sliced" would quietly stop being true of the one
+                # place a reader checks it.
+                anchor = anchor.replace("**", "")
                 if anchor not in body_norm:
                     errors.append(
                         f"decision {n}: declared anchor is no longer in docs/{on_disk[n]} -- "
@@ -981,6 +1034,25 @@ def _self_test() -> int:
          lambda t: (RULINGS_TABLE_ONLY.clear(),
                     RULINGS_TABLE_ONLY.__setitem__(7, ["one sentence."])),
          "now HAS a one-sentence section"),
+        # 🔴 AN ANCHOR CARRYING HER OWN INNER BOLD -- the asymmetry fixed 2026-11-18.
+        #
+        # NON-VACUOUS BY ITS NEEDLE, which is the whole point. The anchor is declared WITH its
+        # `**` and the row is drifted, so the only way to reach "no longer repeats the declared
+        # anchor" is for the anchor to have matched the BODY first. Before the fix this case
+        # reports "the paper moved under the index row" instead -- a different error, naming a
+        # file that had not moved -- so the case fails loudly rather than passing for the wrong
+        # reason. Decision 151 has four such anchors; decision 150 had none, which is why the
+        # hole lived from the day the declaration was invented until the day it was used twice.
+        ("a rulings-table anchor carrying its own inner bold (`**`)",
+         lambda t: (RULINGS_TABLE_ONLY.clear(),
+                    RULINGS_TABLE_ONLY.__setitem__(7, ["one **bold** sentence."]),
+                    _patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة", "## الأحكام"),
+                    _patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "**one sentence.**", "**one **bold** sentence.**"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "no longer repeats the declared anchor"),
     ]
     # Two plants below mutate ANNEXES, a MODULE-LEVEL dict. Without this snapshot the first
     # of them leaks its ghost entry into every later case, and the self-test stops being a set

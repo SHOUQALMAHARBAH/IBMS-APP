@@ -78,7 +78,7 @@ npm run db:seed
 | `Copy-Item .env.example .env` | ينسخ ملف الإعدادات. **لا يطبع شيئاً عند النجاح** — الصمت هو النجاح | لا رسالة | `already exists`: الملف موجود، تخطّي الأمر |
 | `docker compose up -d db` | يشغّل قاعدة البيانات داخل Docker | `Started` أو `Running` | `error during connect`: Docker Desktop غير مفتوح |
 | `npm run db:migrate:deploy` | **ينشئ جداول قاعدة البيانات.** بدونه القاعدة فارغة تماماً ولن يعمل أي شيء | `All migrations have been successfully applied` | `Can't reach database server`: القاعدة لم تجهز بعد — انتظري عشر ثوانٍ وأعيدي الأمر |
-| `npm run db:seed` | يضع الأدوار والصلاحيات. بدونه تدخلين ولا تستطيعين فتح أي شاشة | آخر سطر: `Seeded 16 fixed-date Jordanian public holiday(s) ...` — وقبله `Seeded 227 permissions.` (القياس في ١٦/١٠/٢٠٢٦؛ لإعادة القياس: `bash scripts/from-empty.sh` — يطبع الرقمين موسومَين باسم هذا الملف) | **لا تحكمي على النجاح بالرقم.** الرقم يكبر مع كل صلاحية تُضاف، فاختلافه عن ٢٢٧ يعني غالباً أن هذا المستند قديم لا أن التجهيز فشل. الفشل يُعلن عن نفسه: الأمر يتوقف ويطبع الخطأ، ولا يصل إلى سطره الأخير. وإن دخلتِ ورُفضت كل شاشة فالمؤشّر الوحيد هو **الإسنادات = صفر** (انظري جدول المشكلات) |
+| `npm run db:seed` | يضع الأدوار والصلاحيات. بدونه تدخلين ولا تستطيعين فتح أي شاشة | آخر سطر: `Seeded 16 fixed-date Jordanian public holiday(s) ...` — وقبله `Seeded 234 permissions.` (القياس في ١٨/١١/٢٠٢٦؛ لإعادة القياس: `bash scripts/from-empty.sh` — يطبع الرقمين موسومَين باسم هذا الملف) | **لا تحكمي على النجاح بالرقم.** الرقم يكبر مع كل صلاحية تُضاف، فاختلافه عن ٢٣٤ يعني غالباً أن هذا المستند قديم لا أن التجهيز فشل. الفشل يُعلن عن نفسه: الأمر يتوقف ويطبع الخطأ، ولا يصل إلى سطره الأخير. وإن دخلتِ ورُفضت كل شاشة فالمؤشّر الوحيد هو **الإسنادات = صفر** (انظري جدول المشكلات) |
 
 > **استخدمي `db:migrate:deploy` وليس `db:migrate:dev`.** الأول يطبّق الترحيلات الموجودة ولا شيء غير ذلك.
 > الثاني يقارن بعدها ملف المخطط بقاعدة البيانات، وفي هذا المشروع الملف يحتوي أقل مما تحتويه القاعدة
@@ -136,8 +136,8 @@ npm run dev
 
 - الواجهة (الموقع) تجهز أولًا — **نحو ٢٠ ثانية** — ويظهر في النافذة السطر
   `✓ Ready in 19.1s` مع العنوان `http://localhost:3000`.
-- الخدمة الخلفية (API) **أبطأ بكثير: نحو خمس دقائق** على هذا الجهاز، لأنها تترجم الكود
-  أولًا. هذا طبيعي، ولا يعني أن شيئًا تعطّل. **ولا تُوقفي الأمر في هذه الفترة** — هذه أكثر
+- الخدمة الخلفية (API) **أبطأ بكثير: نحو خمس دقائق على جهاز بذاكرة ٨ غيغابايت**، لأنها
+  تترجم الكود أولًا. هذا طبيعي، ولا يعني أن شيئًا تعطّل. **ولا تُوقفي الأمر في هذه الفترة** — هذه أكثر
   لحظة يُقتل فيها تشغيلٌ سليم.
 - **الدليل على أنها تعمل الآن** سطران يظهران في النافذة بالترتيب:
   `Starting compilation in watch mode...` ثم — بعد نحو ثلاث دقائق وربع —
@@ -154,6 +154,35 @@ npm run dev
   (العنوان `http://localhost:4000/health` يخبرك أن الخدمة تعمل فقط، بدون قاعدة البيانات.)
 
 **اتركي هذه النافذة مفتوحة.** إذا أغلقتِها توقف النظام.
+
+### وإن كان أمامك عرضٌ أمام الناس: شغّلي نسخة الإنتاج
+
+`npm run dev` تضع **شارةَ التطوير** في أسفل كلِّ شاشة — دائرةً سوداء فيها حرف `N` وبجانبها
+`1 Insight`. هي أداةُ مطوِّرين، وليست من المنتج، ولا تختفي بإغلاقها. ونسخةُ الإنتاج لا تحملها
+أصلاً، وهي كذلك **أسرعُ في فتح الشاشات** لأنّ الصفحات مترجَمةٌ سلفاً لا عند أوّل زيارة.
+
+شغّلي الخدمة الخلفية كالمعتاد في نافذة، ثمّ في **نافذةٍ ثانية**:
+
+```powershell
+npm run build -w web
+npm run start -w web
+```
+
+- `build` يأخذ **دقائق**، ويطبع في آخره قائمةَ الصفحات. شغّليه مرّةً بعد كلِّ تغييرٍ في الكود،
+  ولا حاجة لإعادته قبل كلِّ عرض.
+- `start` يجهز في **ثانيةٍ أو ثانيتين** ويطبع `✓ Ready`. العنوان هو نفسه: `http://localhost:3000`.
+
+> ⚠️ **سيطبع `start` تحذيراً يقول:**
+> `"next start" does not work with "output: standalone" configuration. Use "node
+> .next/standalone/server.js" instead.`
+> **تجاهليه، ولا تتبعي نصيحته.** ذاك الإعداد موجودٌ من أجل صورة Docker وحدها. وقد قِيس في
+> ١٨/١١/٢٠٢٦: `npm run start -w web` يفتح `/login` سليمةً تماماً، بينما الأمرُ الذي يقترحه
+> التحذيرُ يفتح الصفحةَ **بلا أيِّ تنسيق** — لأنّ مجلّد `standalone` لا يحمل `.next/static`
+> ولا `public`، فتُطلَب ملفّاتُ التنسيق ويُجاب عنها بـ`404`. أي أنّ اتّباع التحذير يعطيك
+> الشاشةَ المكسورةَ التي تحاولين تفاديها.
+
+**ولا تنسي الخدمة الخلفية.** نسخةُ الإنتاج للواجهة وحدها؛ الـ API يبقى على `npm run dev`
+في نافذته، وإلّا فلن تجيب أيُّ شاشة.
 
 ## ٤. الخطوة الثالثة: جهّزي البيانات
 
@@ -244,6 +273,13 @@ http://localhost:3000
 
 7. تتحول الحالة إلى `مُفعَّلة`. **الآن يعمل النظام كله**، والتنبيه يختفي من جميع الشاشات.
 
+> **والربط لكلِّ حسابٍ على حدة، لا للجهاز.** هذه الخطوات الثماني تتكرّر عند أوّل دخولٍ
+> **لكلِّ حساب** تستخدمينه — وهي السبب الذي يجعل التجوّل بين ستّة حسابات يكلّف وقتاً لم
+> يُحسَب له حساب. ⟶ **إن كان أمامك عرض، فاربطي كلَّ حسابٍ تنوين الدخول به قبل الجلسة
+> لا أثناءها**: كلُّ ربطٍ يحتاج هاتفاً وإدخالَ رمزٍ من ستّ خاناتٍ ينتهي خلال ٣٠ ثانية،
+> وهذا ليس شيئاً يُفعَل وأحدهم ينتظر. والتطبيق يقبل حساباتٍ متعدّدة؛ سمّي كلَّ واحدٍ
+> باسم صاحبه حتى لا تبحثي عن الرمز الصحيح أمام الحضور.
+
 8. **تنبيه آخر قد يبقى ظاهرًا**، ولا حاجة للقلق منه: رسالة تقول إن سياسة المصادقة غير
    مستوفاة بالكامل. السبب أن الدور مضبوط على اشتراط **مفتاح أمان مادي** (USB)، وهذه الميزة
    غير مبنية في النظام بعد. التنبيه لا يمنع أي شيء — وقد قِيس ذلك على حسابك تحديدًا:
@@ -262,7 +298,8 @@ http://localhost:3000
 حسابات `demo.` في الجدول أدناه تحتاج **الربط وحده**: أمر `seed:demo` يُفرغ علامةَ تغيير كلمة
 المرور ويحذف أي ربطٍ قديم في **آخر** خطوةٍ من تنفيذه ويتحقّق من ذلك بنفسه.
 
-أما حسابات `sample.` — وهي **أحد عشر**، واحدٌ لكل دور، كلمتها المشتركة `SampleUser#2026!` —
+أما حسابات `sample.` — وهي **أحد عشر**، واحدٌ لكل دور، وكلمتها المشتركة واحدةٌ مضبوطةٌ في المتغيّر `SAMPLE_USER_PASSWORD` في الملفّ
+`packages/db/prisma/seed-data/sample-users.ts`، ولا تُطبَع في هذا الدليل —
 فتكلّف **خطوتين** قبل أن تُفتح أي شاشة. اعرفي ذلك وأنتِ تخطّطين بأيِّ حساب تدخلين، لا وأنتِ عند
 الحساب الثالث:
 
@@ -574,7 +611,7 @@ What each one does, and how you know it worked:
 | `Copy-Item .env.example .env` | Copies the settings file. **Prints nothing when it works** — silence is success | No message | `already exists`: the file is there, skip this one |
 | `docker compose up -d db` | Starts the database inside Docker | `Started` or `Running` | `error during connect`: Docker Desktop is not open |
 | `npm run db:migrate:deploy` | **Creates the database tables.** Without it the database is completely empty and nothing works | `All migrations have been successfully applied` | `Can't reach database server`: the database is not ready yet — wait ten seconds and run it again |
-| `npm run db:seed` | Puts in the roles and the permissions. Without it you can sign in and then open nothing | A last line of `Seeded 16 fixed-date Jordanian public holiday(s) ...`, with `Seeded 227 permissions.` above it (measured 2026-10-16; re-derive with `bash scripts/from-empty.sh`, which prints both figures labelled for this file) | **Do not judge success by the number.** It grows every time a permission is added, so a figure other than 227 most likely means this document is stale, not that the seed failed. Failure announces itself: the command stops, prints the error, and never reaches its last line. If you can sign in and every screen refuses you, the one number that means something is **grants = 0** — see the troubleshooting table |
+| `npm run db:seed` | Puts in the roles and the permissions. Without it you can sign in and then open nothing | A last line of `Seeded 16 fixed-date Jordanian public holiday(s) ...`, with `Seeded 234 permissions.` above it (measured 2026-11-18; re-derive with `bash scripts/from-empty.sh`, which prints both figures labelled for this file) | **Do not judge success by the number.** It grows every time a permission is added, so a figure other than 234 most likely means this document is stale, not that the seed failed. Failure announces itself: the command stops, prints the error, and never reaches its last line. If you can sign in and every screen refuses you, the one number that means something is **grants = 0** — see the troubleshooting table |
 
 > **Use `db:migrate:deploy`, not `db:migrate:dev`.** The first applies the existing migrations and nothing
 > else. The second then compares the schema file against the database, and in this project the file
@@ -627,7 +664,7 @@ npm run dev
 
 - The website is ready first — about **20 seconds** — and the window prints
   `✓ Ready in 19.1s` with `http://localhost:3000`.
-- The API is much slower: about **five minutes** on this machine, because it compiles
+- The API is much slower: about **five minutes on an 8 GB machine**, because it compiles
   first. That is expected and nothing has broken. **Do not stop the command during that
   window** — it is the likeliest moment for a healthy start to be killed.
 - **The proof it is alive** is two lines, in this order:
@@ -642,6 +679,37 @@ npm run dev
   the API process is alive.)
 
 **Leave that window open** — closing it stops the system.
+
+### If you are presenting to people: run the production build
+
+`npm run dev` puts a **development badge** at the bottom of every screen — a black circle with
+an `N` in it and `1 Insight` beside it. It is a developer tool, it is not part of the product,
+and closing it does not keep it away. The production build does not carry it at all, and it also
+**opens screens faster**, because pages are compiled ahead of time rather than on first visit.
+
+Start the API as usual in one window, then in a **second window**:
+
+```powershell
+npm run build -w web
+npm run start -w web
+```
+
+- `build` takes **minutes** and ends by printing the list of pages. Run it once after a code
+  change; you do not need to repeat it before every demonstration.
+- `start` is ready in **a second or two** and prints `✓ Ready`. The address is the same:
+  `http://localhost:3000`.
+
+> ⚠️ **`start` will print a warning:**
+> `"next start" does not work with "output: standalone" configuration. Use "node
+> .next/standalone/server.js" instead.`
+> **Ignore it, and do not take its advice.** That setting exists for the Docker image only.
+> Measured 2026-11-18: `npm run start -w web` serves `/login` perfectly, while the command the
+> warning recommends serves the page **with no styling at all** — the `standalone` folder
+> carries no `.next/static` and no `public`, so every stylesheet is requested and answered
+> `404`. Following the warning hands you the broken-looking screen you are trying to avoid.
+
+**And do not forget the API.** The production build is the website only; the API stays on
+`npm run dev` in its own window, or no screen will answer.
 
 ## 4. Step three: build the data
 
@@ -733,6 +801,14 @@ In order — this is what actually happened when the path was walked:
 7. The status becomes `Enabled`. **The whole system now works**, and the banner disappears
    everywhere.
 
+> **Pairing is per ACCOUNT, not per machine.** These eight steps repeat at the first sign-in of
+> **every account you use** — which is why walking through six accounts costs time nobody
+> budgets for. ⟶ **If you are presenting, pair every account you intend to sign in as BEFORE
+> the session, not during it**: each pairing needs a phone and a six-digit code that expires in
+> 30 seconds, and that is not a thing to do while somebody waits. The app holds many accounts;
+> name each one after its owner so you are not hunting for the right code in front of an
+> audience.
+
 8. **A second banner may remain**, and it is safe to ignore: it says the MFA policy is not
    fully satisfied. Both roles on this account require a **physical security key**, and that
    feature is not built yet. It blocks nothing.
@@ -752,8 +828,9 @@ The `demo.` accounts in the table below need **pairing only**: `seed:demo` clear
 forced-password-change flag and deletes any old credential rows at the **end** of its own run, and
 checks that it did.
 
-The `sample.` accounts are different. There are **eleven**, one per role, sharing the password
-`SampleUser#2026!`, and each costs **two steps** before any screen opens. Know that while you are
+The `sample.` accounts are different. There are **eleven**, one per role, sharing one password — set in
+`SAMPLE_USER_PASSWORD` in `packages/db/prisma/seed-data/sample-users.ts`, and deliberately not printed
+in this guide. Each costs **two steps** before any screen opens. Know that while you are
 deciding which accounts to use, rather than meeting it on the third one:
 
 1. **A forced password change.** `mustChangePassword` is `true` on all eleven — it is the schema

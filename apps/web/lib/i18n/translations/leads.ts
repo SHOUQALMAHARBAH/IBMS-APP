@@ -50,7 +50,7 @@ export const LEADS = {
   EN: {
     leadsHeading: 'Leads',
     leadsProcessIntro:
-      'Process 1 — capture a lead from any acquisition source and move it through the pipeline ' +
+      'Capture a lead from any acquisition source and move it through the pipeline ' +
       '(New → Contacted → Qualified → Converted to prospect, or Disqualified at any stage).',
     leadsPipelineHeading: 'Pipeline',
     leadsRefusalAct: 'view leads',

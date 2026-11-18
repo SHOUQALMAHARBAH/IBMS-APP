@@ -1182,7 +1182,14 @@ test("🔴 §P2 — a customer's own opportunities are reachable by CLICKING, no
     .last();
   await expect(card).toBeVisible();
 
-  await page.getByRole("button", { name: "View", exact: true }).click();
+  // 🔴 OWNER DECISION 152 §١ — the control was the bare «عرض» / "View" borrowed from
+  // `/employees`, reported as an empty cell because decision 125 forbids joining two shipped
+  // words into a third. She ratified the join, so it is «عرض الفرص» / "View opportunities"
+  // now. `exact: true` is KEPT: without it this would still match the bare word and the
+  // assertion would survive a revert of the very thing it is pinning.
+  await page
+    .getByRole("button", { name: "View opportunities", exact: true })
+    .click();
   await expect(page).toHaveURL("/opportunities?customerId=cust-1");
 });
 

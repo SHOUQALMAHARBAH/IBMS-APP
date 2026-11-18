@@ -1,0 +1,8 @@
+{
+  "unstrip-the-anchor-bold": {
+    "file": "scripts/measurements/decision-index-fit.py",
+    "from": "                anchor = anchor.replace(\"**\", \"\")\n                if anchor not in body_norm:",
+    "to": "                if anchor not in body_norm:",
+    "why": "Proves the self-test case `a rulings-table anchor carrying its own inner bold` is NOT vacuous. The anchor is the third side of a comparison whose own comment claimed to strip `**` from 'both sides' -- it stripped the body and the row and left the anchor as written, so a declared span carrying her inner bold could never be found in a body that had just had every `**` removed. With this line gone the self-test case reports `the paper moved under the index row` instead of `no longer repeats the declared anchor` -- a DIFFERENT error naming a file that had not moved -- and the case fails by name. Invisible until decision 151 because decision 150's five anchors happen to carry no inner bold; 151's rulings 3, 4, 6 and 7 all do."
+  }
+}

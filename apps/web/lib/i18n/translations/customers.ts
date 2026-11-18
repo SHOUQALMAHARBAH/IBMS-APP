@@ -331,7 +331,7 @@ export const CUSTOMERS = {
     impIssueKindNeedsReview: 'Awaiting review',
     customersHeading: "Customers",
     customersProcessIntro:
-      "Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and " +
+      "Customer acquisition and onboarding (individual and corporate), KYC, and " +
       "beneficial ownership.",
     customersOnboardButton: "+ Onboard a new customer",
     customersSearchLabel: "Search",
@@ -421,14 +421,14 @@ export const CUSTOMERS = {
 
     customerNeedsAssessmentHeading: "Needs assessment",
     customerNeedsAssessmentIntro:
-      "Process 5 — a structured risk questionnaire that recommends a coverage list, " +
+      "A structured risk questionnaire that recommends a coverage list, " +
       "reviewed and approved before it feeds an opportunity or RFQ.",
     customerNeedsAssessmentStartButton: "Start a needs assessment",
     customerNeedsAssessmentRefusalAct: 'start a needs assessment',
 
     customerRiskSurveyHeading: "Risk survey",
     customerRiskSurveyIntro:
-      "Process 6 — the detailed asset survey per location (building / equipment / " +
+      "The detailed asset survey per location (building / equipment / " +
       "stock / annual profit / fleet), deriving the Sum Insured and indemnity " +
       "period, consolidated across sites.",
     customerRiskSurveyOpenButton: "Open the risk survey",
@@ -436,7 +436,7 @@ export const CUSTOMERS = {
 
     customerInsuranceProgramHeading: "Insurance program",
     customerInsuranceProgramIntro:
-      "Process 7 — a multi-line Insurance Program assembled from an approved " +
+      "A multi-line Insurance Program assembled from an approved " +
       "needs assessment's coverage list and the risk survey's derived " +
       "Sum Insured, then finalized to feed an RFQ.",
     customerInsuranceProgramOpenButton: "Open the insurance program",
@@ -444,7 +444,7 @@ export const CUSTOMERS = {
 
     customerCrossSellHeading: "Cross-sell",
     customerCrossSellIntro:
-      "Process 8 — a nightly scan compares this customer's in-force " +
+      "A nightly scan compares this customer's in-force " +
       "policy lines against a benchmark line list and flags the gaps as " +
       "cross-sell opportunities to convert or dismiss.",
     customerCrossSellOpenButton: "Open cross-sell opportunities",
@@ -452,7 +452,7 @@ export const CUSTOMERS = {
 
     customerUpSellHeading: "Up-sell",
     customerUpSellIntro:
-      "Process 9 — a nightly job compares this customer's designed " +
+      "A nightly job compares this customer's designed " +
       "property Sum Insured against the current value of their surveyed " +
       "assets and proposes an increase where the gap is material.",
     customerUpSellOpenButton: "Open up-sell recommendations",
@@ -460,7 +460,7 @@ export const CUSTOMERS = {
 
     customerCrmHeading: "Relationship (CRM)",
     customerCrmIntro:
-      "Process 10 — log every customer touchpoint and see the 360° " +
+      "Log every customer touchpoint and see the 360° " +
       "timeline (interactions today, plus policies, claims and " +
       "complaints once those modules exist).",
     customerCrmOpenButton: "Open the relationship timeline",
@@ -527,7 +527,7 @@ export const CUSTOMERS = {
     // customers/new/page.tsx
     customerNewHeading: "Onboard a customer",
     customerNewIntro:
-      "Process 3-4 — a step-by-step KYC wizard: customer type, profile, beneficial owners " +
+      "A step-by-step KYC wizard: customer type, profile, beneficial owners " +
       "(if corporate), supporting documents, then submission to Compliance for screening " +
       "and approval.",
     customerNewRefusalAct: 'add a customer',
@@ -535,7 +535,7 @@ export const CUSTOMERS = {
     // KycQueue.tsx + customers/kyc-queue/page.tsx
     kycQueuePageHeading: "KYC compliance queue",
     kycQueuePageIntro:
-      "Process 3-4 — run sanctions/AML screening, route high-risk results through " +
+      "Run sanctions/AML screening, route high-risk results through " +
       "enhanced due diligence, and approve or reject each KYC file. Approving activates " +
       "the Customer; maker/checker prevents the capturing officer from also being the approver.",
     kycQueueApproveCanAct: 'work the KYC queue and see what each file is waiting for',

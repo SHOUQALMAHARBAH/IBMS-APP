@@ -15,6 +15,15 @@ export const RFQ = {
     oppListIntro:
       'يُطرح برنامج تأمين معتمد نهائياً في السوق كفرصة تجارية. افتح فرصة لإصدار طلب عرض أسعار لكل فرع تأمين وإرساله إلى قائمة مختصرة من شركات التأمين.',
     oppListRefusalAct: 'عرض الفرص',
+    /* 🔴 OWNER DECISION 152 §١ — the customer page's opportunities control.
+       It shipped as the bare «عرض» (`empViewButton`, borrowed from `/employees`), and that
+       screen's own comment reported «عرض الفرص» as an EMPTY CELL because joining two
+       shipped words into a third is what decision 125 forbids. She ratified the join.
+       ⛔ Sliced from her paper by `decision-152.strings.test.ts`, never retyped here.
+       ⚠️ A SEPARATE KEY from `oppListRefusalAct` above, which happens to carry the same
+       span: that one is an ACT phrase inside a refusal sentence («…ليس لديك صلاحية X»),
+       and one key serving a button and a sentence fragment is one key that cannot move. */
+    oppListOpenButton: 'عرض الفرص',
     oppCustomerNotFound:
       'تعذر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     oppListLoadError: 'تعذر تحميل الفرص التجارية — حاول مرة أخرى.',
@@ -446,10 +455,13 @@ export const RFQ = {
     // opportunities/page.tsx
     oppListHeading: 'RFQ / market',
     oppListIntro:
-      'Process 11 — a finalized insurance program is taken to market as an ' +
+      'A finalized insurance program is taken to market as an ' +
       'Opportunity. Open one to raise an RFQ per insurance line and send it to ' +
       'a shortlist of insurers.',
     oppListRefusalAct: 'view opportunities',
+    /* Decision 152 ratifies the ARABIC. The English is ours, as every English half here
+       is — capitalised for a control, where the refusal's own is mid-sentence. */
+    oppListOpenButton: 'View opportunities',
     oppCustomerNotFound:
       'This customer could not be found — it may not exist, or you may not have access to it.',
     oppListLoadError: 'Could not load opportunities — try again.',
@@ -493,7 +505,7 @@ export const RFQ = {
     // rfqs/new/page.tsx
     rfqNewHeading: 'New RFQ',
     rfqNewIntro:
-      'Process 11 — create one RFQ for one insurance line and send it to a ' +
+      'Create one RFQ for one insurance line and send it to a ' +
       'shortlist of insurers. Each insurer starts at SENT.',
     rfqNewRefusalAct: 'raise a request for quotation',
     a15dDeclareRefusalAct:

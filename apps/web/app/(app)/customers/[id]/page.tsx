@@ -517,12 +517,15 @@ export default function CustomerProfilePage() {
             thing the placement path runs on — were reachable only by typing a URL.
 
             ⛔ EVERY STRING IS ALREADY SHIPPING AND NOTHING IS COMPOSED. The heading and the
-            paragraph are the DESTINATION's own (`oppListHeading`, `oppListIntro`), the refusal
-            names the act in its own shipped words (`oppListRefusalAct`), and the button is the
-            bare «عرض» that `/employees` already uses to open a row. Decision 125 forbids
-            joining two shipped words into a third, which is exactly what «فتح الفرص» would be
-            — so that word is REPORTED as an empty cell rather than invented, and this control
-            ships working in the meantime.
+            paragraph are the DESTINATION's own (`oppListHeading`, `oppListIntro`) and the
+            refusal names the act in its own shipped words (`oppListRefusalAct`).
+
+            🔴 THE BUTTON'S WORD WAS AN EMPTY CELL AND IS NOW HERS — OWNER DECISION 152 §١.
+            It shipped as the bare «عرض» that `/employees` uses to open a row, because decision
+            125 forbids joining two shipped words into a third and «عرض الفرص» would have been
+            exactly that. It was REPORTED rather than invented, and she ratified the join: the
+            label is `oppListOpenButton`, sliced from her paper by
+            `lib/i18n/decision-152.strings.test.ts` and never retyped.
 
             Gated on `opportunity.read` — measured on the seeded fixture: the manager, the
             executive, the placement officer and the sales officer hold it. ⛔ No role was
@@ -536,7 +539,7 @@ export default function CustomerProfilePage() {
                   router.push(`/opportunities?customerId=${customer.id}`)
                 }
               >
-                {t('empViewButton')}
+                {t('oppListOpenButton')}
               </Button>
             ) : (
               <p style={cardIntroStyle}>

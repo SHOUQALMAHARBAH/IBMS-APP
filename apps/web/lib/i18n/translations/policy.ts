@@ -380,7 +380,7 @@ export const POLICY = {
 
     // EndorsementSection.tsx
     endorsementSectionHeading: 'Endorsements',
-    endorsementIntro: 'Process 22 — amend the policy after issuance: add lines, increase limits, change insurer.',
+    endorsementIntro: 'Amend the policy after issuance: add lines, increase limits, change insurer.',
     endorsementLoadError: 'Could not load endorsements — try again.',
     endorsementNoneYet: 'No endorsements recorded yet.',
     endorsementCreateButton: 'Request endorsement',
@@ -406,7 +406,7 @@ export const POLICY = {
 
     // ClaimSection.tsx
     claimSectionHeading: 'Claims',
-    claimIntro: 'Processes 23–30 — notify claim → register → document → assess → follow up → settle → close.',
+    claimIntro: 'Notify claim → register → document → assess → follow up → settle → close.',
     claimLoadError: 'Could not load claims — try again.',
     claimNotifyButton: 'Notify a claim',
     claimLossDueDateLabel: 'Loss date',
@@ -547,7 +547,7 @@ export const POLICY = {
 
     // CommissionSection.tsx
     commissionSectionHeading: 'Commission',
-    commissionIntro: 'Process 35 — calculate broker commission on the collected premium.',
+    commissionIntro: 'Calculate broker commission on the collected premium.',
     commissionLoadError: 'Could not load commission data — try again.',
     commissionNoneYet: 'No commission entry for this policy yet.',
     commissionAmountLabel: 'Amount',
