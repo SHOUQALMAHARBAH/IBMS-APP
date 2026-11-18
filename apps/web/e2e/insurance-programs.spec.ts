@@ -27,6 +27,11 @@ async function mockAuth(page: Page, roles: string[]) {
   );
 }
 
+/** 🔴 OWNER DECISION 150 RULING 1 — one envelope per endpoint now, both branches. */
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 const PROGRAM_LIST = [
   {
     id: 'prog-1',
@@ -35,6 +40,9 @@ const PROGRAM_LIST = [
     assembledByUserId: 'user-1',
     status: 'DRAFT',
     createdAt: '2026-03-01T00:00:00.000Z',
+    /* 🔴 OWNER DECISION 150 RULING 1 — every list row names its customer, reached through the
+       risk profile, because `InsuranceProgram` carries no customer column of its own. */
+    riskProfile: { customer: { id: 'cust-1', legalName: 'Acme Trading' } },
     lines: [
       {
         id: 'l1',
@@ -115,7 +123,7 @@ async function mockPrograms(
               message:
                 'You do not hold a permission required to perform this action',
             }
-          : (opts.list ?? PROGRAM_LIST),
+          : paged((opts.list ?? PROGRAM_LIST) as unknown[]),
     });
   });
   await page.route('http://localhost:4000/needs-assessments/na-1**', (route) =>
@@ -161,14 +169,51 @@ test('shows an empty state when the customer has no program yet', async ({
   ).toBeVisible();
 });
 
-test('prompts to pick a customer when none is in the URL', async ({ page }) => {
+/*
+ * 🔴 OWNER DECISION 150 RULING 1 — THIS TEST IS INVERTED, AND THAT IS THE RULING.
+ *
+ * It used to assert that opening `/insurance-programs` from the sidebar showed «No customer
+ * selected» and nothing else. That sentence WAS the defect the owner's second walk reported: the
+ * navigation led to a screen with one line of prose on it. The screen now lists everything the
+ * caller may read, so what is asserted is the list — and, because the old behaviour is the thing
+ * being removed, that the prompt is GONE.
+ */
+test('lists everything the caller may read when no customer is in the URL', async ({
+  page,
+}) => {
   await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
   await mockPrograms(page);
 
   await page.goto('/insurance-programs');
-  await expect(page.locator('main [role="alert"]')).toContainText(
-    'No customer selected',
-  );
+  await expect(
+    page.getByRole('heading', { name: 'Insurance programs' }),
+  ).toBeVisible();
+  // The row is there AND it names its customer — the half that makes a book-wide row usable.
+  await expect(page.getByText('Acme Trading')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toHaveCount(0);
+  // And the search control the ruling asks for.
+  await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
+});
+
+test('the book-wide list searches, and the term reaches the server', async ({
+  page,
+}) => {
+  await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
+  const asked: string[] = [];
+  await page.route('http://localhost:4000/insurance-programs**', (route) => {
+    asked.push(route.request().url());
+    return route.fulfill({ status: 200, json: paged(PROGRAM_LIST) });
+  });
+
+  await page.goto('/insurance-programs');
+  await expect(page.getByText('Acme Trading')).toBeVisible();
+  await page.locator('#program-search').fill('Acme');
+  await page.getByRole('button', { name: 'Search' }).click();
+  // ⛔ The SERVER does the filtering. A screen that narrowed the rows it already had would
+  // disagree with the page control beside it the moment the book outgrew one page.
+  await expect
+    .poll(() => asked.some((u) => u.includes('search=Acme')))
+    .toBe(true);
 });
 
 test('shows a friendly message when the user lacks read permission', async ({

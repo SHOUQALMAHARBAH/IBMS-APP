@@ -1,35 +1,99 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
+import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { hasPermission } from '../../../lib/auth/permissions';
-import { listRfqs, type Rfq } from '../../../lib/rfq/rfq-api';
+import { listAllRfqs, listRfqs, type RfqListRow } from '../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   ErrorState,
   PageHeader,
   SkeletonList,
 } from '../../../components/ui';
+import { Pagination } from '../../../components/ui/Pagination';
 import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import {
+  listCardHeaderRowStyle,
+  listEmptyNoteStyle,
+  listRowsStyle,
+  listSearchButtonStyle,
+  listSearchFieldStyle,
+  listSearchFormStyle,
   rfqBadgeStyle,
   rfqCardStyle,
 } from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
-import { lineDisplayName } from '../../../lib/i18n/names';
+import { insurerDisplayName, lineDisplayName } from '../../../lib/i18n/names';
 
-function RfqList({
+/**
+ * One row, shared by all three branches, so a scoped card and a book-wide card cannot drift into
+ * being two different things.
+ */
+function RfqCard({ rfq }: { rfq: RfqListRow }) {
+  const router = useRouter();
+  const { language, t } = useLanguage();
+  return (
+    <button
+      type="button"
+      style={rfqCardStyle}
+      onClick={() => router.push(`/rfqs/${rfq.id}`)}
+    >
+      <div style={listCardHeaderRowStyle}>
+        <strong>
+          <bdi>{lineDisplayName(rfq, language)}</bdi>
+        </strong>
+        <span style={rfqBadgeStyle}>
+          {t(
+            rfq.insurerSubmissions.length === 1
+              ? 'rfqInsurerCountOne'
+              : 'rfqInsurerCountOther',
+            { count: rfq.insurerSubmissions.length },
+          )}
+        </span>
+      </div>
+      {/* The customer, because a reader who arrived from the sidebar has none in hand. */}
+      <div style={cardMetaStyle}>
+        {t('rfqListCustomerLabel')}: <bdi>{rfq.customer.legalName}</bdi>
+      </div>
+      {/* The line again, labelled — the heading above shows it, and a row scanned in a book-wide
+          list is read by its labels rather than by position. Both go through message 45's
+          `lineDisplayName`, so the two cannot disagree. */}
+      <div style={cardMetaStyle}>
+        {t('rfqListLineLabel')}: <bdi>{lineDisplayName(rfq, language)}</bdi>
+      </div>
+      {/* ⛔ THE INSURERS GO THROUGH `insurerDisplayName`, NEVER `.name` DIRECTLY. Message 45 §2
+          measured what happens otherwise: three submission rows printed an EMPTY cell, because
+          `undefined` renders as nothing in React. Shown only when there is a shortlist — the
+          count badge above already says when there is not. */}
+      {rfq.insurerSubmissions.length > 0 ? (
+        <div style={cardMetaStyle}>
+          {t('rfqListInsurerLabel')}:{' '}
+          <bdi>
+            {rfq.insurerSubmissions
+              .map((s) => insurerDisplayName(s.insurer, language))
+              .join(' · ')}
+          </bdi>
+        </div>
+      ) : null}
+      <div style={cardMetaStyle}>
+        {t('rfqListIssuedMeta', { date: formatDate(rfq.issuedAt, language) })}
+      </div>
+    </button>
+  );
+}
+
+/** The scoped branches, unchanged in meaning: every link that already carried an
+ *  `opportunityId` or a `customerId` lands here and sees exactly what it always did. */
+function RfqsForParent({
   scope,
 }: {
   scope: { opportunityId: string } | { customerId: string };
 }) {
-  const router = useRouter();
-  const { language, t } = useLanguage();
-  const [rfqs, setRfqs] = useState<Rfq[] | null>(null);
+  const { t } = useLanguage();
+  const [rfqs, setRfqs] = useState<RfqListRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const key = 'opportunityId' in scope ? scope.opportunityId : scope.customerId;
@@ -58,83 +122,131 @@ function RfqList({
     })();
   }, [load, t]);
 
-  if (loadError) {
-    return (
-      <ErrorState title={loadError} />
-    );
-  }
+  if (loadError) return <ErrorState title={loadError} />;
   if (!rfqs) return <SkeletonList rows={4} label={t('commonLoading')} />;
   if (rfqs.length === 0) {
     return (
-      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-        {t('rfqListNone')}
-      </p>
+      <p style={listEmptyNoteStyle}>{t('rfqListNone')}</p>
     );
   }
 
   return (
-    <div style={{ marginTop: '1rem' }}>
+    <div style={listRowsStyle}>
       {rfqs.map((rfq) => (
-        <button
-          key={rfq.id}
-          type="button"
-          style={rfqCardStyle}
-          onClick={() => router.push(`/rfqs/${rfq.id}`)}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 'var(--space-4)',
-              flexWrap: 'wrap',
-            }}
-          >
-            <strong>
-              <bdi>{lineDisplayName(rfq, language)}</bdi>
-            </strong>
-            <span style={rfqBadgeStyle}>
-              {t(
-                rfq.insurerSubmissions.length === 1
-                  ? 'rfqInsurerCountOne'
-                  : 'rfqInsurerCountOther',
-                { count: rfq.insurerSubmissions.length },
-              )}
-            </span>
-          </div>
-          <div style={cardMetaStyle}>
-            {t('rfqListIssuedMeta', {
-              date: formatDate(rfq.issuedAt, language),
-            })}
-          </div>
-        </button>
+        <RfqCard key={rfq.id} rfq={rfq} />
       ))}
     </div>
   );
 }
 
-function RfqsFlow() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST, in `policies/page.tsx`'s shape.
+ *
+ * ⚠️ AND IT DOES NOT WIDEN DOOR FOUR. The server scopes this by OWNERSHIP, never by the
+ * customer-file anchor — a reader admitted only by an anchor owns no customer and holds no
+ * `customer-file.all-owners.read`, so this list is empty for them and their anchor stays
+ * consultable on the `customerId` branch alone.
+ */
+function AllRfqs() {
   const { t } = useLanguage();
+  const [rfqs, setRfqs] = useState<RfqListRow[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(0);
+
+  const load = useCallback(
+    async (term: string, nextPage = 0) => {
+      try {
+        const result = await listAllRfqs({
+          ...(term ? { search: term } : {}),
+          ...(nextPage ? { page: nextPage } : {}),
+        });
+        setRfqs(result.items);
+        setTotal(result.total);
+        setPageSize(result.pageSize);
+        setPage(result.page);
+        setLoadError(null);
+      } catch (err) {
+        setRfqs(null);
+        setLoadError(
+          err instanceof ApiError && err.status === 403
+            ? permissionRefusal(t, 'rfqListRefusalAct', 'rfq.read')
+            : err instanceof ApiError
+              ? err.message
+              : t('rfqListLoadError'),
+        );
+      }
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    void (async () => {
+      await load(searchTerm);
+    })();
+  }, [searchTerm, load, t]);
+
+  function onSearchSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSearchTerm(search);
+  }
+
+  return (
+    <>
+      <form onSubmit={onSearchSubmit} style={listSearchFormStyle}>
+        <div style={listSearchFieldStyle}>
+          <label htmlFor="rfq-search">{t('commonSearch')}</label>
+          <input
+            id="rfq-search"
+            dir="auto"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('commonSearchPlaceholder')}
+          />
+        </div>
+        <button type="submit" style={listSearchButtonStyle}>
+          {t('commonSearch')}
+        </button>
+      </form>
+
+      {/* The four states, in the order every other list screen uses. */}
+      {rfqs === null && !loadError ? <SkeletonList rows={4} label={t('commonLoading')} /> : null}
+      {loadError ? <ErrorState title={loadError} /> : null}
+      {rfqs !== null && !loadError ? (
+        rfqs.length === 0 ? (
+          /* `rfqListNone` names no customer, so it is already true of the book-wide and the
+             searched empty case alike — the only one of the three screens whose shipping
+             empty-state sentence needed nothing. */
+          <p style={listEmptyNoteStyle}>{t('rfqListNone')}</p>
+        ) : (
+          <div style={listRowsStyle}>
+            {rfqs.map((rfq) => (
+              <RfqCard key={rfq.id} rfq={rfq} />
+            ))}
+          </div>
+        )
+      ) : null}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={(next) => void load(searchTerm, next)}
+      />
+    </>
+  );
+}
+
+function RfqsFlow() {
+  const searchParams = useSearchParams();
   const opportunityId = searchParams.get('opportunityId') ?? '';
   const customerId = searchParams.get('customerId') ?? '';
 
-  if (opportunityId) return <RfqList scope={{ opportunityId }} />;
-  if (customerId) return <RfqList scope={{ customerId }} />;
-
-  return (
-    <p role="alert" style={errorStyle}>
-      {t('rfqListNoParentPrefix')}{' '}
-      <button
-        type="button"
-        onClick={() => router.push('/opportunities')}
-        style={{ textDecoration: 'underline', cursor: 'pointer' }}
-      >
-        {t('rfqListNoParentLinkLabel')}
-      </button>
-      .
-    </p>
-  );
+  if (opportunityId) return <RfqsForParent scope={{ opportunityId }} />;
+  if (customerId) return <RfqsForParent scope={{ customerId }} />;
+  return <AllRfqs />;
 }
 
 export default function RfqsPage() {

@@ -449,7 +449,8 @@ for (const lang of LANGS) {
     // ABSENCE of the heading is what proves this capture is genuinely
     // mid-flight rather than just an empty screen.
     const gPolicies = gate(paged([POLICY]));
-    const gRfqs = gate([]);
+    // 🔴 OWNER DECISION 150 RULING 1 — `/rfqs` returns a PAGE now.
+    const gRfqs = gate(paged([]));
     await page.route(OPP_POLICIES_URL, gPolicies.route);
     await page.route(OPP_RFQS_URL, gRfqs.route);
     await page.route(CLAIMS_URL, (route) =>
@@ -505,7 +506,7 @@ for (const lang of LANGS) {
       route.fulfill({ status: 200, json: paged([POLICY]) }),
     );
     await page.route(OPP_RFQS_URL, (route) =>
-      route.fulfill({ status: 200, json: [] }),
+      route.fulfill({ status: 200, json: paged([]) }),
     );
     await page.route(CLAIMS_URL, (route) =>
       route.fulfill({ status: 200, json: paged([]) }),

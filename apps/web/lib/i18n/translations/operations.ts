@@ -405,6 +405,23 @@ export const OPERATIONS = {
     iprogNoneForCustomer:
       'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
     iprogOpenProgramAria: 'فتح برنامج التأمين المُجمَّع في {at}',
+    /* 🔴 OWNER DECISION 150 RULING 1 — the three lists open from the sidebar now, and a row
+       reached that way has to name its customer.
+
+       ⛔ NO ARABIC IS COMPOSED HERE. Every value below is BYTE-IDENTICAL to a span already
+       shipping for the same thing — «العميل» from `policiesCustomerLabel`, «فرع التأمين» from
+       `policiesLineLabel`, «شركة التأمين» from `poldInsurer`, «تاريخ الإنشاء» from
+       `poldCreated`, «لا توجد سجلات.» from `smNoRecords`. New KEYS rather than shared ones,
+       which is this dictionary's own convention (twenty keys carry «العميل»): one key serving
+       two screens is one key that cannot move.
+
+       ⚠️ AND THE EMPTY-STATE SENTENCE IS A REPORTED EMPTY CELL. `oppListNoneYet` below says
+       «لهذا العميل», which is FALSE on a book-wide list, so it keeps the customer-scoped branch
+       and the book-wide branch takes the generic sentence. A sentence naming opportunities
+       rather than records would be a new one, and that is hers. */
+    iprogListCustomerLabel: 'العميل',
+    iprogListCreatedLabel: 'تاريخ الإنشاء',
+    iprogListNoRecords: 'لا توجد سجلات.',
 
     // ---- Needs assessments (#5) --------------------------------------------------------------------
     naHeading: 'تقييمات الاحتياجات',
@@ -1102,6 +1119,11 @@ export const OPERATIONS = {
     iprogNoneForCustomer:
       'No insurance program yet for this customer — assemble one from an approved needs assessment.',
     iprogOpenProgramAria: 'Open the insurance program assembled on {at}',
+    /* 🔴 OWNER DECISION 150 RULING 1 — see the Arabic note; every value is a span already
+       shipping for the same thing. */
+    iprogListCustomerLabel: 'Client',
+    iprogListCreatedLabel: 'Created',
+    iprogListNoRecords: 'No records.',
 
     naHeading: 'Needs assessments',
     naLoading: 'Loading…',

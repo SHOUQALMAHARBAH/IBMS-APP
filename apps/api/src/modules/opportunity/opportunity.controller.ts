@@ -41,7 +41,7 @@ export class OpportunityController {
     @Query() query: ListOpportunitiesQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.opportunities.list(query.customerId, user);
+    return this.opportunities.list(query, user);
   }
 
   @RequirePermissions('opportunity.read')

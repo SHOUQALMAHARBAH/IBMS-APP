@@ -247,6 +247,44 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
 });
 
 /*
+ * 🔴 OWNER DECISION 150 — A CARD THE CALLER MAY NOT OPEN SAYS SO.
+ *
+ * The row was already correctly withheld as a CONTROL — `customer.read` gates this list while
+ * `/customers/[id]` stays on `customer.360-view.read`, so a clickable row would lead to a
+ * refusal. What it did not do was tell the reader, so the card looked exactly like the clickable
+ * one and did nothing: a permission reading as a broken screen.
+ *
+ * ⛔ NO NEW SENTENCE. `permissionRefusal` is the one place a refusal is worded, and the
+ * act/code pair is the one `/customers/[id]` already ships for this code.
+ *
+ * ⚠️ `PLACEMENT_TECHNICAL_OFFICER` holds `customer.read` and NOT `customer.360-view.read` —
+ * measured in the fixture. A role holding both would render the clickable card and this test
+ * would pass for the wrong reason.
+ */
+test("a customer card the caller cannot open says why, and is not a control", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await page.route("http://localhost:4000/customers", (route) =>
+    route.fulfill({ status: 200, json: paged([CUSTOMER]) }),
+  );
+
+  await page.goto("/customers");
+  // The anchor: the card itself rendered. Without it the absence below is satisfied by a blank
+  // page and proves nothing.
+  await expect(page.getByText(CUSTOMER.legalName).first()).toBeVisible();
+
+  await expect(page.locator("[data-permission-refusal]")).toContainText(
+    "(customer.360-view.read)",
+  );
+  // AND IT IS STILL NOT A CONTROL. The sentence explains the withholding; it does not replace
+  // it, and a card that both explained and opened would be the worse of the two defects.
+  await expect(
+    page.getByRole("button", { name: /View profile/i }),
+  ).toHaveCount(0);
+});
+
+/*
  * CORRECTING A CUSTOMER'S CONTACT DETAILS — the caller `PATCH /customers/:id` shipped
  * without (IMPROVEMENTS § 1.65).
  *
@@ -1170,8 +1208,9 @@ test("🔴 §P2 — a customer's own opportunities are reachable by CLICKING, no
   await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  // 🔴 OWNER DECISION 150 RULING 1 — `/opportunities` returns a PAGE now.
   await page.route("http://localhost:4000/opportunities**", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
 
   await page.goto("/customers/cust-1");

@@ -1,0 +1,32 @@
+{
+  "the-opportunity-list-stops-being-tenant-scoped": {
+    "file": "apps/api/src/prisma/tenant-scope.extension.ts",
+    "from": "    .filter((model) => model.fields.some((f) => f.name === 'organizationId'))",
+    "to": "    .filter(\n      (model) =>\n        model.fields.some((f) => f.name === 'organizationId') &&\n        model.name !== 'Opportunity',\n    )",
+    "why": "A REAL CROSS-TENANT LEAK ON THE NEW BOOK-WIDE LIST. `Opportunity` drops out of the derived set, so `tenantScopeExtension` stops adding `organizationId` to its reads and `GET /opportunities` answers office A with office B's row. This is the plant the three isolation tests exist for — before decision 150 ruling 1 these records had NO cross-office assertion at all, because a `customerId`-only list cannot produce one. ⚠️ Expected to kill the opportunities isolation test AND the shared-name search, and to leave the RFQ and programme ones green: a plant that reddened all three would mean the tests were measuring the extension in general rather than their own route. ⛔ And this is LAYER ONE, not RLS — an HTTP assertion is answered by the application's filter, never by a database refusal; see `certificate-stored.e2e-spec.ts` for the measurement."
+  },
+  "the-book-wide-list-forgets-who-owns-the-customer": {
+    "file": "apps/api/src/modules/opportunity/opportunity.service.ts",
+    "from": "      ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,",
+    "to": "      ownerUserId: null,",
+    "why": "THE SCOPING RULE REVERSED — a cross-OWNER leak inside one office, which is the half an isolation test cannot see. Every caller reaches the whole book, so a Sales/Relationship Officer lists opportunities on customers belonging to colleagues. It is the tempting edit precisely because it makes the screen fuller. Expected to kill `pins a caller without that code to the customers they own` by name and to LEAVE `lists the whole book for a caller who may reach any customer file` green — which is why both directions are asserted: the second test alone passes against this plant."
+  },
+  "the-rfq-list-row-carries-its-raw-join": {
+    "file": "apps/api/src/modules/rfq/rfq.service.ts",
+    "from": "  const { opportunity, ...rfq } = row;\n  return { ...rfqForWire(rfq), customer: opportunity.customer };",
+    "to": "  return { ...rfqForWire(row), customer: row.opportunity.customer };",
+    "why": "THE RAW-JOIN-AS-PAYLOAD SHAPE PUT BACK, in the exact form message 45 §2 measured: the `opportunity` join travels on the wire BESIDE the resolved `customer`, so one question has two answers and the web type describes neither. That is how the insurer column came to render as an empty cell — `undefined` prints as nothing in React and nobody is told. Expected to kill `lifts the customer onto the row and leaves the join behind` by name, and nothing else: the customer is still correct, which is what makes the defect quiet."
+  },
+  "the-unopenable-customer-card-says-nothing-again": {
+    "file": "apps/web/app/(app)/customers/page.tsx",
+    "from": "                  <p style={cardMetaStyle} data-permission-refusal>\n                    {permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}\n                  </p>\n",
+    "to": "",
+    "why": "THE STATE THE OWNER'S SECOND WALK FOUND: the card is withheld as a control and says nothing about it, so it looks exactly like the clickable one and does nothing when pressed. ⚠️ This is the shape that reads as a BROKEN SCREEN rather than as a permission, which is why the sentence is the fix rather than removing the card. Expected to kill `a customer card the caller cannot open says why, and is not a control` by name, and nothing else — the card is still correctly not a control, which is what makes the defect quiet."
+  },
+  "the-programmes-list-stops-naming-its-customer": {
+    "file": "apps/web/app/(app)/insurance-programs/page.tsx",
+    "from": "      <div style={cardMetaStyle}>\n        {t('iprogListCustomerLabel')}:{' '}\n        <bdi>{program.riskProfile.customer.legalName}</bdi>\n      </div>\n",
+    "to": "",
+    "why": "THE BOOK-WIDE ROW WITHOUT ITS CUSTOMER — which is a row a reader who arrived from the sidebar cannot place at all, and the reason the ruling asks for the name in the first place. ⚠️ It is the EASY regression: the customer-scoped branch does not need the line (the reader already has the customer in hand), so deleting it looks like tidying. Expected to kill `lists everything the caller may read when no customer is in the URL` and `the book-wide list searches, and the term reaches the server`, both of which assert «Acme Trading» on the row."
+  }
+}

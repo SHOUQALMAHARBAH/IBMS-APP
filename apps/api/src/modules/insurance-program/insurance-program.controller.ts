@@ -33,7 +33,7 @@ export class InsuranceProgramController {
     @Query() query: ListInsuranceProgramsQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.programs.list(query.customerId, user);
+    return this.programs.list(query, user);
   }
 
   @RequirePermissions('program.read')

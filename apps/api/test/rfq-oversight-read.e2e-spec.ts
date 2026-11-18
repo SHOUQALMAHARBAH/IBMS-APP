@@ -383,7 +383,8 @@ describe('door four: an anchored oversight read of an RFQ', () => {
       .get(`/rfqs?customerId=${target.customerId}`)
       .set(bearer(dpo.accessToken))
       .expect(200);
-    const rows = res.body as { id: string }[];
+    // 🔴 OWNER DECISION 150 RULING 1 — one envelope per endpoint now, every branch.
+    const rows = (res.body as { items: { id: string }[] }).items;
     expect(Array.isArray(rows)).toBe(true);
     // Non-vacuity: the target RFQ is IN the list, so a later absence assertion cannot pass against
     // an empty page.
@@ -412,17 +413,41 @@ describe('door four: an anchored oversight read of an RFQ', () => {
     });
   }, 300_000);
 
-  it('9 — the LIST refuses an anchored reader a DIFFERENT customer, and refuses no filter at all', async () => {
+  it('9 — the LIST refuses an anchored reader a DIFFERENT customer, and the BOOK is empty for them', async () => {
     // One file, not the book.
     await request(app!.getHttpServer())
       .get(`/rfqs?customerId=${other.customerId}`)
       .set(bearer(dpo.accessToken))
       .expect(404);
-    // And there is no unfiltered mode to be handed: exactly one filter, never neither.
-    await request(app!.getHttpServer())
+    /*
+     * 🔴 OWNER DECISION 150 RULING 1 CHANGED THE MECHANISM HERE AND NOT THE ANSWER.
+     *
+     * The unfiltered list used to be a 422 — "exactly one filter, never neither" — because an
+     * unfiltered list handed to an ANCHORED reader would be the blanket key door four refused.
+     * The book-wide list exists now, so the refusal had to move from the status code to the
+     * SCOPE, and this asserts it really did: the DPO is scoped by OWNERSHIP, holds no
+     * `customer-file.all-owners.read` and owns no customer, so the book answers 200 with
+     * NOTHING — and specifically without the RFQ their anchor would admit on the branch above.
+     *
+     * ⛔ The absence is asserted against a NAMED row rather than only against a count: `toBe(0)`
+     * alone would pass just as well against a list that failed to query anything at all, and
+     * `target.rfqId` is the one row this reader could otherwise reach.
+     */
+    const book = await request(app!.getHttpServer())
       .get('/rfqs')
       .set(bearer(dpo.accessToken))
-      .expect(422);
+      .expect(200);
+    const bookBody = book.body as {
+      items: { id: string }[];
+      total: number;
+    };
+    const bookRows = bookBody.items;
+    expect(
+      bookRows.map((r) => r.id),
+      'the customer-file anchor widened the BOOK-wide list — door four',
+    ).not.toContain(target.rfqId);
+    expect(bookRows).toHaveLength(0);
+    expect(bookBody.total).toBe(0);
     // `opportunityId` stays owner-only — an anchor is per CUSTOMER, and an Opportunity is a
     // placement-path object whose id a reader outside that path has no way to know.
     await request(app!.getHttpServer())

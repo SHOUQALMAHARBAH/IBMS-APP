@@ -42,6 +42,50 @@ export interface InsuranceProgramWithLines extends InsuranceProgram {
   lines: InsuranceProgramLineWithNames[];
 }
 
+/** The book-wide list's row: the programme, its lines, and the customer it belongs to — reached
+ *  through `RiskProfile`, because `InsuranceProgram` carries no customer column of its own (the
+ *  same join `findManyByCustomerId` below has always used). */
+export type InsuranceProgramForList = InsuranceProgramWithLines & {
+  riskProfile: { customer: { id: string; legalName: string } };
+};
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST'S FILTER. The same shape as
+ * `ListPoliciesFilter`, deliberately: the ruling is that this list becomes what `/policies`
+ * already is, and the visibility rule it becomes is `/policies`'s own.
+ *
+ * ⛔ Applied IN the query, never after it: a list narrowed in memory lets the page size decide
+ * what the caller cannot see.
+ */
+export interface ListInsuranceProgramsFilter {
+  /** `null` = this caller reaches the whole book. Otherwise, only programmes whose Customer is
+   *  owned by this user id. */
+  ownerUserId: string | null;
+  /** Matched against the customer's legal name — a programme has no number of its own. */
+  search?: string;
+}
+
+const PROGRAM_LIST_INCLUDE = {
+  lines: {
+    include: INSURANCE_LINE_NAME_INCLUDE,
+    orderBy: { insuranceLine: 'asc' },
+  },
+  riskProfile: {
+    select: { customer: { select: { id: true, legalName: true } } },
+  },
+} as const;
+
+function buildProgramListWhere(
+  filter: ListInsuranceProgramsFilter,
+): Prisma.InsuranceProgramWhereInput {
+  const customer: Prisma.CustomerWhereInput = {};
+  if (filter.ownerUserId !== null) customer.ownerUserId = filter.ownerUserId;
+  if (filter.search) {
+    customer.legalName = { contains: filter.search, mode: 'insensitive' };
+  }
+  return Object.keys(customer).length > 0 ? { riskProfile: { customer } } : {};
+}
+
 /** Process 7 — Product Recommendation / Program Design. Same "one repository
  * per aggregate root" shape as lead/prospect/customer/risk-profile — an
  * `InsuranceProgramLine` only ever exists inside one program and is only
@@ -67,18 +111,32 @@ export class InsuranceProgramRepository {
     });
   }
 
-  findManyByCustomerId(
-    customerId: string,
-  ): Promise<InsuranceProgramWithLines[]> {
+  findManyByCustomerId(customerId: string): Promise<InsuranceProgramForList[]> {
     return this.prisma.client.insuranceProgram.findMany({
       where: { riskProfile: { customerId } },
-      include: {
-        lines: {
-          include: INSURANCE_LINE_NAME_INCLUDE,
-          orderBy: { insuranceLine: 'asc' },
-        },
-      },
+      include: PROGRAM_LIST_INCLUDE,
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** The book-wide list. Every filter is part of the query, so the window bounds the MATCHING
+   *  rows rather than the rows scanned. */
+  findManyForActor(
+    filter: ListInsuranceProgramsFilter,
+    window: { take: number; skip: number },
+  ): Promise<InsuranceProgramForList[]> {
+    return this.prisma.client.insuranceProgram.findMany({
+      where: buildProgramListWhere(filter),
+      include: PROGRAM_LIST_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  countForActor(filter: ListInsuranceProgramsFilter): Promise<number> {
+    return this.prisma.client.insuranceProgram.count({
+      where: buildProgramListWhere(filter),
     });
   }
 

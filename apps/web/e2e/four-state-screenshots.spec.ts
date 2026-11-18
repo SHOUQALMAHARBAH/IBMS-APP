@@ -629,8 +629,9 @@ const OPPORTUNITY = {
 };
 
 async function mockOpportunityDetailBase(page: Page) {
+  // 🔴 OWNER DECISION 150 RULING 1 — `/rfqs` returns a PAGE now.
   await page.route("http://localhost:4000/rfqs?opportunityId=opp-1", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
   await page.route(
     "http://localhost:4000/client-decisions?opportunityId=opp-1",

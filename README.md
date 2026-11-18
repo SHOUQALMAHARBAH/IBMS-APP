@@ -255,6 +255,23 @@ already give).
   `POLICY_LIST_TAKE`. The cap is only safe because the filtering happens in
   SQL; filtering a capped read afterwards lets the cap decide what the caller
   cannot see. Supplying both scopes is still refused.
+* **🔴 AND `GET /opportunities`, `GET /rfqs` AND `GET /insurance-programs` ANSWER
+  THE SAME WAY NOW (owner decision 150 ruling 1).** All three were
+  `customerId`-only, so each screen opened from the sidebar with one sentence and
+  nothing on it — the owner's second demo walk reported exactly that. With no
+  scope they return the book-wide list, filtered **in the query** on the rule
+  `/policies` already uses: a holder of `customer-file.all-owners.read`
+  (Placement / Manager / Executive) reaches the whole book, everybody else is
+  pinned to Customers they own. **No permission code was minted** — that family
+  code is the one `assertCustomerVisible` has always consulted for these records.
+  Each returns ONE envelope on every branch (`wholeSet` on the scoped ones), and
+  the web clients unwrap `.items`, so every existing caller keeps its shape.
+  ⚠️ **The RFQ list's old 422 on "neither filter" was load-bearing** and is still
+  enforced, by the SCOPE rather than by a status code: a reader admitted only by
+  the customer-file anchor holds no all-owners code and owns no customer, so the
+  book answers them nothing. ⛔ Never consult the anchor on the book-wide branch —
+  an anchor is per customer, and a list it widened is the blanket key door four
+  refused.
 * **`e2e/fixtures/role-permissions.ts` is generated** from
   `packages/db/prisma/seed-data/permissions.ts`. 71 of 74 Playwright specs mock
   `/auth/me`, and the UI renders off `permissions`, so each spec returns a realistic set

@@ -34,6 +34,22 @@ export const RFQ = {
     oppRenewal: 'تجديد',
     oppNewBusiness: 'أعمال جديدة',
     oppCreatedMeta: '{type} · أُنشئت {date}',
+    /* 🔴 OWNER DECISION 150 RULING 1 — the three lists open from the sidebar now, and a row
+       reached that way has to name its customer.
+
+       ⛔ NO ARABIC IS COMPOSED HERE. Every value below is BYTE-IDENTICAL to a span already
+       shipping for the same thing — «العميل» from `policiesCustomerLabel`, «فرع التأمين» from
+       `policiesLineLabel`, «شركة التأمين» from `poldInsurer`, «تاريخ الإنشاء» from
+       `poldCreated`, «لا توجد سجلات.» from `smNoRecords`. New KEYS rather than shared ones,
+       which is this dictionary's own convention (twenty keys carry «العميل»): one key serving
+       two screens is one key that cannot move.
+
+       ⚠️ AND THE EMPTY-STATE SENTENCE IS A REPORTED EMPTY CELL. `oppListNoneYet` below says
+       «لهذا العميل», which is FALSE on a book-wide list, so it keeps the customer-scoped branch
+       and the book-wide branch takes the generic sentence. A sentence naming opportunities
+       rather than records would be a new one, and that is hers. */
+    oppListCustomerLabel: 'العميل',
+    oppListNoRecords: 'لا توجد سجلات.',
     oppNoCustomerSelectedPrefix: 'لم يُحدَّد عميل — افتح عميلاً من',
     oppNoCustomerSelectedSuffix: 'وصولاً إلى فرصه التجارية من برنامج تأمين معتمد نهائياً.',
 
@@ -62,6 +78,9 @@ export const RFQ = {
       'تعذر العثور على الجهة الأصل — قد لا تكون موجودة، أو لا تملك صلاحية الوصول إليها.',
     rfqListLoadError: 'تعذر تحميل طلبات عروض الأسعار — حاول مرة أخرى.',
     rfqListNone: 'لا توجد طلبات عروض أسعار.',
+    rfqListCustomerLabel: 'العميل',
+    rfqListLineLabel: 'فرع التأمين',
+    rfqListInsurerLabel: 'شركة التأمين',
     rfqListIssuedMeta: 'صدر بتاريخ {date}',
     rfqListNoParentPrefix: 'لم تُحدَّد فرصة تجارية أو عميل — افتح واحدة من',
     rfqListNoParentLinkLabel: 'طلب عروض الأسعار / السوق',
@@ -472,6 +491,10 @@ export const RFQ = {
     oppRenewal: 'Renewal',
     oppNewBusiness: 'New business',
     oppCreatedMeta: '{type} · created {date}',
+    /* 🔴 OWNER DECISION 150 RULING 1 — see the Arabic note; every value is a span already
+       shipping for the same thing. */
+    oppListCustomerLabel: 'Client',
+    oppListNoRecords: 'No records.',
     oppNoCustomerSelectedPrefix: 'No customer selected — open a customer from',
     oppNoCustomerSelectedSuffix: 'and reach its opportunities from a finalized insurance program.',
 
@@ -498,6 +521,9 @@ export const RFQ = {
     rfqListParentNotFound: 'That parent could not be found — it may not exist, or you may not have access to it.',
     rfqListLoadError: 'Could not load RFQs — try again.',
     rfqListNone: 'No RFQs.',
+    rfqListCustomerLabel: 'Client',
+    rfqListLineLabel: 'Insurance line',
+    rfqListInsurerLabel: 'Insurer',
     rfqListIssuedMeta: 'Issued {date}',
     rfqListNoParentPrefix: 'No opportunity or customer selected — open one from',
     rfqListNoParentLinkLabel: 'RFQ / market',

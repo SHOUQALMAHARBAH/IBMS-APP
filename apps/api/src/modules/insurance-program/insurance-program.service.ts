@@ -13,9 +13,11 @@ import type {
 } from '@ibms/db';
 import {
   InsuranceProgramRepository,
+  type InsuranceProgramForList,
   type InsuranceProgramLineInput,
   type InsuranceProgramWithLines,
 } from '../../repositories/insurance-program.repository';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import { NeedsAssessmentRepository } from '../../repositories/needs-assessment.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -33,6 +35,7 @@ import {
   type AssembledProgramLine,
 } from './insurance-program.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import type { ListInsuranceProgramsQueryDto } from './dto/list-insurance-programs-query.dto';
 import type { AssembleInsuranceProgramDto } from './dto/assemble-insurance-program.dto';
 import { assertWithinRoleScope } from '../../common/role-scope';
 import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
@@ -551,12 +554,37 @@ export class InsuranceProgramService {
     return this.toView(await this.mustFind(id));
   }
 
+  /**
+   * 🔴 OWNER DECISION 150 RULING 1 — THE LIST OPENS FROM THE SIDEBAR NOW. See
+   * `OpportunityService.list` for the full account; this is the same change on the same rule.
+   *
+   * ⛔ No permission code was minted: `canReachAnyCustomer` here is
+   * `customer-file.all-owners.read`, which `assertCustomerVisible` has always consulted for this
+   * record. The scoped branch enforces it per row; the book-wide branch expresses the same thing
+   * as a query filter, because a list narrowed after the read would let the page size decide what
+   * the caller cannot see.
+   */
   async list(
-    customerId: string,
+    query: ListInsuranceProgramsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<InsuranceProgramWithLines[]> {
-    await this.assertCustomerVisible(customerId, actor);
-    return this.programs.findManyByCustomerId(customerId);
+  ): Promise<Paginated<InsuranceProgramForList>> {
+    if (query.customerId) {
+      await this.assertCustomerVisible(query.customerId, actor);
+      return wholeSet(
+        await this.programs.findManyByCustomerId(query.customerId),
+      );
+    }
+
+    const filter = {
+      ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
+      search: query.search,
+    };
+    const window = pageWindow(query.page, query.pageSize);
+    const [rows, total] = await Promise.all([
+      this.programs.findManyForActor(filter, window),
+      this.programs.countForActor(filter),
+    ]);
+    return { items: rows, total, page: window.page, pageSize: window.pageSize };
   }
 
   async get(

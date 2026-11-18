@@ -452,7 +452,8 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
         .get(`/insurance-programs?customerId=${customerId}`)
         .set(bearer(placement.accessToken))
         .expect(200);
-      expect((list.body as ProgramBody[]).length).toBe(1);
+      // 🔴 OWNER DECISION 150 RULING 1 — one envelope per endpoint now, both branches.
+      expect((list.body as { items: ProgramBody[] }).items.length).toBe(1);
     });
   });
 
@@ -681,7 +682,9 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
         .get(`/insurance-programs?customerId=${customerId}`)
         .set(bearer(placement.accessToken))
         .expect(200)
-        .expect((r) => expect((r.body as ProgramBody[]).length).toBe(1));
+        .expect((r) =>
+          expect((r.body as { items: ProgramBody[] }).items.length).toBe(1),
+        );
     });
   });
 });
