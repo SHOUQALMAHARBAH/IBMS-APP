@@ -272,6 +272,19 @@ already give).
   book answers them nothing. ⛔ Never consult the anchor on the book-wide branch —
   an anchor is per customer, and a list it widened is the blanket key door four
   refused.
+* **AND `check:bilingual-names` MATCHES THE INSURANCE LINE, NOT ONLY A NAME (2026-11-18).**
+  It shipped covering `insurer.name` / `legalName`, and its own header already said the walk it
+  came from was about the insurer *and the insurance line* — so `/rfqs/[id]`'s heading
+  interpolated the line AS STORED, printing an English line to a reader who had just chosen the
+  Arabic one, with the gate green beside it. A rendered `.insuranceLine` must now go through
+  `lineDisplayName`. ⛔ `key=` / `value=` are NOT renders (`/rfqs/new`'s `<option>` is correct
+  as written), and the five `LINE_DECLARED` sites are a **debt on the API** rather than an
+  amnesty: measured, only `rfq`, `policy` and `insurance-program` send `insuranceLineAr`, so on
+  the rest the Arabic name was never on the wire at all.
+* **`check:seed-password-in-docs` covers ALL of `docs/` at budget zero (2026-11-18).** It began
+  scoped to `docs/first-run.md` with `docs/phase-2-walkthrough.md` reported rather than fixed;
+  that file now names `SAMPLE_USER_PASSWORD` and its source file instead of the value, and the
+  declaration list is EMPTY. ⛔ Nothing under `docs/` may ever be declared into it.
 * **`e2e/fixtures/role-permissions.ts` is generated** from
   `packages/db/prisma/seed-data/permissions.ts`. 71 of 74 Playwright specs mock
   `/auth/me`, and the UI renders off `permissions`, so each spec returns a realistic set

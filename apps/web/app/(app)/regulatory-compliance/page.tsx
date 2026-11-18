@@ -759,11 +759,20 @@ export default function RegulatoryCompliancePage() {
           ) : null}
           {/*
             OWNER DECISION 136(ب) — the sentence for an office that may not issue because nobody
-            has declared yet. Shown to EVERY reader of this screen, not only a declarer: the
-            employee who met this refusal on a policy needs to see the same words here, and the
-            licence manager needs to know why issuance stopped.
+            has declared yet.
+
+            🔴 WITHHELD FROM THE ONE PERSON WHO CAN END IT, and the correction is the owner's
+            (§T2 of her second demo walk). It used to render for EVERY reader, on the reasoning
+            that the employee who met this refusal on a policy needs the same words here — true,
+            and it is still shown to them. What it must not do is stand BESIDE THE BUTTON: this
+            sentence ends «راجع مسؤول النظام في مكتبك», and printing it to the holder of
+            `license-renewal.declare` sends that person to ask themselves for the act they are
+            looking at the control for.
+
+            ⛔ NO WORD CHANGES. The sentence is hers, byte for byte; only its condition moved.
           */}
-          {standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
+          {!canDeclareRenewal &&
+          standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
             <p
               style={warningStyle}
               role="status"

@@ -365,9 +365,13 @@ test('step 3a — BEFORE the grant the office is told why, and there is nothing 
   page,
 }) => {
   await openCompliance(page, ['license.manage']);
-  // Decision 136(ب)'s sentence is shown to EVERY reader of this screen, so this is not an empty
+  // Decision 136(ب)'s sentence is shown to a reader who CANNOT declare, so this is not an empty
   // screen — it is a screen that explains itself and has no control on it. That is the state the
   // presenter starts from, and the reason there is anything to demonstrate.
+  //
+  // 🔴 §T2 — AND «a reader who cannot declare» IS THE WHOLE CONDITION NOW. This caller holds
+  // `license.manage` and not the declaration code, which is exactly who the sentence is for;
+  // step 3b below asserts the other half, that the holder does NOT meet it.
   await expect(
     page.locator('[data-renewal-awaiting-declaration]'),
   ).toBeVisible();
@@ -386,4 +390,20 @@ test('step 3b — AFTER the grant the declaration control is there, with its oat
   await expect(
     page.locator('[data-renewal-declaration-sentence]'),
   ).toBeVisible();
+
+  /*
+   * 🔴 §T2 — AND DECISION 136(ب)'s SENTENCE IS GONE FOR THIS READER.
+   *
+   * It ends «راجع مسؤول النظام في مكتبك», and standing beside the button sends the one person
+   * who can end the state to go and ask themselves for the act they are looking at the control
+   * for. The owner's second walk reported exactly that.
+   *
+   * NON-VACUOUS BY ITS ANCHOR: the declaration control above is visible in this same render, so
+   * the absence is read off a screen that demonstrably loaded — and step 3a proves the same
+   * sentence IS shown to a caller who cannot declare, so this is about the CALLER and not about
+   * the sentence having been deleted.
+   */
+  await expect(
+    page.locator('[data-renewal-awaiting-declaration]'),
+  ).toHaveCount(0);
 });

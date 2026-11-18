@@ -80,7 +80,9 @@ sample.manager@ibms.internal      sharedPasswordMatches=true  mfaEnabled=false  
 ```
 
 Each carries **0 `MfaCredential` rows**, so no code can be asked for and none can be wrong. The
-password is still `SampleUser#2026!`.
+password is unchanged — it is the value set in `SAMPLE_USER_PASSWORD` (`packages/db/prisma/seed-data/sample-users.ts`), and it is
+deliberately not printed here: a password written in a document stopped being a secret the
+moment it was written there.
 
 **THE TWO STEPS, AND PLAN YOUR ACCOUNTS AROUND THEM RATHER THAN MEETING THEM ON THE THIRD ONE.**
 Signing into a `sample.*` account costs two things before any screen opens:
@@ -250,7 +252,7 @@ It reports zero right now, and says so plainly rather than pretending zero is a 
 
 - **Route:** http://localhost:3000/insurer-performance (and `/documents`, `/information-assets`,
   `/employees`)
-- **Sign in as:** `sample.exec@ibms.internal` (`SampleUser#2026!`) for the insurer one — EXECUTIVE_
+- **Sign in as:** `sample.exec@ibms.internal` (the shared `sample.` password — see § Accounts) for the insurer one — EXECUTIVE_
   MANAGEMENT holds `insurer-performance.view`, which is what that screen is gated on.
 - **Do this:** on `/insurer-performance`, type **`Sample`** into the insurer field and pick
   **"Sample General & Motor Insurance Co."** from the list that appears. Press the view button.
@@ -313,7 +315,7 @@ done.
 ## 7 · An Executive could not find an employee
 
 - **Route:** http://localhost:3000/employee-performance
-- **Sign in as:** `sample.exec@ibms.internal` (`SampleUser#2026!`) — **this role specifically**, because
+- **Sign in as:** `sample.exec@ibms.internal` (the shared `sample.` password — see § Accounts) — **this role specifically**, because
   the defect was invisible to every other role. EXECUTIVE_MANAGEMENT holds `employee-performance.view`
   and does *not* hold the national-ID reveal permission the search was gated on.
 - **Do this:** type **`مراد`** into the employee field (that is `مراد كريم رشيد التميمي`, a real active
@@ -329,7 +331,7 @@ done.
 ## 8 · The Data Protection Officer could not find a customer on their own screen
 
 - **Route:** http://localhost:3000/dsr
-- **Sign in as:** `sample.dpo@ibms.internal` (`SampleUser#2026!`) — **this role specifically.** The DPO
+- **Sign in as:** `sample.dpo@ibms.internal` (the shared `sample.` password — see § Accounts) — **this role specifically.** The DPO
   holds `dsr.log` and does *not* hold `customer.read`, and `/dsr` is the screen their job is done on.
 - **Do this:** type **`Bassam`** into the customer field (that is `Bassam Twal`, a real individual in
   office `default`). Pick them.

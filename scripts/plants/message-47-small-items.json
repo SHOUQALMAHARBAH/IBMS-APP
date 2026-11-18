@@ -1,0 +1,20 @@
+{
+  "the-rfq-heading-prints-the-line-as-stored-again": {
+    "file": "apps/web/app/(app)/rfqs/[id]/page.tsx",
+    "from": "          <h1>{t('rfqDetailHeading', { line: lineDisplayName(rfq, language) })}</h1>",
+    "to": "          <h1>{t('rfqDetailHeading', { line: rfq.insuranceLine })}</h1>",
+    "why": "§S1 REVERSED, in the exact state the owner's second walk found: the heading reads «طلب عرض أسعار — Motor Fleet» to a reader who had just chosen the Arabic line. ⚠️ THE POINT OF THIS PLANT IS THE GATE, NOT THE SCREEN — `check:bilingual-names` was green beside this defect for a day, because it matched an insurer's NAME and a line is a different field behind a different helper. Expected to red `npm run check:bilingual-names` BY NAME AND LINE, which is the half that was missing; the Playwright suite is expected to stay green, because no spec asserted the Arabic heading and that is how it lived."
+  },
+  "the-declarer-is-sent-to-ask-themselves-again": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "          {!canDeclareRenewal &&\n          standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (",
+    "to": "          {standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (",
+    "why": "§T2 REVERSED. Decision 136(ب)'s sentence ends «راجع مسؤول النظام في مكتبك» and goes back to standing BESIDE the declaration button, so the one person who can end the state is told to go and ask themselves for it. ⛔ The sentence itself is untouched by this plant and by its fix — only the condition moves, which is what «no word changes» means. Expected to kill the Playwright test that asserts the declarer does NOT see it, and to leave green the test that asserts a reader who cannot declare DOES."
+  },
+  "the-walkthrough-prints-the-shared-password-again": {
+    "file": "scripts/measurements/seed-password-in-docs.py",
+    "from": "SUBJECT_PREFIX = \"docs/\"",
+    "to": "SUBJECT_PREFIX = \"docs/first-run.md\"",
+    "why": "THE WIDENING UNDONE AT ITS SOURCE, which is the only way to plant this defect without writing a real password into a tracked file — the exact thing the gate exists to stop, and the reason message 46 could not plant it in the real tree either. With the subject narrowed back to one document, every other file under `docs/` falls to the REPORTED_ELSEWHERE path and an undeclared one fails there instead. ⚠️ Expected to red `check:seed-password-in-docs` IN A DIFFERENT DIRECTION from the real defect — it names the self-test cases that prove the widening, which is what a narrowed subject really breaks. The subject direction itself is proven on the synthetic trees, with a synthetic value."
+  }
+}

@@ -904,9 +904,11 @@ test('OWNER DECISION 136(ب) — the office awaiting a declaration is told what 
   page,
 }) => {
   /*
-   * The sentence sends the employee to their own administrator, not to the Central Bank. It is
-   * shown to EVERY reader of this screen rather than only to a declarer: the person who met this
-   * refusal on a policy needs to see the same words here.
+   * The sentence sends the employee to their own administrator, not to the Central Bank — so it
+   * is shown to a reader who CANNOT declare, which is who it is addressed to. §T2 withheld it
+   * from the holder of `license-renewal.declare`, and ⚠️ this caller is not one: measured, NO
+   * SEEDED ROLE holds that code (decision 151 ruling 6), so a Compliance Officer meets this
+   * sentence and never the button.
    */
   await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
   await mockRegulatoryCompliance(page, {
