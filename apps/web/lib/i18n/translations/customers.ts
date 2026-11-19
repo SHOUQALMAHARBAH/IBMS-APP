@@ -136,7 +136,7 @@ export const CUSTOMERS = {
     customerFieldFatherName: "اسم الأب",
     customerFieldGrandfatherName: "اسم الجد",
     customerFieldFamilyName: "اسم العائلة",
-    customerRevealJustificationLabel: "مبرر كشف {field} (البند 10.6، يُسجَّل)",
+    customerRevealJustificationLabel: 'مبرر كشف {field} (يُسجَّل)',
     customerRevealJustificationRequired:
       "يلزم إدخال مبرر مكتوب لكشف هذا الحقل.",
     customerRevealConfirmButton: "تأكيد الكشف",

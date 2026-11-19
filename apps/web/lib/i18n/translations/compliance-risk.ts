@@ -52,7 +52,7 @@ export const COMPLIANCE_RISK = {
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
     shMissingConfig:
-      'إعدادات ناقصة: {missing}. الفحص الآلي غير مُهيّأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+      'إعدادات ناقصة: {missing}. الفحص الآلي غير مُهيّأ، ومراجعة الالتزام مطلوبة قبل متابعة سير العمل.',
     shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
     shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
     wsRescreenSummary:
@@ -73,7 +73,7 @@ export const COMPLIANCE_RISK = {
     wsColDownloaded: 'نُزّل في',
     wsColGenerationStatus: 'الحالة',
     wsRestore: 'استعادة هذا الإصدار',
-    wsRestoreReason: 'سبب استعادة قائمة أقدم (١٠ أحرف على الأقل)',
+    wsRestoreReason: 'سبب استعادة قائمة أقدم (10 أحرف على الأقل)',
     wsRestoreReasonHint:
       'استعادة إصدار أقدم تُضيّق ما يمكن أن يكتشفه الفحص. اذكر ما حدث للإصدار ' +
       'الأحدث — السبب يُسجَّل في سجل التدقيق ويُنسب إليك.',
@@ -154,11 +154,11 @@ export const COMPLIANCE_RISK = {
     providerOfficesInviteEmailLabel: 'البريد الإلكتروني للعمل (يصبح هوية الدخول)',
     providerOfficesInviteNameLabel: 'الاسم الكامل كما يظهر على الحساب',
     providerOfficesInviteReasonLabel:
-      'سبب منح هذه المنظمة مسؤولاً أول (١٠ أحرف على الأقل)',
+      'سبب منح هذه المنظمة مسؤولاً أول (10 أحرف على الأقل)',
     providerOfficesInviteSubmit: 'إرسال الدعوة',
     providerOfficesInviteSending: 'جارٍ الإرسال…',
     providerOfficesInviteReasonTooShort:
-      'السبب يحتاج ١٠ أحرف على الأقل — يُسجَّل في سجل التدقيق ويجعل هذا الإنشاء قابلاً للمساءلة.',
+      'السبب يحتاج 10 أحرف على الأقل — يُسجَّل في سجل التدقيق ويجعل هذا الإنشاء قابلاً للمساءلة.',
     providerOfficesInviteNoPasswordNote:
       'لا يُنشئ النظام كلمة مرور ولا يولّدها ولا يحفظها ولا يعرضها على أحد في أي مرحلة. يدخل المسؤول المدعو بطلب إعادة تعيين كلمة المرور على بريده.',
     providerOfficesInviteChannelNote:
@@ -214,10 +214,10 @@ export const COMPLIANCE_RISK = {
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
     rcScopeOneTypeBasisNote:
-      'وتُطبَّق قاعدةُ النوع الواحد على كلِّ مكتب وساطة، مباشرةً كان أو إعادةَ تأمين، لأنّ هذا النظام لا يحمل نصّاً تنظيميّاً منفصلاً لوساطة إعادة التأمين — فإن كان هذا المكتب وسيطَ إعادة تأمين فهذا هو سندُ تطبيق المادة ٣/أ عليه، ومسألةُ شمولها لوسيط إعادة التأمين غيرُ محسومةٍ هنا.',
+      'وتُطبَّق قاعدةُ النوع الواحد على كلِّ مكتب وساطة، مباشرةً كان أو إعادةَ تأمين، لأنّ هذا النظام لا يحمل نصّاً تنظيميّاً منفصلاً لوساطة إعادة التأمين — فإن كان هذا المكتب وسيطَ إعادة تأمين فهذا هو سندُ تطبيق المادة 3/أ عليه، ومسألةُ شمولها لوسيط إعادة التأمين غيرُ محسومةٍ هنا.',
     rcCapitalHeading: 'رأس المال (المادة 4/أ)',
     rcCapitalCountingUnitUnverified:
-      'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة ٤/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة ٣٢ فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
+      'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة 4/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة 32 فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
     rcCapitalRequired: 'رأس المال المطلوب',
     rcCapitalPaidUp: 'رأس المال المدفوع',
     rcCapitalUnrecordedWarning:
@@ -332,13 +332,13 @@ export const COMPLIANCE_RISK = {
     rcStandingCancelled:
       'ملغى',
     rcStandingDerived:
-      'هذه الحالةُ مُستنبَطةٌ من مدَدِ الترخيصِ المسجّلةِ ومن قراراتِ الجهةِ الرقابيةِ المدوَّنة، وليست محفوظةً كحقل. وهي نفسُ الحالةِ التي يَمنعُ النظامُ على أساسِها الأعمالَ الجديدة.',
+      'هذه الحالةُ مُستنبَطةٌ من مدَدِ الترخيصِ المسجّلةِ ومن قراراتِ الجهةِ الرقابيةِ المدوَّنة. وهي نفسُ الحالةِ التي يَمنعُ النظامُ على أساسِها الأعمالَ الجديدة.',
     rcStandingMayNotPractise:
       'لا يجوزُ للمكتبِ مباشرةُ أعمالٍ جديدةٍ في هذه الحالة: إصدارُ وثيقةٍ جديدةٍ، أو تجديدُها، أو طلبُ عروضٍ من الشركات، أو إصدارُ توصيةٍ للعميل، أو ملحقٌ يزيدُ التغطية، أو إصدارُ شهادةِ تأمين. أمّا التحصيلُ والتوريدُ والمطالباتُ والإلغاءُ والتقاريرُ وأعمالُ الامتثالِ فتستمرُّ.',
     rcStandingDecisionRef:
       'رقمُ قرارِ الجهةِ الرقابية',
     rcStandingDeemedCancelled:
-      'عُدَّ الترخيصُ ملغىً بحكمِ المادة ١٤/ج: مضى على الإيقافِ بناءً على طلبِ الوسيطِ أكثرُ من سنتين. لم يَصدُر بذلك قرارٌ من الجهةِ الرقابية، وهذا ما استنبطَه النظامُ من التواريخِ المسجّلة.',
+      'عُدَّ الترخيصُ ملغىً بحكمِ المادة 14/ج: مضى على الإيقافِ بناءً على طلبِ الوسيطِ أكثرُ من سنتين. لم يَصدُر بذلك قرارٌ من الجهةِ الرقابية، وهذا ما استنبطَه النظامُ من التواريخِ المسجّلة.',
     rcActionsHeading:
       'قراراتُ الجهةِ الرقابيةِ المدوَّنة',
     rcActionKind:
@@ -364,11 +364,11 @@ export const COMPLIANCE_RISK = {
     rcRecordActionButton:
       'تدوينُ القرار',
     rcActionReplacesMarker:
-      'هنا يُدوَّنُ القرارُ كما وردَ في الكتاب: نوعُه وسندُه وتاريخُ نفاذِه ورقمُه. وقد حلَّ هذا محلَّ زرٍّ واحدٍ كان يُعلِّمُ الترخيصَ منتهيًا دونَ أن يَحفظَ شيئًا من ذلك، فكان الإيقافُ مدوَّنًا بلا ما يُستندُ إليه.',
+      'هنا يُدوَّنُ القرارُ كما وردَ في الكتاب: نوعُه وسندُه وتاريخُ نفاذِه ورقمُه.',
     rcNoticeHeading:
       'تنبيهُ تجديدِ الترخيص',
     rcNoticeFirst:
-      'بقي على انتهاءِ مدّةِ الترخيصِ خمسةٌ وأربعون يومًا، وهو الموعدُ الذي يَجبُ أن يُقدَّمَ فيه طلبُ التجديد (المادة ١١).',
+      'بقي على انتهاءِ مدّةِ الترخيصِ خمسةٌ وأربعون يومًا، وهو الموعدُ الذي يَجبُ أن يُقدَّمَ فيه طلبُ التجديد (المادة 11).',
     rcNoticeSecond:
       'بقي على انتهاءِ مدّةِ الترخيصِ ثلاثون يومًا.',
     rcNoticeContinuing:
@@ -380,13 +380,13 @@ export const COMPLIANCE_RISK = {
     rcNoticeDaysSince:
       'الأيّامُ المنقضيةُ على الانتهاء',
     rcNoticeApplicationDueBy:
-      'آخرُ موعدٍ لتقديمِ طلبِ التجديد (المادة ١١)',
+      'آخرُ موعدٍ لتقديمِ طلبِ التجديد (المادة 11)',
     rcNoticeFiled:
       'طلبُ التجديدِ مدوَّنٌ لدينا. وهذا لا يَرفعُ المنعَ ولا يُوقِفُ التنبيه: تقديمُ الطلبِ ليس قرارًا، والذي يَرفعُ المنعَ هو تدوينُ مدّةِ الترخيصِ الجديدةِ مع شهادتِها.',
     rcNoticeNotFiled:
       'لا يوجدُ طلبُ تجديدٍ مدوَّنٌ لدينا.',
     rcNoticeNoSource:
-      'موعدُ الخمسةِ والأربعين يومًا مأخوذٌ من المادة ١١. أمّا موعدُ الثلاثين يومًا فهو تنبيهٌ داخليٌّ إضافيٌّ لا يَستندُ إلى نصٍّ.',
+      'موعدُ الخمسةِ والأربعين يومًا مأخوذٌ من المادة 11. أمّا موعدُ الثلاثين يومًا فهو تنبيهٌ داخليٌّ إضافيٌّ لا يَستندُ إلى نصٍّ.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     rcRefusalAct: 'عرض شاشة الالتزام التنظيمي',
     rcCalendarRefusalAct: 'عرض تقويم الالتزام',
@@ -532,16 +532,20 @@ export const COMPLIANCE_RISK = {
      * outcome for a self-approval report. The Arabic says WHY and HOW MANY, which the
      * English never did.
      *
-     * THE 20000 IS TIED TO THE CONSTANT BY AN ASSERTION, NOT INTERPOLATED, and the
-     * choice is deliberate: interpolating would render the figure through
-     * `formatNumber`, which keeps digits WESTERN, and would therefore silently overrule
-     * the owner's own «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
-     * dictionary's established convention — measured, 210 such characters across 14
-     * files, `dsrExtendButton`'s «١٥ يوماً» among them — while `formatNumber`'s
-     * Western digits are for figures rendered from DATA. So her bytes stand and
+     * THE 20000 IS TIED TO THE CONSTANT BY AN ASSERTION, NOT INTERPOLATED, and
      * `screen-copy.test.ts` fails by name if the constant moves away from the string.
+     *
+     * 🔴 CORRECTED 2026-11-19 — OWNER DECISION 146 RULING 1-أ. This note used to give a
+     * SECOND reason for the assertion: that interpolating would render through
+     * `formatNumber`, which keeps digits WESTERN, and so would silently overrule the
+     * owner's own «٢٠٠٠٠» — Arabic-Indic numerals in prose being this dictionary's
+     * established convention (measured then at 210 characters across 14 files).
+     * **She reversed that convention**: «كل رقم مكتوب في نصوص النظام غربي», and annex §٣
+     * names this very key as row 13 of the fifty-three. The digits above are Western now.
+     *
+     * ⟶ The first reason stands on its own and is why the assertion is kept.
      */
-    icTruncatedNote: '(نتيجة غير مكتملة — فُحِص أول ٢٠٠٠٠ سجل)',
+    icTruncatedNote: '(نتيجة غير مكتملة — فُحِص أول 20000 سجل)',
     /* `dormant` carries BOTH halves on purpose — watched, AND not yet written to.
      * «غير مستعمل» alone would leave the reader asking why the pair is listed at
      * all, which is the question the flag exists to answer. */
@@ -619,7 +623,7 @@ export const COMPLIANCE_RISK = {
     // ---- Audit trail (Part 5.1) ----------------------------------------------
     atHeading: 'سجل التدقيق',
     atIntro:
-      'العدسة القرائية فقط للمدقّق الخارجي (الجزء 5.1): السجلات، وتاريخ المستندات، وتاريخ انتقالات حالات سير العمل لفترة ارتباط محدّدة. والوصول نفسه محدّد زمنياً عبر إعدادات حساب كل مستخدم، لا من هنا.',
+      'العدسة القرائية فقط للمدقّق الخارجي: السجلات، وتاريخ المستندات، وتاريخ انتقالات حالات سير العمل لفترة ارتباط محدّدة. والوصول نفسه محدّد زمنياً عبر إعدادات حساب كل مستخدم، لا من هنا.',
     atColOccurred: 'وقت الحدوث',
     atColAction: 'الإجراء',
     atColEntity: 'الكيان',

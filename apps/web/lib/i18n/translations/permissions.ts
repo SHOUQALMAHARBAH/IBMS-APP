@@ -123,7 +123,7 @@ export const PERMISSIONS = {
     // ⛔ Deferred only because message 41 orders §4 after §3, and §3 (decision 128 with the
     // persisted certificate) did not ship. It is three strings and a slice when it does.
     'perm:claims-analytics.view': 'يرى نسبة الخسارة وتحليلات المطالبات. يكشف أداء كل عميل وكل شركة تأمين — أي من يكلّف المكتب أكثر مما يدفع. لا يكشف عمولة',
-    'perm:client-accounting.read': 'يرى ما لم يُقبَض من العملاء وأعماره (مستحق، ٣٠ يوماً، ٦٠، ٩٠، أكثر). يكشف من يتأخّر في الدفع',
+    'perm:client-accounting.read': 'يرى ما لم يُقبَض من العملاء وأعماره (مستحق، 30 يوماً، 60، 90، أكثر). يكشف من يتأخّر في الدفع',
     'perm:client-decision.capture': 'يسجّل قرار العميل على التوصية المرسلة — قرار واحد يوجّه الفرصة إلى التنفيذ أو الإغلاق أو إعادة التفاوض',
     'perm:client-decision.read': 'يقرأ قرار العميل ووجهة الفرصة بعده',
     'perm:commission-override.approve': 'يعتمد تعديلاً يدوياً على عمولة. ولا يجوز أن يكون هو من طلبه — والطلب والاعتماد يُسجَّلان منفصلين',

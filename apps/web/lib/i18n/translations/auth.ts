@@ -21,7 +21,7 @@ export const AUTH = {
     authBrandChipPrivacy: 'خصوصيّة مدمجة',
 
     authSignInHeading: 'تسجيل الدخول',
-    authMfaPrompt: 'أدخل الرمز المكوَّن من ٦ أرقام من تطبيق المصادقة.',
+    authMfaPrompt: 'أدخل الرمز المكوَّن من 6 أرقام من تطبيق المصادقة.',
     authMfaCodeLabel: 'رمز المصادقة',
     authVerifying: 'جارٍ التحقق…',
     authVerifyButton: 'تحقّق',
@@ -38,7 +38,7 @@ export const AUTH = {
     authCreateAccountHeading: 'إنشاء حساب',
     authFullNameLabel: 'الاسم الكامل',
     authPasswordRule:
-      '١٢ حرفاً على الأقل، وتشمل حرفاً كبيراً وحرفاً صغيراً ورقماً ورمزاً.',
+      '12 حرفاً على الأقل، وتشمل حرفاً كبيراً وحرفاً صغيراً ورقماً ورمزاً.',
     authCreatingAccount: 'جارٍ إنشاء الحساب…',
     authSignUpButton: 'إنشاء حساب',
     authAlreadyHaveAccount: 'لديك حساب بالفعل؟',
