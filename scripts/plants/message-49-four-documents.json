@@ -1,0 +1,22 @@
+{
+  "schedule-summary-ignores-arabic-insurer": {
+    "file": "apps/api/src/modules/policy/policy-schedule-summary.template.ts",
+    "from": "  const insurer = preferLanguage(data.insurerName, data.insurerNameAr, lang);",
+    "to": "  const insurer = data.insurerName;"
+  },
+  "comparison-label-back-to-khat": {
+    "file": "apps/api/src/modules/comparison/quotation-comparison.template.ts",
+    "from": "          ['فرع التأمين', data.insuranceLine],",
+    "to": "          ['خط التأمين', data.insuranceLine],"
+  },
+  "invoice-ignores-arabic-line": {
+    "file": "apps/api/src/modules/finance/invoice-document.template.ts",
+    "from": "      : preferLanguage(data.insuranceLine, data.insuranceLineAr, lang);",
+    "to": "      : data.insuranceLine;"
+  },
+  "recommendation-ignores-arabic-insurer": {
+    "file": "apps/api/src/modules/recommendation/recommendation-report.template.ts",
+    "from": "  const insurer = preferLanguage(data.insurerName, data.insurerNameAr, lang);",
+    "to": "  const insurer = data.insurerName;"
+  }
+}

@@ -6,7 +6,8 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildPolicyScheduleSummaryHtml } from './policy-schedule-summary.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { insurerName } from '../../repositories/insurer-identity';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 
 const POLICY_SCHEDULE_SUMMARY_TEMPLATE_TYPE = 'policy_schedule_summary';
 
@@ -73,15 +74,29 @@ export class PolicyScheduleSummaryDocumentService {
     const language: DocumentLanguage =
       requestedLanguage ?? customer.languagePreference;
 
+    const insurerPair = policy.insurer
+      ? resolveInsurerNamePair(policy.insurer)
+      : { name: policy.insurerId, nameAr: null };
+
     const html = buildPolicyScheduleSummaryHtml(
       {
         policyId: policy.id,
         customerLegalName: customer.legalName,
-        insurerName: policy.insurer
-          ? insurerName(policy.insurer)
-          : policy.insurerId,
+        /*
+         * BOTH NAMES FROM ONE SOURCE — decision 153 §U2 applied to this document.
+         * `resolveInsurerNamePair` picks the source once and reads both halves from it; its
+         * Latin half goes through `resolveInsurerName`, the same function `insurerName`
+         * delegated to, so nothing about WHICH name wins has changed.
+         *
+         * ⚠️ `policy.insurerId` stays the fallback for a policy with no insurer row, exactly as
+         * before — an id is not a name in either language, so its Arabic half is null.
+         */
+        insurerName: insurerPair.name,
+        insurerNameAr: insurerPair.nameAr,
         policyNumber: policy.policyNumber,
         insuranceLine: policy.insuranceLine,
+        // The catalogue join `POLICY_INCLUDE` already selects — no query changed here.
+        insuranceLineAr: insuranceLineNameAr(policy),
         inceptionDate: policy.inceptionDate,
         expiryDate: policy.expiryDate,
         requestedPremium: policy.requestedPremium,

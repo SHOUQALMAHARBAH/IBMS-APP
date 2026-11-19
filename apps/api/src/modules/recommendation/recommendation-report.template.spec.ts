@@ -4,12 +4,25 @@ import {
   type RecommendationReportData,
 } from './recommendation-report.template';
 
+/*
+ * ⚠️ `insurerNameAr` IS NULL ON EVERY FIXTURE BELOW, DELIBERATELY.
+ *
+ * These fixtures put ARABIC TEXT in `insurerName`, which is the LATIN field — so an assertion
+ * that the Arabic render shows an Arabic name passes against a template that never consults
+ * `insurerNameAr` at all. That is the exact vacuity message 45 §2 caught in a Playwright
+ * fixture, and leaving the Arabic half null here keeps these tests exercising the FALLBACK
+ * direction (no Arabic recorded -> render the Latin name) rather than quietly proving nothing.
+ *
+ * The decision 153 §U2 test at the bottom of this file carries its own fixture, with a genuinely
+ * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
+ */
 const BASE_DATA: RecommendationReportData = {
   recommendationId: 'rec-123',
   customerLegalName: 'شركة الأفق للتأمين',
   insuranceLine: 'Property All Risks',
   createdAt: new Date('2026-03-05T00:00:00Z'),
   insurerName: 'الاتحاد للتأمين',
+  insurerNameAr: null,
   premium: { toString: () => '1250.5' },
   currency: 'JOD',
   deductible: { toString: () => '100' },
@@ -172,5 +185,39 @@ describe('buildRecommendationReportHtml', () => {
     // A double-escape would turn "&lt;" into "&amp;lt;" — assert that
     // never happens.
     expect(html).not.toContain('&amp;lt;');
+  });
+
+  /*
+   * 🔴 DECISION 153 §U2, APPLIED TO THE FOUR DOCUMENTS THE CERTIFICATE'S FIX REPORTED.
+   *
+   * «أسماء شركات التأمين وفروع التأمين تُطبَع بالعربية حيث هي موجودة». The fixture below is
+   * NON-VACUOUS BY CONSTRUCTION: the Latin name is genuinely Latin and the Arabic one is a
+   * different string, so a template that ignored `insurerNameAr` would fail the first
+   * assertion, and one that printed Arabic into the English render would fail the last.
+   */
+  it('🔴 decision 153 §U2 — the Arabic recommendation says «فرع التأمين» and names the insurer in Arabic', () => {
+    const data: RecommendationReportData = {
+      ...BASE_DATA,
+      insurerName: 'Al-Ittihad Insurance',
+      insurerNameAr: 'الاتحاد للتأمين',
+    };
+
+    const ar = buildRecommendationReportHtml(data, 'AR');
+    expect(ar).toContain('فرع التأمين');
+    expect(ar).not.toContain('خط التأمين');
+    expect(ar).toContain('الاتحاد للتأمين');
+    expect(ar).not.toContain('Al-Ittihad Insurance');
+
+    /*
+     * ⚠️ THE LINE IS STILL THE STORED ENGLISH STRING, asserted rather than left unsaid.
+     * `RECOMMENDATION_INCLUDE` selects the RFQ's line FK IDS but not the catalogue rows they
+     * point at, so there is no Arabic name here to read, and §1 of message 49 rules out the
+     * query change. This fails the day that changes, which is the point.
+     */
+    expect(ar).toContain('Property All Risks');
+
+    const en = buildRecommendationReportHtml(data, 'EN');
+    expect(en).toContain('Al-Ittihad Insurance');
+    expect(en).not.toContain('الاتحاد للتأمين');
   });
 });

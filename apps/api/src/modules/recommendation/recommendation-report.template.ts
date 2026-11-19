@@ -5,6 +5,7 @@ import {
   formatDocumentDate,
   formatDocumentMoney,
   formatDocumentPercent,
+  preferLanguage,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
 
@@ -43,6 +44,9 @@ export interface RecommendationReportData {
   insuranceLine: string;
   createdAt: Date;
   insurerName: string;
+  /** The insurer's Arabic name, read from the SAME source as `insurerName` by
+   *  `resolveInsurerNamePair` — never coalesced field by field. */
+  insurerNameAr: string | null;
   premium: { toString(): string };
   currency: string;
   deductible: { toString(): string } | null;
@@ -91,14 +95,26 @@ function renderSection(
   const title = lang === 'ar' ? 'تقرير التوصية' : 'Recommendation Report';
   const body = lang === 'ar' ? data.bodyAr : data.bodyEn;
 
+  /*
+   * THE INSURER IN THE READER'S LANGUAGE — decision 153 §U2, applied to this document.
+   * The line has no Arabic name to read here; see the comment on its row below.
+   */
+  const insurer = preferLanguage(data.insurerName, data.insurerNameAr, lang);
+
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
           ['رقم المرجع', escapeHtml(data.recommendationId)],
           ['العميل', escapeHtml(data.customerLegalName)],
-          ['خط التأمين', escapeHtml(data.insuranceLine)],
+          // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
+          //
+          // ⚠️ THE VALUE BESIDE IT IS STILL THE STORED ENGLISH LINE, and that is reported
+          // rather than fixed: `RECOMMENDATION_INCLUDE` selects the RFQ's line FK ids but not
+          // the catalogue rows they point at, so there is no Arabic name HERE to read. Giving
+          // it one is a query change, which §1 of this message rules out.
+          ['فرع التأمين', escapeHtml(data.insuranceLine)],
           ['تاريخ الإعداد', formatDocumentDate(data.createdAt, 'ar')],
-          ['شركة التأمين الموصى بها', escapeHtml(data.insurerName)],
+          ['شركة التأمين الموصى بها', escapeHtml(insurer)],
           ['القسط', formatDocumentMoney(data.premium, 'ar', data.currency)],
           ['التحمل', formatDocumentMoney(data.deductible, 'ar', data.currency)],
           [
@@ -126,7 +142,7 @@ function renderSection(
           ['Customer', escapeHtml(data.customerLegalName)],
           ['Insurance Line', escapeHtml(data.insuranceLine)],
           ['Prepared', formatDocumentDate(data.createdAt, 'en')],
-          ['Recommended Insurer', escapeHtml(data.insurerName)],
+          ['Recommended Insurer', escapeHtml(insurer)],
           ['Premium', formatDocumentMoney(data.premium, 'en', data.currency)],
           [
             'Deductible',
