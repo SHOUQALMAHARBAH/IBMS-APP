@@ -232,12 +232,21 @@ already give).
 * **Money renders through `formatMoney`, everywhere.** Four dashboards were printing
   `{rawValue} JOD` — an ungrouped, unformatted number with a hand-written suffix,
   bypassing the shared formatter entirely. They now read `JOD 37,500.000` like every
-  other figure in the app. **⚠️ CORRECTED 2026-11-19: "everywhere" is not true and the
-  word is left standing with this marker beside it rather than quietly edited.** That
-  sweep fixed the `{rawValue} JOD` SHAPE; a second shape it never looked at — an amount
-  printed bare, with no suffix to grep for — is still on the dashboards. Measured:
-  `/dashboards/financial` alone prints **nine**. That is message 48 §3 item 3, deferred
-  with the section rather than hidden.
+  other figure in the app. **⚠️ CORRECTED 2026-11-19: "everywhere" was NOT true, and the
+  word was left standing with a marker beside it rather than quietly edited.** That sweep
+  fixed the `{rawValue} JOD` SHAPE; a second shape it never looked at — an amount printed
+  bare, with no suffix to grep for — was still on the dashboards, `/dashboards/financial`
+  alone printing **nine**. **✅ MADE TRUE THE SAME DAY (message 49 §3 item 1), AND THE
+  FIGURE IS STATED SO THE NEXT READER CAN CHECK IT RATHER THAN TRUST IT: 21 bare amounts
+  across FIVE of the seven dashboards** — executive 4, financial 9,
+  insurer-employee-performance 2, sales 3, kpi-dashboard 3 — now go through `formatMoney`.
+  **⛔ The other two are not an oversight**: `/dashboards/compliance` and
+  `/dashboards/policy` render no money at all, and `/dashboards/claims` already formatted
+  all eight of its amounts. ⚠️ AND THE COUNTS ARE DELIBERATELY NOT ROUTED THROUGH IT —
+  `totalCustomers`, open claims, policy counts and the SLA timer totals are numbers of
+  things, and `formatMoney` would stamp «JOD» on a number of people. **The claim is now
+  true of the dashboards specifically**; it is not a claim about every screen in the app,
+  and ⛔ it should not be widened into one without a sweep that measures the wider set.
 * **A BREAKDOWN'S KEY IS A STORED VALUE, AND NO STRING SEARCH CAN FIND IT.** Three
   dashboards printed the key of a `Record<string, number>` the API sends —
   `COMPLIANCE_REVIEW`, `CONVERTED_TO_PROSPECT`, `EXCEPTION_RAISED` — under Arabic

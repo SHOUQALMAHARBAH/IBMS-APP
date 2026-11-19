@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -73,7 +74,23 @@ test("renders the cross-module summary with per-domain stats and status tables",
     page.getByRole("heading", { name: "General KPI Dashboard" }),
   ).toBeVisible();
   await expect(page.getByText("128")).toBeVisible();
-  await expect(page.getByText("125000.000")).toBeVisible();
+  /*
+   * 🔴 WAS `getByText("125000.000")` — the raw decimal string. Message 49 §3 item 1 put the
+   * three money tiles on this screen through `formatMoney`, so it reads «JOD 125,000.000»
+   * and the old substring cannot survive the grouping comma. ⚠️ The ABSENCE of the raw
+   * form is asserted too: a presence check alone passes against a screen printing both.
+   */
+  await expect(page.getByText("JOD 125,000.000")).toBeVisible();
+  await expect(page.getByText("JOD 3,400.500")).toBeVisible();
+  await expect(page.getByText("JOD 875.250")).toBeVisible();
+  await expectAbsentWithin(page.getByRole("main"), (s) =>
+    s.getByText("125000.000", { exact: false }),
+  );
+  // ⛔ And the COUNTS beside them stay unformatted — 128 customers is a number of people,
+  // and `formatMoney` would stamp «JOD» on it.
+  await expectAbsentWithin(page.getByRole("main"), (s) =>
+    s.getByText("JOD 128", { exact: false }),
+  );
   await expect(page.getByRole("cell", { name: "NEW" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Finance" })).toBeVisible();
   await expect(

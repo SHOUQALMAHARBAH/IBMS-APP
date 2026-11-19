@@ -1,0 +1,14 @@
+{
+  "financial-profitability-back-to-raw": {
+    "file": "apps/web/app/(app)/dashboards/financial/page.tsx",
+    "from": "                <Td>{formatMoney(r.premiumWritten, language)}</Td>",
+    "to": "                <Td>{r.premiumWritten}</Td>",
+    "why": "Message 49 §3 item 1 — every amount on the seven dashboards goes through `formatMoney`, the ONE home for how money is written. Reverting ONE column must kill the financial dashboard's money test by name, and must NOT touch the other dashboards' tests."
+  },
+  "screening-health-key-back-to-raw": {
+    "file": "apps/web/app/(app)/screening-health/page.tsx",
+    "from": "                        <Td>\n                          {state in CASE_STATUS_KEY\n                            ? t(\n                                CASE_STATUS_KEY[\n                                  state as keyof typeof CASE_STATUS_KEY\n                                ],\n                              )\n                            : state}\n                        </Td>",
+    "to": "                        <Td>{state}</Td>",
+    "why": "Message 49 §3 item 3 — `/screening-health` rendered the destructured key of an `Object.entries()` walk raw, which is `check:raw-values`'s shape C. ⚠️ The plant must remove the WHOLE lookup, not short-circuit it: a first version wrote `false && state in CASE_STATUS_KEY` and the gate stayed GREEN, because the matcher still saw a vocabulary on the line — a plant that does not bite reads exactly like a guard that works."
+  }
+}

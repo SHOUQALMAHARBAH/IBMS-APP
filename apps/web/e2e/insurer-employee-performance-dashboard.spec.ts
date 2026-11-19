@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -88,7 +89,21 @@ test("renders both the insurer and employee performance sections", async ({ page
   await expect(
     page.getByRole("cell", { name: "emp-1", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByText("15000.000")).toBeVisible();
+  /*
+   * 🔴 WAS `getByText("15000.000")` — the raw decimal string. The two money columns went
+   * through `displayOrDash`, which only turns null into an em dash; message 49 §3 item 1
+   * routes them through `formatMoney` instead. ⛔ The OTHER columns keep `displayOrDash`:
+   * they are counts and scores, and the «90.00» asserted above is a SCORE, not money —
+   * its absence of a «JOD» prefix is asserted here so a later sweep cannot widen into it.
+   */
+  await expect(page.getByText("JOD 15,000.000")).toBeVisible();
+  await expect(page.getByText("JOD 2,250.000")).toBeVisible();
+  await expectAbsentWithin(page.getByRole("main"), (s) =>
+    s.getByText("15000.000", { exact: false }),
+  );
+  await expectAbsentWithin(page.getByRole("main"), (s) =>
+    s.getByText("JOD 90.00", { exact: false }),
+  );
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
 

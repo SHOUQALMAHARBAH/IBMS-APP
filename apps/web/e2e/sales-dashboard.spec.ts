@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -66,7 +67,19 @@ test("renders every metric section with real figures", async ({ page }) => {
   await page.goto("/dashboards/sales");
   await expect(page.getByRole("heading", { name: "Sales Dashboard" })).toBeVisible();
   await expect(page.getByText("20", { exact: true })).toBeVisible();
-  await expect(page.getByText("5000.000")).toBeVisible();
+  /*
+   * 🔴 WAS `getByText("5000.000")` — the raw decimal string. Message 49 §3 item 1 put the
+   * three premium-written tiles through `formatMoney`, so they read «JOD 5,000.000» and the
+   * old substring cannot survive the grouping comma. The commission tile below already went
+   * through it, which is why «JOD 800.000» on the next line never changed — one screen was
+   * formatting one figure and printing three raw.
+   */
+  await expect(page.getByText("JOD 5,000.000")).toBeVisible();
+  await expect(page.getByText("JOD 3,000.000")).toBeVisible();
+  await expect(page.getByText("JOD 8,000.000")).toBeVisible();
+  await expectAbsentWithin(page.getByRole("main"), (s) =>
+    s.getByText("5000.000", { exact: false }),
+  );
   await expect(page.getByText("JOD 800.000")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
