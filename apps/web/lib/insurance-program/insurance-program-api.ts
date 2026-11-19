@@ -5,6 +5,7 @@
 // decimal strings, never JS numbers (ibms-brain/meta/lex/money-decimal-jod.md).
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { Paginated } from '../api/paginated';
 
 export type InsuranceProgramStatus = 'DRAFT' | 'FINALIZED' | 'SUPERSEDED';
 
@@ -63,12 +64,35 @@ export function assembleInsuranceProgram(
   return apiPost('/insurance-programs', { needsAssessmentId });
 }
 
-export function listInsurancePrograms(
+/** 🔴 OWNER DECISION 150 RULING 1 — every list row names its customer. */
+export interface InsuranceProgramListRow extends InsuranceProgram {
+  riskProfile: { customer: { id: string; legalName: string } };
+}
+
+/** One customer's programmes. Unwrapped to an array so this function keeps the shape its
+ *  callers have always had. */
+export async function listInsurancePrograms(
   customerId: string,
-): Promise<InsuranceProgram[]> {
-  return apiGet(
+): Promise<InsuranceProgramListRow[]> {
+  const page: Paginated<InsuranceProgramListRow> = await apiGet(
     `/insurance-programs?customerId=${encodeURIComponent(customerId)}`,
   );
+  return page.items;
+}
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST. Same visibility rule as `/policies`:
+ * `customer-file.all-owners.read` reaches the whole book, everybody else only the programmes on
+ * customers they own, ⛔ decided in the query.
+ */
+export function listAllInsurancePrograms(
+  params: { search?: string; page?: number } = {},
+): Promise<Paginated<InsuranceProgramListRow>> {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  if (params.page) qs.set('page', String(params.page));
+  const suffix = qs.toString();
+  return apiGet(`/insurance-programs${suffix ? `?${suffix}` : ''}`);
 }
 
 export function getInsuranceProgram(

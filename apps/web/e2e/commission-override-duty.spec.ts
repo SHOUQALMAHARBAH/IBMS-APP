@@ -171,8 +171,12 @@ async function mockScreen(page: Page, entries: unknown[]) {
     route.fulfill({ status: 200, json: entries }),
   );
   // Everything else the opportunity page reads, empty — this spec is about one block.
+  // 🔴 OWNER DECISION 150 RULING 1 — `/rfqs` returns a PAGE now, so it leaves the
+  // bare-array loop below: `listRfqs` reads `page.items`, and `[]` would give it `undefined`.
+  await page.route("http://localhost:4000/rfqs?opportunityId=opp-1", (route) =>
+    route.fulfill({ status: 200, json: paged([]) }),
+  );
   for (const url of [
-    "http://localhost:4000/rfqs?opportunityId=opp-1",
     "http://localhost:4000/client-decisions?opportunityId=opp-1",
     "http://localhost:4000/recommendations?opportunityId=opp-1",
     "http://localhost:4000/commission/agreements**",

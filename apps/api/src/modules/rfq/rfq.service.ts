@@ -18,9 +18,11 @@ import {
   type RfqCommunicationRow,
   type RfqInsurerWithInsurer,
   type RfqInsurerWithParents,
+  type RfqListRow,
   type RfqWithSubmissions,
   type SelectableInsurer,
 } from '../../repositories/rfq.repository';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import { insurerIdentity } from '../../repositories/insurer-identity';
 import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { OpportunityRepository } from '../../repositories/opportunity.repository';
@@ -143,6 +145,26 @@ function rfqForWire(rfq: RfqWithSubmissions): RfqForWire {
       }),
     ),
   };
+}
+
+/**
+ * A LIST ROW as it leaves this service — an RFQ on the wire, plus the customer it belongs to.
+ *
+ * 🔴 OWNER DECISION 150 RULING 1. A reader who opened `/rfqs` from the sidebar has no customer
+ * in hand, so a row that does not name one is a row they cannot place.
+ *
+ * ⛔ `customer` is LIFTED out of `opportunity` rather than the join being spread onto the wire.
+ * Message 45 §2's own new assertion caught `rfqForWire` doing exactly that with the two line
+ * rows: a raw join beside a resolved field is two ways to answer one question, which is how the
+ * insurer column came to be blank in the first place.
+ */
+export type RfqListRowForWire = RfqForWire & {
+  customer: { id: string; legalName: string };
+};
+
+function rfqListRowForWire(row: RfqListRow): RfqListRowForWire {
+  const { opportunity, ...rfq } = row;
+  return { ...rfqForWire(rfq), customer: opportunity.customer };
 }
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
@@ -1009,15 +1031,52 @@ export class RfqService {
     return updated;
   }
 
+  /**
+   * 🔴 OWNER DECISION 150 RULING 1 — THE LIST OPENS FROM THE SIDEBAR NOW, AND DOOR FOUR IS
+   * UNCHANGED BY IT.
+   *
+   * This route used to refuse "neither filter" outright, so `/rfqs` reached from the navigation
+   * rendered one sentence and nothing else. The refusal was not arbitrary: an UNFILTERED list
+   * handed to a reader admitted by a CUSTOMER-FILE ANCHOR would be the blanket key the anchor
+   * design refused.
+   *
+   * ⟶ IT IS STILL REFUSED, AND BY THE FILTER RATHER THAN BY A 422. The book-wide branch is
+   *   scoped by OWNERSHIP, exactly as `/policies` and `/claims` are: a caller holding
+   *   `customer-file.all-owners.read` reaches the whole book, everybody else is pinned to
+   *   Customers they own. ⚠️ An anchored reader holds neither — measured 2026-11-18, that code
+   *   is PLACEMENT + MANAGER + EXEC and the Compliance Officer and DPO hold none of it — and
+   *   owns no customer, so their book-wide list is EMPTY. The anchor is consultable on the
+   *   `customerId` branch and nowhere else, which is what it was always for.
+   *
+   * ⛔ The anchor is NOT consulted here, and must never be: an anchor is per customer, and a
+   * list it widened would be a list whose scope the anchor does not bound.
+   */
   async list(
     query: ListRfqsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<RfqForWire[]> {
+  ): Promise<Paginated<RfqListRowForWire>> {
     const { opportunityId, customerId } = query;
-    if ((opportunityId && customerId) || (!opportunityId && !customerId)) {
+    if (opportunityId && customerId) {
       throw new UnprocessableEntityException(
-        'Provide exactly one of opportunityId or customerId.',
+        'Provide at most one of opportunityId or customerId.',
       );
+    }
+    if (!opportunityId && !customerId) {
+      const filter = {
+        ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
+        search: query.search,
+      };
+      const window = pageWindow(query.page, query.pageSize);
+      const [rows, total] = await Promise.all([
+        this.rfqs.findManyForActor(filter, window),
+        this.rfqs.countForActor(filter),
+      ]);
+      return {
+        items: rows.map(rfqListRowForWire),
+        total,
+        page: window.page,
+        pageSize: window.pageSize,
+      };
     }
     if (opportunityId) {
       /*
@@ -1032,8 +1091,10 @@ export class RfqService {
         actor,
         'Opportunity not found',
       );
-      return (await this.rfqs.findRfqsByOpportunityId(opportunityId)).map(
-        rfqForWire,
+      return wholeSet(
+        (await this.rfqs.findRfqsByOpportunityId(opportunityId)).map(
+          rfqListRowForWire,
+        ),
       );
     }
 
@@ -1059,7 +1120,7 @@ export class RfqService {
         { rfqCount: rows.length },
       );
     }
-    return rows.map(rfqForWire);
+    return wholeSet(rows.map(rfqListRowForWire));
   }
 
   /**

@@ -169,3 +169,52 @@ export const a15dReasonInputStyle: CSSProperties = {
   marginTop: '0.35rem',
   width: '100%',
 };
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — the search row shared by the three book-wide lists.
+ *
+ * NAMED rather than inline, and that is not a style preference: `check:inline-styles`'s budget
+ * may only FALL, so three new screens writing `policies/page.tsx`'s form styles by hand would
+ * have pushed it up by six sites. Declaring it once moves the count the other way and means the
+ * three lists cannot drift into three different search rows.
+ */
+export const listSearchFormStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-3)',
+  alignItems: 'flex-end',
+  margin: 'var(--space-4) 0',
+};
+
+/** One labelled field inside it. */
+export const listSearchFieldStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--space-1)',
+};
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — the three book-wide lists' shared surfaces.
+ *
+ * ⛔ NAMED, NOT INLINE, and the gate is what insisted: `check:inline-styles`'s budget may only
+ * FALL, and three screens writing the same four declarations by hand put it UP by seven. These
+ * are the four, declared once — which also means the three lists cannot drift into three
+ * slightly different cards.
+ */
+export const listRowsStyle: CSSProperties = { marginTop: '1rem' };
+
+/** The empty-state line under a list that has no rows. */
+export const listEmptyNoteStyle: CSSProperties = {
+  color: 'var(--ink-secondary)',
+  marginTop: '1rem',
+};
+
+/** A submit control in the search row. */
+export const listSearchButtonStyle: CSSProperties = { cursor: 'pointer' };
+
+/** A card's top line: a heading on one side, a badge on the other, wrapping on a narrow screen. */
+export const listCardHeaderRowStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 'var(--space-4)',
+  flexWrap: 'wrap',
+};

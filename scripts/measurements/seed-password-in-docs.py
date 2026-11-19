@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A PASSWORD A SEED SCRIPT ASSIGNS MUST NOT BE PRINTED IN `docs/first-run.md`.
+A PASSWORD A SEED SCRIPT ASSIGNS MUST NOT BE PRINTED ANYWHERE UNDER `docs/`.
 
     python scripts/measurements/seed-password-in-docs.py             # report
     python scripts/measurements/seed-password-in-docs.py --check      # gate, both directions
@@ -18,9 +18,14 @@ in the requirements document"* -- and then printed a different one four hundred 
 down. A rule a document states and breaks about itself is worse than one it never states,
 because a reader who has met §2 has no reason to doubt §7.
 
-So this is budget ZERO on `docs/first-run.md`. There is no correct instance: a guide that needs
-to say WHICH password can say where it is SET, by variable name and file, which is what it does
-now and what a reader can actually act on.
+So this is budget ZERO. There is no correct instance: a document that needs to say WHICH
+password can say where it is SET, by variable name and file, which is what it does now and what
+a reader can actually act on.
+
+🔴 AND THE SUBJECT IS THE WHOLE OF `docs/` SINCE 2026-11-18. It shipped covering `first-run.md`
+alone, with `docs/phase-2-walkthrough.md`'s four occurrences REPORTED rather than changed —
+message 46 §1.1 asked for a report. The owner then asked for the fix, so that file names the
+variable now and the declaration below is EMPTY. 194 documents are read, measured.
 
 ## What it reads, and why it is derived rather than listed
 
@@ -36,19 +41,17 @@ defect planted in front of it, because it read one line and the real string was 
 `EXPECTED_SECRET_COUNT`: if the derivation stops finding the password, the gate FAILS rather
 than passing, and says which direction it failed in.
 
-## The second file is REPORTED, not hidden, and the report is asserted
+## A file OUTSIDE `docs/` is REPORTED, not hidden, and the report is asserted
 
-Measured 2026-11-18, the same literal is also in `docs/phase-2-walkthrough.md`, four times.
-Message 46 §1.1 asked for that to be REPORTED by file -- it did not ask for it to be changed --
-so it is declared below rather than fixed, and the declaration is checked in BOTH directions:
+`REPORTED_ELSEWHERE` covers the rest of the repository, and it is checked in BOTH directions:
 
   * a declared file that no longer holds the literal is STALE and fails, so the day somebody
     cleans it up this declaration is removed rather than quietly outliving its reason;
   * a file OUTSIDE the declaration and outside the seed that holds it fails BY NAME, which is
     the real job -- a new document that prints it cannot ship green.
 
-⛔ `docs/first-run.md` may never enter that declaration. It is the subject of the gate, and a
-subject that can be declared away is not a subject. That is asserted too.
+⛔ NOTHING UNDER `docs/` MAY EVER ENTER THAT DECLARATION. That tree is the subject of the gate,
+and a subject that can be declared away is not a subject. That is asserted too.
 """
 
 from __future__ import annotations
@@ -68,7 +71,19 @@ for _stream in (sys.stdout, sys.stderr):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# The document this gate is ABOUT. Budget zero, no exception possible.
+# 🔴 THE SUBJECT IS THE WHOLE OF `docs/` NOW, WIDENED 2026-11-18 ON THE OWNER'S INSTRUCTION.
+#
+# It shipped scoped to `docs/first-run.md` because that is the document handed to somebody who
+# does not read code, and the second file was REPORTED rather than changed — message 46 §1.1
+# asked for a report, not a fix. She then asked for the fix: `docs/phase-2-walkthrough.md` held
+# the same literal four times and no longer does, and `REPORTED_ELSEWHERE` is EMPTY.
+#
+# ⛔ The declaration stays in the code, empty, rather than being deleted — a file that starts
+# printing the password again must be a FAILURE to be explained, not a one-line declaration
+# somebody adds without noticing the list used to be empty.
+SUBJECT_PREFIX = "docs/"
+# The one document the gate came from. Kept by name so its absence is still an error: a gate
+# whose subject can quietly stop existing checks nothing.
 SUBJECT = "docs/first-run.md"
 
 # Where a seeded credential may legitimately be a literal: the script that sets it.
@@ -84,11 +99,15 @@ ASSIGN = re.compile(
 # Measured 2026-11-18: exactly one. Asserted so a derivation that stops matching FAILS.
 EXPECTED_SECRET_COUNT = 1
 
-# Files outside the seed that hold a seeded password literal, DECLARED with its count and
-# checked in both directions. Message 46 §1.1 asked for this to be reported by file.
-REPORTED_ELSEWHERE: dict[str, int] = {
-    "docs/phase-2-walkthrough.md": 4,
-}
+# Files outside `docs/` and outside the seed that hold a seeded password literal, DECLARED with
+# its count and checked in both directions.
+#
+# 🔴 EMPTY SINCE 2026-11-18, and that is the point rather than an oversight. It held
+# `docs/phase-2-walkthrough.md` (4 occurrences) until the owner asked for the value to be taken
+# out of it; nothing in the repository prints a seeded password now. ⛔ Nothing under `docs/` may
+# ever be added here — that whole tree is the SUBJECT, and a subject that can be declared away is
+# not a subject. Asserted below.
+REPORTED_ELSEWHERE: dict[str, int] = {}
 
 
 
@@ -133,11 +152,15 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
     # list is not a subject, and this is REPORTED rather than asserted: a traceback inside
     # `npm run check:docs` tells a reader the gate is broken when what is broken is the
     # declaration, which is a different thing with a different fix.
-    if SUBJECT in REPORTED_ELSEWHERE:
-        errors.append(
-            f"{SUBJECT} is the SUBJECT of this gate and may never be declared in "
-            f"REPORTED_ELSEWHERE -- take the password out of it instead"
-        )
+    declared_subjects = sorted(
+        rel for rel in REPORTED_ELSEWHERE if rel.startswith(SUBJECT_PREFIX)
+    )
+    if declared_subjects:
+        for rel in declared_subjects:
+            errors.append(
+                f"{rel} is under {SUBJECT_PREFIX}, which is the SUBJECT of this gate, and may "
+                f"never be declared in REPORTED_ELSEWHERE -- take the password out of it instead"
+            )
         return errors, lines
 
     # ---- derive the secrets from the seed scripts -------------------------------------
@@ -152,7 +175,7 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
             secrets[m.group(3)] = (rel, body[:m.start()].count("\n") + 1)
 
     lines.append("")
-    lines.append("  a seeded password printed in the first-run guide")
+    lines.append("  a seeded password printed anywhere under docs/")
     lines.append("")
     lines.append(f"  password literals assigned in seed scripts   {len(secrets)}")
     for value, (rel, line) in sorted(secrets.items(), key=lambda kv: kv[1]):
@@ -168,28 +191,43 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
         )
         return errors, lines
 
-    # ---- budget zero on the subject ---------------------------------------------------
-    subject_body = _read(root, SUBJECT)
-    if subject_body is None:
+    # ---- budget zero across the whole subject tree -------------------------------------
+    if _read(root, SUBJECT) is None:
         errors.append(f"{SUBJECT} is missing -- this gate has no subject")
         return errors, lines
 
+    subject_files = [f for f in files if f.startswith(SUBJECT_PREFIX)]
+    if not subject_files:
+        errors.append(
+            f"no file under {SUBJECT_PREFIX} was read -- a budget-zero gate over an empty "
+            f"population reports a confident green over nothing"
+        )
+        return errors, lines
+
     hits = 0
-    for value, (rel, line) in secrets.items():
-        n = subject_body.count(value)
-        if n:
-            hits += n
-            errors.append(
-                f"{SUBJECT} prints the password set at {rel}:{line} -- {n} occurrence(s). "
-                f"Say WHERE it is set (the variable name and the file), never what it is: a "
-                f"password written in a document stopped being a secret when it was written"
-            )
-    lines.append(f"  occurrences in {SUBJECT}                 {hits}   budget 0")
+    for doc in subject_files:
+        body = _read(root, doc)
+        if body is None:
+            continue
+        for value, (rel, line) in secrets.items():
+            n = body.count(value)
+            if n:
+                hits += n
+                errors.append(
+                    f"{doc} prints the password set at {rel}:{line} -- {n} occurrence(s). "
+                    f"Say WHERE it is set (the variable name and the file), never what it is: "
+                    f"a password written in a document stopped being a secret when it was "
+                    f"written"
+                )
+    lines.append(f"  files under {SUBJECT_PREFIX} read                     {len(subject_files)}")
+    lines.append(f"  occurrences under {SUBJECT_PREFIX}               {hits}   budget 0")
 
     # ---- the declared report, both directions -----------------------------------------
     elsewhere: dict[str, int] = {}
     for rel in files:
-        if rel == SUBJECT or rel.startswith(SEED_PREFIXES):
+        # `docs/` is the subject and was counted above; counting it again here would report the
+        # same occurrence twice, under two different rules.
+        if rel.startswith(SUBJECT_PREFIX) or rel.startswith(SEED_PREFIXES):
             continue
         body = _read(root, rel)
         if body is None:
@@ -267,18 +305,35 @@ def _self_test() -> int:
                                      "# First run\n\n```\n" + LIT + "\n```\n"}),
                     REPORTED_ELSEWHERE.clear()),
          "prints the password set at"),
-        ("ANOTHER tracked document prints it, undeclared",
+        # 🔴 THE WIDENING, 2026-11-18. A SECOND document under `docs/` is the SUBJECT now, not
+        # an "elsewhere" to be declared — this is the case that passed before and must fail
+        # after, and `docs/phase-2-walkthrough.md` is the real file it stands for.
+        ("a SECOND document under docs/ prints it",
          lambda t: (_build(t, extra={"docs/walkthrough.md": "password: " + LIT + "\n"}),
+                    REPORTED_ELSEWHERE.clear()),
+         "prints the password set at"),
+        # ⛔ AND IT CANNOT BE DECLARED AWAY EITHER. Before the widening this was a legitimate
+        # declaration; the whole tree is the subject now, so declaring any of it is the error.
+        ("a document under docs/ declared as an exception",
+         lambda t: (_build(t, extra={"docs/walkthrough.md": "password: " + LIT + "\n"}),
+                    REPORTED_ELSEWHERE.clear(),
+                    REPORTED_ELSEWHERE.__setitem__("docs/walkthrough.md", 1)),
+         "may never be declared in REPORTED_ELSEWHERE"),
+        # The elsewhere path still exists and still works — OUTSIDE `docs/`, which is where it
+        # now applies. Without this the widening would have quietly deleted a rule rather than
+        # narrowed its scope.
+        ("a file OUTSIDE docs/ prints it, undeclared",
+         lambda t: (_build(t, extra={"README.md": "password: " + LIT + "\n"}),
                     REPORTED_ELSEWHERE.clear()),
          "is not declared in REPORTED_ELSEWHERE"),
         ("a declared file that no longer holds it -- the declaration is stale",
          lambda t: (_build(t), REPORTED_ELSEWHERE.clear(),
-                    REPORTED_ELSEWHERE.__setitem__("docs/gone.md", 1)),
+                    REPORTED_ELSEWHERE.__setitem__("gone.md", 1)),
          "the declaration is stale"),
         ("a declared file whose COUNT has moved",
-         lambda t: (_build(t, extra={"docs/walkthrough.md": LIT + "\n" + LIT + "\n"}),
+         lambda t: (_build(t, extra={"README.md": LIT + "\n" + LIT + "\n"}),
                     REPORTED_ELSEWHERE.clear(),
-                    REPORTED_ELSEWHERE.__setitem__("docs/walkthrough.md", 1)),
+                    REPORTED_ELSEWHERE.__setitem__("README.md", 1)),
          "that declaration is stale"),
         # 🔴 THE NON-VACUITY FLOOR. Without this a pattern that silently stops matching turns
         # the gate into a green light over its own subject -- the recorded `check:process-prefix`
@@ -296,6 +351,13 @@ def _self_test() -> int:
          lambda t: (_build(t, guide_prints=True), REPORTED_ELSEWHERE.clear(),
                     REPORTED_ELSEWHERE.__setitem__(SUBJECT, 1)),
          "may never be declared in REPORTED_ELSEWHERE"),
+        # 🔴 THE POPULATION FLOOR ON THE WIDENED SUBJECT. A tree whose `docs/` holds nothing
+        # must FAIL rather than print a confident zero — the recorded `check:process-prefix`
+        # shape, one scope wider.
+        ("docs/ holds nothing at all",
+         lambda t: (_build(t), REPORTED_ELSEWHERE.clear(),
+                    os.remove(os.path.join(t, "docs", "first-run.md"))),
+         "has no subject"),
     ]
 
     passed = failed = 0
@@ -343,7 +405,7 @@ def main() -> int:
     if errors:
         print(f"\n  {len(errors)} error(s)\n")
         return 1 if "--check" in sys.argv else 0
-    print("  OK: the first-run guide prints no password a seed script assigns.\n")
+    print("  OK: no document under docs/ prints a password a seed script assigns.\n")
     return 0
 
 

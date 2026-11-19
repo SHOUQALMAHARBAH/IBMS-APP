@@ -39,6 +39,11 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
+/** 🔴 OWNER DECISION 150 RULING 1 — the three lists return a PAGE now, every branch. */
+function listPage<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 async function mockAuth(page: Page, roles: string[]) {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
@@ -192,8 +197,11 @@ test("SCREEN 3 of 4 — the policy's electronic file shows an insurer licence ce
       },
     }),
   );
+  // 🔴 OWNER DECISION 150 RULING 1 — `/rfqs` returns a PAGE now, so it leaves the loop below.
+  await page.route("http://localhost:4000/rfqs?opportunityId=opp-1", (route) =>
+    route.fulfill({ status: 200, json: listPage([]) }),
+  );
   for (const url of [
-    "http://localhost:4000/rfqs?opportunityId=opp-1",
     "http://localhost:4000/client-decisions?opportunityId=opp-1",
     "http://localhost:4000/recommendations?opportunityId=opp-1",
     "http://localhost:4000/commission/agreements**",

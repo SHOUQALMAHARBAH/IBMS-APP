@@ -10,7 +10,9 @@ import type { Opportunity, OpportunityStatus } from '@ibms/db';
 import {
   OpportunityRepository,
   type CreateOpportunityInput,
+  type OpportunityWithCustomer,
 } from '../../repositories/opportunity.repository';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import { InsuranceProgramRepository } from '../../repositories/insurance-program.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -19,6 +21,7 @@ import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util'
 import { quantizeMoney } from '../../common/money.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateOpportunityDto } from './dto/create-opportunity.dto';
+import type { ListOpportunitiesQueryDto } from './dto/list-opportunities-query.dto';
 import type { SetTargetPremiumThresholdDto } from './dto/set-target-premium-threshold.dto';
 
 /** The programme context echoed back on a create / get so the caller can see
@@ -229,12 +232,43 @@ export class OpportunityService {
     return this.toView(opportunity);
   }
 
+  /**
+   * 🔴 OWNER DECISION 150 RULING 1 — THE LIST OPENS FROM THE SIDEBAR NOW.
+   *
+   * It was `customerId`-only, so `/opportunities` reached from the navigation rendered one
+   * sentence and nothing else: there was no route to an opportunity for anyone who did not
+   * already have a customer in hand. The owner's second walk reported exactly that.
+   *
+   * ⛔ THE VISIBILITY RULE IS NOT NEW AND NO CODE WAS MINTED. It is the rule `/policies` and
+   * `/claims` already use, and the family code it reads — `customer-file.all-owners.read` — is
+   * the one `assertCustomerVisible` below has always consulted for this record. The scoped branch
+   * enforces it PER ROW; the book-wide branch expresses the same thing as a query filter, because
+   * a list narrowed after the read would let the page size decide what the caller cannot see.
+   *
+   * The `customerId` branch is unchanged in meaning, so existing links do not break; both
+   * branches return ONE envelope, which is `/policies`'s own arrangement and means one client.
+   */
   async list(
-    customerId: string,
+    query: ListOpportunitiesQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<Opportunity[]> {
-    await this.assertCustomerVisible(customerId, actor);
-    return this.opportunities.findManyByCustomerId(customerId);
+  ): Promise<Paginated<OpportunityWithCustomer>> {
+    if (query.customerId) {
+      await this.assertCustomerVisible(query.customerId, actor);
+      return wholeSet(
+        await this.opportunities.findManyByCustomerId(query.customerId),
+      );
+    }
+
+    const filter = {
+      ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
+      search: query.search,
+    };
+    const window = pageWindow(query.page, query.pageSize);
+    const [rows, total] = await Promise.all([
+      this.opportunities.findManyForActor(filter, window),
+      this.opportunities.countForActor(filter),
+    ]);
+    return { items: rows, total, page: window.page, pageSize: window.pageSize };
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<OpportunityView> {

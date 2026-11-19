@@ -76,6 +76,28 @@ async function openAt(
       },
     }),
   );
+  /*
+   * 🔴 DECISION 150 RULING 1 MADE `/insurance-programs` ANSWER WITH AN ENVELOPE, AND THE
+   * CATCH-ALL'S `[]` CRASHES THE SCREEN THIS FILE EXISTS TO PHOTOGRAPH. The book-wide branch
+   * reads `result.items`; handed an array it gets `undefined`, `programs.length` throws, and
+   * the page becomes «This page couldn't load» — a second instance of the exact trap the
+   * paragraph above records. CI caught it on a tree whose local sweep had run nine specs and
+   * not this one.
+   *
+   * ⛔ The ORIGIN is matched as well as the path. A pathname-only predicate would also match
+   * the page's OWN document request at `localhost:3000/insurance-programs` and answer the
+   * navigation with JSON.
+   */
+  await page.route(
+    (url) =>
+      url.origin === "http://localhost:4000" &&
+      url.pathname === "/insurance-programs",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: { items: [], total: 0, page: 0, pageSize: 20 },
+      }),
+  );
   await page.goto(path);
 }
 

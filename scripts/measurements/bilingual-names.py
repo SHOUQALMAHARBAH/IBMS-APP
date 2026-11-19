@@ -65,7 +65,31 @@ INSURER_FIELD = re.compile(r"\binsurer\??\.(name|nameAr)\b")
 LEGAL_FIELD = re.compile(r"\.\s*(legalName|legalNameAr)\b")
 INSURER_CONTEXT = re.compile(r"[Ii]nsurer|[Mm]aster")
 
-HELPERS = ("insurerDisplayName(", "legalDisplayName(", "referenceDisplayName(")
+# 🔴 THE INSURANCE LINE, ADDED 2026-11-18 — AND THE HOLE IT CLOSES IS WHY.
+#
+# This gate shipped covering the insurer's NAME only, and its own header above already says the
+# walk it came from "is about the insurer and the insurance line". The line half was never
+# matched: both regexes above read a `name` field, and a line is `insuranceLine` /
+# `insuranceLineAr` behind a different helper. So `/rfqs/[id]`'s heading interpolated the line AS
+# STORED and printed «طلب عرض أسعار — Motor Fleet» to a reader who had just chosen the Arabic
+# line, with this gate green beside it.
+#
+# A PROPERTY READ, which is what tells a render from the rest: the three dashboards and
+# `/commission` hold `insuranceLine` as FILTER STATE (`insuranceLine.trim()`), with no object
+# before it, and those are not renders of anything.
+LINE_FIELD = re.compile(r"\.\s*(insuranceLine|insuranceLineAr)\b")
+# ⛔ `key=` / `value=` ARE NOT RENDERS. `/rfqs/new`'s own `<option>` is the proof: its key and its
+# value are the stored identifier, which is exactly right, and its visible label goes through
+# `lineDisplayName` on the next line. A gate that flagged the attribute would be demanding the
+# helper in the one place it must not be used.
+LINE_ATTRIBUTE = re.compile(r"(key|value)=\{[^}]*\binsuranceLine\b")
+
+HELPERS = (
+    "insurerDisplayName(",
+    "legalDisplayName(",
+    "referenceDisplayName(",
+    "lineDisplayName(",
+)
 
 # site -> why it is allowed to read the field directly. Checked in BOTH directions.
 DECLARED: dict[str, str] = {
@@ -75,6 +99,32 @@ DECLARED: dict[str, str] = {
         "them through a by-language helper would put one name in both boxes and the next save "
         "would overwrite the other language with it. That is the one place where reading the "
         "field directly is not merely allowed but required.",
+}
+
+# 🔴 A LINE RENDERED AS STORED BECAUSE NO ARABIC NAME IS ON ITS WIRE. Checked in BOTH directions,
+# like `DECLARED` above: a site that stops reading the field fails as stale.
+#
+# ⛔ THIS IS NOT AN AMNESTY AND MUST NOT BECOME ONE. Measured 2026-11-18: exactly THREE services
+# send `insuranceLineAr` — `rfq.service.ts`, `policy.service.ts` and
+# `insurance-program.service.ts` — so on every other payload the Arabic name is not merely
+# unrendered, it was never sent. `lineDisplayName` would hand back the English string the screen
+# already shows, and writing the call would claim a by-language choice this screen cannot make.
+#
+# ⟶ So every row here is a DEBT ON THE API rather than on the screen, and it is reported as one.
+#   The day a payload gains `insuranceLineAr`, its row comes off this list and the call goes in.
+LINE_DECLARED: dict[str, str] = {
+    os.path.join("apps", "web", "app", "(app)", "commission", "page.tsx"):
+        "a commission entry's line. `GET /commission/entries` sends no `insuranceLineAr`.",
+    os.path.join("apps", "web", "app", "(app)", "dashboards", "policy", "page.tsx"):
+        "the policy dashboard's cancellation rows. That aggregate sends no `insuranceLineAr`.",
+    os.path.join("apps", "web", "app", "(app)", "renewal-cases", "page.tsx"):
+        "a renewal case's line. `GET /renewal-cases` sends no `insuranceLineAr`.",
+    os.path.join("apps", "web", "components", "recommendation", "RecommendationSection.tsx"):
+        "the recommended QUOTATION's line. The quotation wire sends no `insuranceLineAr`; the "
+        "RFQ beside it does, and the two are different payloads.",
+    os.path.join("apps", "web", "components", "ui", "EntitySearch.tsx"):
+        "the policy picker's detail line. `GET /policies/search` returns a picker projection, "
+        "which carries the identifier and the name a person searches by and no Arabic line.",
 }
 
 
@@ -133,10 +183,11 @@ def _strip_comments(text: str) -> str:
     return out
 
 
-def measure(root: str) -> tuple[list[str], list[str], set[str]]:
+def measure(root: str) -> tuple[list[str], list[str], set[str], set[str]]:
     findings: list[str] = []
     lines: list[str] = []
     hit_declared: set[str] = set()
+    hit_line_declared: set[str] = set()
     scanned = 0
     for rel in _tracked(root):
         path = os.path.join(root, rel)
@@ -149,9 +200,21 @@ def measure(root: str) -> tuple[list[str], list[str], set[str]]:
         code = _strip_comments(body)
         norm = rel.replace("/", os.sep)
         declared = norm in DECLARED
+        line_declared = norm in LINE_DECLARED
         for n, line in enumerate(code.split("\n"), start=1):
             if any(h in line for h in HELPERS):
                 continue
+            if LINE_FIELD.search(line) and not LINE_ATTRIBUTE.search(line):
+                if line_declared:
+                    hit_line_declared.add(norm)
+                else:
+                    findings.append(
+                        f"{rel}:{n}: renders an insurance line as STORED -- call "
+                        f"lineDisplayName(row, language) instead, or a reader in Arabic meets "
+                        f"the English string on a line they chose in Arabic. If the payload "
+                        f"carries no `insuranceLineAr`, the fix is on the API and the site "
+                        f"belongs in LINE_DECLARED with that reason."
+                    )
             if INSURER_FIELD.search(line):
                 if declared:
                     hit_declared.add(norm)
@@ -171,8 +234,9 @@ def measure(root: str) -> tuple[list[str], list[str], set[str]]:
                 )
     lines.append(f"  files scanned in apps/web/app + components   {scanned}")
     lines.append(f"  declared both-scripts screens, each asserted  {len(DECLARED)}")
-    lines.append(f"  hand-written name reads (budget 0)            {len(findings)}")
-    return findings, lines, hit_declared
+    lines.append(f"  lines with no Arabic ON THE WIRE, declared    {len(LINE_DECLARED)}")
+    lines.append(f"  hand-written name/line reads (budget 0)       {len(findings)}")
+    return findings, lines, hit_declared, hit_line_declared
 
 
 def _is_this_repo(root: str) -> bool:
@@ -188,7 +252,7 @@ def _is_this_repo(root: str) -> bool:
 
 
 def run(root: str, check: bool) -> int:
-    findings, lines, hit = measure(root)
+    findings, lines, hit, hit_line = measure(root)
     errors = list(findings)
     # The second direction: a declaration whose site no longer reads the field is stale.
     for rel in sorted(DECLARED if _is_this_repo(root) else {}):
@@ -197,6 +261,13 @@ def run(root: str, check: bool) -> int:
                 f"{rel} is declared as a both-scripts screen but no longer reads the name "
                 f"field -- the declaration is STALE, remove it rather than leaving an "
                 f"exemption nothing uses"
+            )
+    for rel in sorted(LINE_DECLARED if _is_this_repo(root) else {}):
+        if rel not in hit_line:
+            errors.append(
+                f"{rel} is declared as rendering a line with no Arabic on its wire but no "
+                f"longer reads the field -- the declaration is STALE, remove it rather than "
+                f"leaving an exemption nothing uses"
             )
     print()
     print("  bilingual name rendering")
@@ -210,8 +281,8 @@ def run(root: str, check: bool) -> int:
         print()
         print(f"  {len(errors)} error(s)")
         return 1 if check else 0
-    print("  ok     every rendered insurer name goes through the by-language helper, and every")
-    print("         declared both-scripts screen still is one")
+    print("  ok     every rendered insurer name AND insurance line goes through the by-language")
+    print("         helper, and every declared site still is one")
     return 0
 
 
@@ -252,6 +323,33 @@ def _self_test() -> int:
          lambda t: open(os.path.join(t, "apps", "web", "components", "Cust.tsx"), "wb")
          .write(b"<span>{customer.legalName}</span>\n"),
          None),
+        # 🔴 THE LINE HALF, added 2026-11-18. The first four prove the matcher SEES the shape;
+        # the three after them keep it from seeing shapes that are not it.
+        ("a heading interpolating the line as stored",
+         lambda t: open(os.path.join(t, "apps", "web", "app", "(app)", "x", "h.tsx"), "wb")
+         .write(b"<h1>{t('rfqDetailHeading', { line: rfq.insuranceLine })}</h1>\n"),
+         "renders an insurance line as STORED"),
+        ("a table cell rendering the line as stored",
+         lambda t: open(os.path.join(t, "apps", "web", "components", "T.tsx"), "wb")
+         .write(b"<Td>{r.insuranceLine}</Td>\n"),
+         "renders an insurance line as STORED"),
+        ("reading insuranceLineAr by hand is the same finding",
+         lambda t: open(os.path.join(t, "apps", "web", "components", "A.tsx"), "wb")
+         .write(b"<bdi>{row.insuranceLineAr}</bdi>\n"),
+         "renders an insurance line as STORED"),
+        # ⛔ The three NON-findings, and each is a shape that really ships.
+        ("a `value={...insuranceLine}` attribute is NOT a finding",
+         lambda t: open(os.path.join(t, "apps", "web", "components", "O.tsx"), "wb")
+         .write(b"<option key={l.insuranceLine} value={l.insuranceLine}>\n"),
+         None),
+        ("filter STATE with no object before it is NOT a finding",
+         lambda t: open(os.path.join(t, "apps", "web", "components", "F.tsx"), "wb")
+         .write(b"const q = { insuranceLine: insuranceLine.trim() || undefined };\n"),
+         None),
+        ("a line already going through lineDisplayName is NOT a finding",
+         lambda t: open(os.path.join(t, "apps", "web", "components", "G.tsx"), "wb")
+         .write(b"<bdi>{lineDisplayName(rfq, language)}</bdi>\n"),
+         None),
         # The blindness every guard here has committed at least once.
         ("a COMMENT discussing insurer.name is NOT a finding",
          lambda t: open(os.path.join(t, "apps", "web", "components", "K.tsx"), "wb")
@@ -272,6 +370,7 @@ def _self_test() -> int:
          "the declaration is STALE"),
     ]
     declared_before = dict(DECLARED)
+    line_declared_before = dict(LINE_DECLARED)
     passed = failed = 0
     for label, mutate, needle in plants:
         tmp = tempfile.mkdtemp(prefix="bilingual-names-")
@@ -279,9 +378,12 @@ def _self_test() -> int:
             build(tmp)
             if mutate:
                 mutate(tmp)
-            errs, _, hit = measure(tmp)
+            errs, _, hit, hit_line = measure(tmp)
             for rel in sorted(DECLARED if _is_this_repo(tmp) else {}):
                 if rel not in hit:
+                    errs.append(f"{rel} ... the declaration is STALE")
+            for rel in sorted(LINE_DECLARED if _is_this_repo(tmp) else {}):
+                if rel not in hit_line:
                     errs.append(f"{rel} ... the declaration is STALE")
             if needle is None:
                 ok = not errs
@@ -296,7 +398,12 @@ def _self_test() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
             DECLARED.clear()
             DECLARED.update(declared_before)
+            LINE_DECLARED.clear()
+            LINE_DECLARED.update(line_declared_before)
     assert DECLARED == declared_before, "the self-test left DECLARED mutated"
+    assert LINE_DECLARED == line_declared_before, (
+        "the self-test left LINE_DECLARED mutated"
+    )
     print(f"\n  self-test: {passed} passed, {failed} failed\n")
     return 1 if failed else 0
 

@@ -2,6 +2,46 @@ import { Injectable } from '@nestjs/common';
 import type { Opportunity, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST'S FILTER.
+ *
+ * Byte-for-byte the shape `ListPoliciesFilter` already has, and that is the point rather than
+ * laziness: the ruling is that this screen becomes what `/policies` already is, and the
+ * visibility rule it becomes is `/policies`'s own — `<family>.all-owners.read` reaches the whole
+ * book, everybody else is pinned to Customers they own, EXPRESSED IN THE QUERY.
+ *
+ * ⛔ The filter may never be applied after the read. Paginating a list that was narrowed in
+ * memory lets the page size decide what the caller cannot see — the recorded `DpoWorkspaceService`
+ * defect, which `/policies` and `/claims` both carry a comment about.
+ */
+export interface ListOpportunitiesFilter {
+  /** `null` = this caller reaches the whole book. Otherwise, only opportunities whose Customer is
+   *  owned by this user id. */
+  ownerUserId: string | null;
+  /** Matched against the customer's legal name — the one thing a person looking for an
+   *  opportunity actually has to hand, an Opportunity having no number of its own. */
+  search?: string;
+}
+
+const OPPORTUNITY_LIST_INCLUDE = {
+  customer: { select: { id: true, legalName: true } },
+} as const;
+
+export type OpportunityWithCustomer = Opportunity & {
+  customer: { id: string; legalName: string };
+};
+
+function buildOpportunityListWhere(
+  filter: ListOpportunitiesFilter,
+): Prisma.OpportunityWhereInput {
+  const customer: Prisma.CustomerWhereInput = {};
+  if (filter.ownerUserId !== null) customer.ownerUserId = filter.ownerUserId;
+  if (filter.search) {
+    customer.legalName = { contains: filter.search, mode: 'insensitive' };
+  }
+  return Object.keys(customer).length > 0 ? { customer } : {};
+}
+
 export interface CreateOpportunityInput {
   customerId: string;
   insuranceProgramId: string;
@@ -34,10 +74,32 @@ export class OpportunityRepository {
     return this.prisma.client.opportunity.findUnique({ where: { id } });
   }
 
-  findManyByCustomerId(customerId: string): Promise<Opportunity[]> {
+  findManyByCustomerId(customerId: string): Promise<OpportunityWithCustomer[]> {
     return this.prisma.client.opportunity.findMany({
       where: { customerId },
+      include: OPPORTUNITY_LIST_INCLUDE,
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** The book-wide list. Every filter is part of the query, so the window bounds the MATCHING
+   *  rows rather than the rows scanned. */
+  findManyForActor(
+    filter: ListOpportunitiesFilter,
+    window: { take: number; skip: number },
+  ): Promise<OpportunityWithCustomer[]> {
+    return this.prisma.client.opportunity.findMany({
+      where: buildOpportunityListWhere(filter),
+      include: OPPORTUNITY_LIST_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  countForActor(filter: ListOpportunitiesFilter): Promise<number> {
+    return this.prisma.client.opportunity.count({
+      where: buildOpportunityListWhere(filter),
     });
   }
 

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { pickEntity } from "./support/pick-entity";
-import { expectAbsentWithin } from "./support/anchored";
+import { anchoredCount, expectAbsentWithin, expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -115,6 +115,75 @@ test("unlocks and deletes a document", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "Unlocked" })).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("No documents recorded for this policy.")).toBeVisible();
+});
+
+/**
+ * A STORED CERTIFICATE. `storageRef` carries the `db:documentContent/` prefix the repository writes
+ * when this system holds the bytes itself — ⛔ the discriminator is that prefix and not the category,
+ * because the prefix is what the server really writes.
+ */
+const STORED_CERT = {
+  ...DOC,
+  id: "doc-2",
+  category: "CERTIFICATE_OF_INSURANCE",
+  fileName: "certificate-of-insurance-policy-1-AR.pdf",
+  storageRef: "db:documentContent/doc-2",
+};
+
+/*
+ * 🔴 OWNER DECISION 142 §٥ CRITERION 5 — «لا مسار يحذف الشهادة», ON THE SCREEN.
+ *
+ * ⚠️ TWO ROLES, AND THAT IS A MEASUREMENT RATHER THAN CONVENIENCE: no seeded role holds BOTH
+ * `document.read` and `document.delete-override` (measured 2026-11-18 across the fixture — the
+ * override is ADMIN + DPO, neither of whom holds the read). An office defines its own roles now, so
+ * a person holding both is constructible; assigning both roles is how this test says so out loud.
+ */
+test("a stored certificate offers no deletion control, even to a caller who may override the lock", async ({ page }) => {
+  await mockAuth(page, ["SYSTEM_SECURITY_ADMINISTRATOR", "PLACEMENT_TECHNICAL_OFFICER"]);
+  await page.route("http://localhost:4000/documents?policyId=policy-1", (route) =>
+    route.fulfill({ status: 200, json: [DOC, STORED_CERT] }),
+  );
+
+  await page.goto("/documents");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
+  await page.getByRole("button", { name: "Look up documents" }).click();
+  await expect(page.getByRole("cell", { name: "certificate-of-insurance-policy-1-AR.pdf" })).toBeVisible();
+
+  /*
+   * NON-VACUITY, AND IT IS THE WHOLE TEST. The ordinary row's unlock button IS there, for this
+   * same caller in this same render — so the certificate's missing one is about the ROW. Without
+   * this the assertion below would pass just as well against a screen that withheld the control
+   * from everybody, or against one that never rendered.
+   */
+  await expect(page.getByRole("button", { name: "Unlock for deletion" })).toBeVisible();
+  expect(
+    await anchoredCount(page.getByRole("button", { name: "Unlock for deletion" })),
+    "the stored certificate was offered a deletion unlock — decision 142 §٥ criterion 5",
+  ).toBe(1);
+
+  // And the certificate is not simply absent from the screen: its own control is there.
+  expect(await anchoredCount(page.locator("[data-stored-download]"))).toBe(1);
+});
+
+test("the deletion controls are withheld from a caller who does not hold document.delete-override", async ({ page }) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await page.route("http://localhost:4000/documents?policyId=policy-1", (route) =>
+    route.fulfill({ status: 200, json: [DOC] }),
+  );
+
+  await page.goto("/documents");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
+  await page.getByRole("button", { name: "Look up documents" }).click();
+
+  /*
+   * The anchor is a control this caller DOES hold, on the row under test — so the absence below
+   * is read off a screen that demonstrably rendered this document, which is what `expectNone`
+   * exists to insist on. The owner's second walk saw the unlock offered to exactly this role.
+   */
+  const anchor = page.getByRole("button", { name: "New version" });
+  await expect(anchor).toBeVisible();
+  await expectNone(page.getByRole("button", { name: "Unlock for deletion" }), anchor);
+  await expectNone(page.getByRole("button", { name: "Delete", exact: true }), anchor);
 });
 
 test("computes a policy's highest-classification-present summary", async ({ page }) => {

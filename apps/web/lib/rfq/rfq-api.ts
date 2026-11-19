@@ -4,6 +4,7 @@
 // insurers; each shortlisted insurer is tracked as an RFQInsurer submission.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { Paginated } from '../api/paginated';
 
 export type RfqInsurerStatus =
   | 'SENT'
@@ -292,14 +293,40 @@ export function listAvailableLines(
   );
 }
 
-export function listRfqs(
+/** 🔴 OWNER DECISION 150 RULING 1 — every list row names its customer. */
+export interface RfqListRow extends Rfq {
+  customer: { id: string; legalName: string };
+}
+
+/** One opportunity's or one customer's requests. Unwrapped to an array so this function keeps
+ *  the shape its callers have always had. */
+export async function listRfqs(
   scope: { opportunityId: string } | { customerId: string },
-): Promise<Rfq[]> {
+): Promise<RfqListRow[]> {
   const query =
     'opportunityId' in scope
       ? `opportunityId=${encodeURIComponent(scope.opportunityId)}`
       : `customerId=${encodeURIComponent(scope.customerId)}`;
-  return apiGet(`/rfqs?${query}`);
+  const page: Paginated<RfqListRow> = await apiGet(`/rfqs?${query}`);
+  return page.items;
+}
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST.
+ *
+ * ⚠️ AND IT DOES NOT WIDEN DOOR FOUR. The scope is the ownership filter, never the customer-file
+ * anchor: a reader admitted only by an anchor owns no customer and holds no
+ * `customer-file.all-owners.read`, so this answers them an EMPTY list. Their anchor is
+ * consultable on the `customerId` branch and nowhere else, which is what it was always for.
+ */
+export function listAllRfqs(
+  params: { search?: string; page?: number } = {},
+): Promise<Paginated<RfqListRow>> {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  if (params.page) qs.set('page', String(params.page));
+  const suffix = qs.toString();
+  return apiGet(`/rfqs${suffix ? `?${suffix}` : ''}`);
 }
 
 export function getRfq(id: string): Promise<Rfq> {

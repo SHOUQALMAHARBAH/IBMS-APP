@@ -32,6 +32,20 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   });
 }
 
+/** A Sales/Relationship Officer: holds `rfq.read` and NOT `customer-file.all-owners.read`, so
+ *  the book-wide list pins them to the customers they own. The other half of the scoping rule. */
+function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
+  return withDerivedPermissions({
+    id: 'sls-1',
+    organizationId: 'org-1',
+    email: 'sales@ibms.test',
+    roles: ['SALES_RELATIONSHIP_OFFICER'],
+    roleIds: [],
+    sessionId: 'session-2',
+    ...overrides,
+  });
+}
+
 function p2002(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
     code: 'P2002',
@@ -65,6 +79,19 @@ const RFQ_ROW = {
   ],
 };
 
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — A LIST ROW, WHICH IS NOT THE DETAIL ROW.
+ *
+ * ⛔ The `opportunity` join is on the LIST fixture only, and deliberately: `findRfqById` does
+ * not include it, and a shared fixture carrying it would let `rfqForWire` spread a raw join
+ * onto the detail wire in the test while the real code does not — a fixture agreeing with a
+ * defect rather than with the product.
+ */
+const RFQ_LIST_ROW = {
+  ...RFQ_ROW,
+  opportunity: { customer: { id: 'cust-1', legalName: 'Acme Trading' } },
+};
+
 function makeDeps() {
   const createRfq = vi
     .fn()
@@ -77,8 +104,12 @@ function makeDeps() {
       }),
     );
   const findRfqById = vi.fn().mockResolvedValue({ ...RFQ_ROW });
-  const findRfqsByOpportunityId = vi.fn().mockResolvedValue([{ ...RFQ_ROW }]);
-  const findRfqsByCustomerId = vi.fn().mockResolvedValue([{ ...RFQ_ROW }]);
+  const findRfqsByOpportunityId = vi
+    .fn()
+    .mockResolvedValue([{ ...RFQ_LIST_ROW }]);
+  const findRfqsByCustomerId = vi.fn().mockResolvedValue([{ ...RFQ_LIST_ROW }]);
+  const findManyForActor = vi.fn().mockResolvedValue([{ ...RFQ_LIST_ROW }]);
+  const countForActor = vi.fn().mockResolvedValue(1);
   const findRfqByOpportunityAndLine = vi.fn().mockResolvedValue(null);
   const createInsurerSubmission = vi.fn().mockResolvedValue({ id: 'sub-x' });
   const findInsurerSubmissionById = vi.fn().mockResolvedValue({
@@ -134,6 +165,8 @@ function makeDeps() {
     findRfqById,
     findRfqsByOpportunityId,
     findRfqsByCustomerId,
+    findManyForActor,
+    countForActor,
     findRfqByOpportunityAndLine,
     createInsurerSubmission,
     findInsurerSubmissionById,
@@ -238,6 +271,8 @@ function makeDeps() {
       findRfqById,
       findRfqsByOpportunityId,
       findRfqsByCustomerId,
+      findManyForActor,
+      countForActor,
       findRfqByOpportunityAndLine,
       createInsurerSubmission,
       findInsurerSubmissionById,
@@ -509,11 +544,8 @@ describe('RfqService', () => {
   });
 
   describe('list', () => {
-    it('requires exactly one of opportunityId / customerId', async () => {
+    it('refuses BOTH filters at once — two questions, and answering one silently is worse', async () => {
       const { service } = makeDeps();
-      await expect(service.list({}, placement())).rejects.toThrow(
-        UnprocessableEntityException,
-      );
       await expect(
         service.list(
           { opportunityId: 'opp-1', customerId: 'cust-1' },
@@ -522,10 +554,51 @@ describe('RfqService', () => {
       ).rejects.toThrow(UnprocessableEntityException);
     });
 
+    /*
+     * 🔴 OWNER DECISION 150 RULING 1 — "neither" USED TO BE A 422 AND IS THE BOOK NOW.
+     *
+     * ⚠️ `placement()` holds `customer-file.all-owners.read`, so the owner filter is `null` —
+     * and that is asserted rather than left implicit, because it is the whole scoping rule.
+     */
+    it('lists the whole book for a caller who may reach any customer file', async () => {
+      const { service, mocks } = makeDeps();
+      const page = await service.list({}, placement());
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerUserId: null }),
+        expect.anything(),
+      );
+      expect(page.items).toHaveLength(1);
+      expect(page.total).toBe(1);
+    });
+
+    /* THE OTHER DIRECTION, and it is the half that matters: a caller WITHOUT that code is
+     * pinned to their own customers, IN THE QUERY. Without this, a filter that silently passed
+     * `null` for everyone would pass the test above. */
+    it('pins a caller without it to the customers they own', async () => {
+      const { service, mocks } = makeDeps();
+      await service.list({}, sales());
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerUserId: sales().id }),
+        expect.anything(),
+      );
+    });
+
     it('lists by opportunity after a visibility check', async () => {
       const { service, mocks } = makeDeps();
       await service.list({ opportunityId: 'opp-1' }, placement());
       expect(mocks.findRfqsByOpportunityId).toHaveBeenCalledWith('opp-1');
+    });
+
+    /* AND THE CUSTOMER TRAVELS WITH THE ROW while the raw join does NOT — the shape message 45
+     * §2 measured, where a join spread onto the wire printed an empty cell. */
+    it('lifts the customer onto the row and leaves the join behind', async () => {
+      const { service } = makeDeps();
+      const page = await service.list({ opportunityId: 'opp-1' }, placement());
+      expect(page.items[0].customer).toEqual({
+        id: 'cust-1',
+        legalName: 'Acme Trading',
+      });
+      expect(page.items[0]).not.toHaveProperty('opportunity');
     });
   });
 

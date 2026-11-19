@@ -85,6 +85,11 @@ const DRAFT_ASSESSMENT = {
   updatedAt: '2026-02-01T00:00:00.000Z',
 };
 
+/** 🔴 OWNER DECISION 150 RULING 1 — the three lists return a PAGE now, every branch. */
+function listPage<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 async function mockQuestionnaire(page: Page) {
   await page.route('**/needs-assessments/questionnaire', (route) =>
     route.fulfill({ status: 200, json: QUESTIONNAIRE }),
@@ -549,7 +554,7 @@ test('🔴 §P2 — an APPROVED assessment that already has a programme LINKS to
   await page.route('http://localhost:4000/insurance-programs?**', (route) =>
     route.fulfill({
       status: 200,
-      json: [
+      json: listPage([
         {
           id: 'prog-9',
           riskProfileId: 'rp-1',
@@ -559,7 +564,7 @@ test('🔴 §P2 — an APPROVED assessment that already has a programme LINKS to
           createdAt: '2026-02-02T00:00:00.000Z',
           updatedAt: '2026-02-02T00:00:00.000Z',
         },
-      ],
+      ]),
     }),
   );
   await page.route('http://localhost:4000/consent-records**', (route) =>
@@ -594,7 +599,7 @@ test('§P2 — and with NO programme yet, the assemble button is what stands', a
     route.fulfill({ status: 200, json: { ...DRAFT_ASSESSMENT, status: 'APPROVED' } }),
   );
   await page.route('http://localhost:4000/insurance-programs?**', (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: listPage([]) }),
   );
   await page.route('http://localhost:4000/consent-records**', (route) =>
     route.fulfill({ status: 200, json: [] }),

@@ -16,6 +16,11 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
+/** 🔴 OWNER DECISION 150 RULING 1 — the three lists return a PAGE now, every branch. */
+function listPage<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 async function mockAuth(
   page: Page,
   roles: string[],
@@ -38,6 +43,9 @@ async function mockAuth(
     }),
   );
 }
+
+/** 🔴 OWNER DECISION 150 RULING 1 — the customer every book-wide list row carries. */
+const LIST_CUSTOMER = { id: "cust-1", legalName: "Acme Trading" };
 
 const OPPORTUNITY = {
   id: "opp-1",
@@ -468,7 +476,16 @@ async function mockRfqApi(
     if (/\/opportunities\/opp-1(\?|$)/.test(url)) {
       return route.fulfill({ status: 200, json: opp });
     }
-    return route.fulfill({ status: 200, json: [opp] });
+    /*
+     * 🔴 OWNER DECISION 150 RULING 1 — the list returns a PAGE now, and its rows name their
+     * customer. ⛔ The customer is added HERE and not on the `OPPORTUNITY` fixture above: the
+     * DETAIL route does not send it, and a fixture that handed both branches the same shape
+     * would be a fixture agreeing with a defect rather than with the product.
+     */
+    return route.fulfill({
+      status: 200,
+      json: listPage([{ ...opp, customer: LIST_CUSTOMER }]),
+    });
   });
 
   // Broker recommendation (Part C #16) — starts empty; a POST drafts it, and
@@ -1598,7 +1615,12 @@ async function mockRfqApi(
     if (/\/rfqs\/rfq-1(\/|\?|$)/.test(url)) {
       return route.fulfill({ status: 200, json: RFQ });
     }
-    return route.fulfill({ status: 200, json: [RFQ] });
+    // 🔴 OWNER DECISION 150 RULING 1 — a PAGE, and the row names its customer. Added here
+    // rather than on `RFQ`, for the same reason as the opportunity list above.
+    return route.fulfill({
+      status: 200,
+      json: listPage([{ ...RFQ, customer: LIST_CUSTOMER }]),
+    });
   });
 
   await page.route("http://localhost:4000/rfq-insurers/**", (route) => {
@@ -1748,6 +1770,63 @@ test("opens an opportunity and lists its RFQs", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /Property All Risks/ }),
   ).toBeVisible();
+});
+
+/*
+ * 🔴 OWNER DECISION 150 RULING 1 — THE ACCEPTANCE PATH, BY CLICKING, WITH NO URL TYPED.
+ *
+ * The owner's second walk reported that `/opportunities` and `/rfqs` opened from the sidebar
+ * with one sentence and nothing else, because each list was requested per customer. These two
+ * tests are the ruling's own acceptance: from the navigation to an opportunity, and from the
+ * navigation to a request, without a `customerId` anywhere.
+ *
+ * ⛔ `page.goto` TAKES THE BARE PATH, which is the whole point — the test would pass against the
+ * old screen if it carried a query string, and that is exactly the defect.
+ */
+test("OWNER DECISION 150 ruling 1 — the opportunities list opens from the sidebar and a row opens", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+
+  await page.goto("/opportunities");
+  await expect(
+    page.getByRole("heading", { name: "RFQ / market" }),
+  ).toBeVisible();
+  // The row names its customer — the half that makes a book-wide row usable by a reader who
+  // arrived with nothing in hand.
+  await expect(page.getByText("Acme Trading")).toBeVisible();
+  /* And the prompt that WAS this screen is gone. ⛔ SCOPED to `main`, not page-wide: a
+     page-wide text absence can match an element the test is not about — a nav label, a tooltip
+     — and `check:absence` refuses one for exactly that reason. */
+  await expectAbsentWithin(page.locator("main"), (scope) =>
+    scope.getByText("No customer selected"),
+  );
+
+  await page.getByRole("button", { name: /Opportunity opp-1/ }).click();
+  await expect(page).toHaveURL("/opportunities/opp-1");
+  await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
+});
+
+test("OWNER DECISION 150 ruling 1 — the RFQ list opens from the sidebar, named by customer, line and insurer", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs");
+  await expect(page.getByRole("heading", { name: "RFQs" })).toBeVisible();
+  await expect(page.getByText("Acme Trading")).toBeVisible();
+  // ⛔ THE INSURER NAME, through message 45's helper. The measured failure it closes is an
+  // EMPTY cell: `undefined` renders as nothing in React, so a row that could not resolve a name
+  // would look like a row with no insurer rather than like a bug.
+  await expect(page.getByText("Jordan Insurance Co")).toBeVisible();
+  await expectAbsentWithin(page.locator("main"), (scope) =>
+    scope.getByText("No customer or opportunity"),
+  );
+
+  await page.getByRole("button", { name: /Property All Risks/ }).first().click();
+  await expect(page).toHaveURL("/rfqs/rfq-1");
 });
 
 test("creates an RFQ with an insurer shortlist", async ({ page }) => {

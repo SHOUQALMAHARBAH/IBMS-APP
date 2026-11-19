@@ -16,6 +16,22 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
+/** A Sales/Relationship Officer: holds the read code and NOT `customer-file.all-owners.read`,
+ *  so the book-wide list pins them to the customers they own. The other half of the rule. */
+function salesOfficer(
+  overrides?: Partial<AuthenticatedUser>,
+): AuthenticatedUser {
+  return withDerivedPermissions({
+    id: 'sls-1',
+    organizationId: 'org-1',
+    email: 'sales@ibms.test',
+    roles: ['SALES_RELATIONSHIP_OFFICER'],
+    roleIds: [],
+    sessionId: 'session-sales',
+    ...overrides,
+  });
+}
+
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return withDerivedPermissions({
     id: 'plc-1',
@@ -62,6 +78,8 @@ function makeDeps() {
     );
   const findProgramById = vi.fn();
   const findManyByCustomerId = vi.fn().mockResolvedValue([]);
+  const findManyForActor = vi.fn().mockResolvedValue([]);
+  const countForActor = vi.fn().mockResolvedValue(0);
   const findManyByRiskProfileId = vi.fn().mockResolvedValue([]);
   const createLines = vi.fn().mockResolvedValue({ count: 0 });
   const reassembleLines = vi.fn().mockResolvedValue({ count: 0 });
@@ -69,6 +87,8 @@ function makeDeps() {
     create: createProgram,
     findById: findProgramById,
     findManyByCustomerId,
+    findManyForActor,
+    countForActor,
     findManyByRiskProfileId,
     createLines,
     reassembleLines,
@@ -160,6 +180,8 @@ function makeDeps() {
       createProgram,
       findProgramById,
       findManyByCustomerId,
+      findManyForActor,
+      countForActor,
       findManyByRiskProfileId,
       createLines,
       reassembleLines,
@@ -417,9 +439,45 @@ describe('InsuranceProgramService', () => {
 
     it('list resolves visibility against the customer then returns its programs', async () => {
       const { service, mocks } = makeDeps();
-      await service.list('cust-1', placement());
+      await service.list({ customerId: 'cust-1' }, placement());
       expect(mocks.findCustomerById).toHaveBeenCalledWith('cust-1');
       expect(mocks.findManyByCustomerId).toHaveBeenCalledWith('cust-1');
+    });
+
+    /*
+     * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE BRANCH, AND ITS SCOPING RULE.
+     *
+     * ⚠️ BOTH DIRECTIONS, because a filter that silently passed `null` for everyone would pass
+     * the first test alone — and that is the exact shape of a cross-owner leak.
+     */
+    it('lists the whole book for a caller who may reach any customer file', async () => {
+      const { service, mocks } = makeDeps();
+      await service.list({}, placement());
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerUserId: null }),
+        expect.anything(),
+      );
+    });
+
+    it('pins a caller without that code to the customers they own', async () => {
+      const { service, mocks } = makeDeps();
+      await service.list({}, salesOfficer());
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerUserId: salesOfficer().id }),
+        expect.anything(),
+      );
+    });
+
+    /* AND THE SEARCH TERM REACHES THE QUERY. ⛔ A list narrowed after the read would let the
+     * page size decide what the caller cannot see — the recorded `DpoWorkspaceService` defect
+     * — so the term has to be part of the filter the repository receives. */
+    it('passes the search term into the query rather than filtering afterwards', async () => {
+      const { service, mocks } = makeDeps();
+      await service.list({ search: 'Acme' }, placement());
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'Acme' }),
+        expect.anything(),
+      );
     });
   });
 });

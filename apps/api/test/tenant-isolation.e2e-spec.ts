@@ -191,6 +191,19 @@ let isolationAdmin: { accessToken: string; id: string };
 let sharedRoleUser: { accessToken: string; id: string };
 let customerAId: string;
 let customerBId: string;
+/* 🔴 OWNER DECISION 150 RULING 1 — office B's commercial chain, for the three book-wide lists. */
+let programBId: string;
+let opportunityBId: string;
+let rfqBId: string;
+/* Office A's matching chain, on the customer that shares office B's legal name — so the search
+ * below has something to MATCH in this office. Removed in the teardown: db-test is cumulative
+ * and four rows a run is residue, not a fixture. */
+let officeAChain: {
+  rfqId: string;
+  opportunityId: string;
+  programId: string;
+  riskProfileId: string;
+} | null = null;
 
 /**
  * Removes office B and everything in it.
@@ -233,6 +246,22 @@ async function removeOfficeB(): Promise<void> {
     where: { legalName: 'Shared Insurer plc' },
   });
   await rawPrisma.ultimateBeneficialOwner.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
+  /*
+   * 🔴 OWNER DECISION 150 RULING 1 — office B's COMMERCIAL CHAIN, planted so the three
+   * book-wide lists have a foreign row to fail to show. Children first, same rule as above:
+   * every one of these foreign keys would otherwise pin the Customer, and through it the
+   * Organization, and defeat the self-heal entirely.
+   */
+  await rawPrisma.rFQ.deleteMany({ where: { organizationId: ORG_B_ID } });
+  await rawPrisma.opportunity.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
+  await rawPrisma.insuranceProgram.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
+  await rawPrisma.riskProfile.deleteMany({
     where: { organizationId: ORG_B_ID },
   });
   await rawPrisma.customer.deleteMany({
@@ -356,6 +385,89 @@ beforeAll(async () => {
     },
   });
   customerBId = customerB.id;
+
+  /*
+   * 🔴 OWNER DECISION 150 RULING 1 — OFFICE B'S COMMERCIAL CHAIN.
+   *
+   * `/opportunities`, `/rfqs` and `/insurance-programs` each open from the sidebar now and
+   * answer "everything you may read". That is a new place a foreign office's rows could appear,
+   * and the three records had no cross-tenant assertion at all before — their lists could not
+   * produce one, being `customerId`-only.
+   *
+   * ⚠️ WRITTEN AS THE OWNER, and `organizationId` is SPELLED OUT. The column's default is
+   * `dbgenerated()`, which reads `app.current_org_id`; the owner connection sets no tenant
+   * context, so a row written without it would land nowhere useful — the recorded reason
+   * `company-administrator-invitation.e2e-spec.ts` carries the same comment.
+   */
+  const riskProfileB = await rawPrisma.riskProfile.create({
+    data: {
+      organizationId: ORG_B_ID,
+      customerId: customerB.id,
+      siteLabel: 'Rawabi head office (tenant-isolation e2e)',
+    },
+  });
+  const programB = await rawPrisma.insuranceProgram.create({
+    data: { organizationId: ORG_B_ID, riskProfileId: riskProfileB.id },
+  });
+  const opportunityB = await rawPrisma.opportunity.create({
+    data: {
+      organizationId: ORG_B_ID,
+      customerId: customerB.id,
+      insuranceProgramId: programB.id,
+    },
+  });
+  const rfqB = await rawPrisma.rFQ.create({
+    data: {
+      organizationId: ORG_B_ID,
+      opportunityId: opportunityB.id,
+      insuranceLine: 'MOTOR',
+    },
+  });
+  programBId = programB.id;
+  opportunityBId = opportunityB.id;
+  rfqBId = rfqB.id;
+
+  /*
+   * AND THE SAME CHAIN IN OFFICE A, on the customer carrying the IDENTICAL legal name.
+   *
+   * Without it the shared-name search would return nothing in either office, and an absence
+   * assertion satisfied by an empty result proves nothing at all — the vacuity shape this
+   * repository keeps meeting. With it, the search is the sharpest form of the question: the one
+   * query most likely to surface a foreign row returns this office's and not the other's.
+   */
+  const riskProfileA = await rawPrisma.riskProfile.create({
+    data: {
+      organizationId: TEST_ORGANIZATION_ID,
+      customerId: customerAId,
+      siteLabel: 'Office A head office (tenant-isolation e2e)',
+    },
+  });
+  const programA = await rawPrisma.insuranceProgram.create({
+    data: {
+      organizationId: TEST_ORGANIZATION_ID,
+      riskProfileId: riskProfileA.id,
+    },
+  });
+  const opportunityA = await rawPrisma.opportunity.create({
+    data: {
+      organizationId: TEST_ORGANIZATION_ID,
+      customerId: customerAId,
+      insuranceProgramId: programA.id,
+    },
+  });
+  const rfqA = await rawPrisma.rFQ.create({
+    data: {
+      organizationId: TEST_ORGANIZATION_ID,
+      opportunityId: opportunityA.id,
+      insuranceLine: 'MOTOR',
+    },
+  });
+  officeAChain = {
+    rfqId: rfqA.id,
+    opportunityId: opportunityA.id,
+    programId: programA.id,
+    riskProfileId: riskProfileA.id,
+  };
 }, 120_000);
 
 // 120s, not vitest's 10s default for a hook, and the number is a measurement rather than
@@ -374,6 +486,21 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   app = null;
+  /* Office A's planted chain, children first. ⛔ By ID, never by a filter: office A is the
+   * DEFAULT organization and a sweep there would delete rows this suite did not write. */
+  if (officeAChain) {
+    await rawPrisma.rFQ.deleteMany({ where: { id: officeAChain.rfqId } });
+    await rawPrisma.opportunity.deleteMany({
+      where: { id: officeAChain.opportunityId },
+    });
+    await rawPrisma.insuranceProgram.deleteMany({
+      where: { id: officeAChain.programId },
+    });
+    await rawPrisma.riskProfile.deleteMany({
+      where: { id: officeAChain.riskProfileId },
+    });
+    officeAChain = null;
+  }
   // Owner connection: RLS would otherwise stop the cleanup seeing the very
   // rows it needs to remove. Leaving office B behind would break signup for
   // every spec file that runs after this one.
@@ -543,6 +670,133 @@ describe('Part V — two Organizations cannot reach each other (item 1)', () => 
       where: { customerId: customerBId },
     });
     expect(ubos).toHaveLength(0);
+  });
+});
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE THREE LISTS THAT OPEN FROM THE SIDEBAR NOW.
+ *
+ * `/opportunities`, `/rfqs` and `/insurance-programs` each answered one customer at a time
+ * until this batch, so a cross-office list assertion was not expressible about them: there was
+ * no list to leak into. There is now, and these are it.
+ *
+ * ## ⚠️ WHAT THIS PROVES, AND WHICH LAYER
+ *
+ * ⛔ NOT RLS. `tenantScopeExtension` puts `organizationId` into the query before it leaves the
+ * application, so an HTTP assertion is never answered by a database refusal — measured
+ * 2026-11-11 with a `USING (true)` plant that left a whole suite green. What these prove is
+ * LAYER ONE, the application's tenant scope, on three routes that never had such a test. The
+ * database layer is items 2-5 below, on `APP_DATABASE_URL`.
+ *
+ * ## ⚠️ AND THE DIRECTION IS A FIXTURE LIMIT, NOT A CHOICE
+ *
+ * The ruling asks for a reader in the SECOND office seeing none of the first's rows. There is
+ * no authenticated path into office B anywhere in this suite — signup refuses to guess once
+ * two Organizations exist, and subdomain resolution is Phase 4 — so every cross-office HTTP
+ * assertion in this repository runs from office A against planted office-B rows, and these
+ * follow it. The claim is symmetric; the fixture is not.
+ *
+ * ## `total`, NOT THE PAGE
+ *
+ * Scanning the returned rows would only prove office B is absent from the FIRST page. `total`
+ * counts every row matching the filter across every page, so comparing it with office A's own
+ * row count proves office B contributes nothing to the set at all — the arrangement the
+ * customers list above already uses, and the only one that survives a cumulative database.
+ */
+describe('OWNER DECISION 150 ruling 1 — the three book-wide lists carry no other office', () => {
+  /*
+   * ⚠️ `officeA` HOLDS `BRANCH_DEPARTMENT_MANAGER`, SO IT HOLDS `customer-file.all-owners.read`
+   * — measured in `permissions.ts`, where that code is PLACEMENT + MANAGER + EXEC. That is what
+   * makes `total` comparable to a plain per-organization count: this caller reaches office A's
+   * whole book, so the only thing that can narrow the set is the tenant scope under test.
+   */
+  it('the opportunities list shows office A’s whole book and none of office B’s', async () => {
+    const res = await request(app!.getHttpServer())
+      .get('/opportunities')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const body = res.body as { items: { id: string }[]; total: number };
+
+    expect(body.total).toBe(
+      await rawPrisma.opportunity.count({
+        where: { organizationId: TEST_ORGANIZATION_ID },
+      }),
+    );
+    // NON-VACUITY: office B really has one, so the absence below is about the scope and not
+    // about an empty table.
+    expect(
+      await rawPrisma.opportunity.count({
+        where: { organizationId: ORG_B_ID },
+      }),
+    ).toBeGreaterThan(0);
+    expect(body.items.map((r) => r.id)).not.toContain(opportunityBId);
+  });
+
+  it('the RFQ list shows office A’s whole book and none of office B’s', async () => {
+    const res = await request(app!.getHttpServer())
+      .get('/rfqs')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const body = res.body as { items: { id: string }[]; total: number };
+
+    expect(body.total).toBe(
+      await rawPrisma.rFQ.count({
+        where: { organizationId: TEST_ORGANIZATION_ID },
+      }),
+    );
+    expect(
+      await rawPrisma.rFQ.count({
+        where: { organizationId: ORG_B_ID },
+      }),
+    ).toBeGreaterThan(0);
+    expect(body.items.map((r) => r.id)).not.toContain(rfqBId);
+  });
+
+  it('the insurance-programme list shows office A’s whole book and none of office B’s', async () => {
+    const res = await request(app!.getHttpServer())
+      .get('/insurance-programs')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const body = res.body as { items: { id: string }[]; total: number };
+
+    expect(body.total).toBe(
+      await rawPrisma.insuranceProgram.count({
+        where: { organizationId: TEST_ORGANIZATION_ID },
+      }),
+    );
+    expect(
+      await rawPrisma.insuranceProgram.count({
+        where: { organizationId: ORG_B_ID },
+      }),
+    ).toBeGreaterThan(0);
+    expect(body.items.map((r) => r.id)).not.toContain(programBId);
+  });
+
+  /*
+   * AND SEARCHING FOR THE NAME BOTH OFFICES SHARE. The two customers carry the IDENTICAL legal
+   * name, so a search for it is the sharpest form of this question: a scope that leaked would
+   * return office B's row on the one query most likely to surface it.
+   */
+  it('searching the shared customer name returns office A’s rows only, on all three', async () => {
+    const term = encodeURIComponent(SHARED_CUSTOMER_NAME);
+    for (const [path, foreignId] of [
+      ['/opportunities', opportunityBId],
+      ['/rfqs', rfqBId],
+      ['/insurance-programs', programBId],
+    ] as const) {
+      const res = await request(app!.getHttpServer())
+        .get(`${path}?search=${term}`)
+        .set(bearer(officeA.accessToken))
+        .expect(200);
+      const body = res.body as { items: { id: string }[]; total: number };
+      expect(
+        body.items.map((r) => r.id),
+        `${path} returned office B's row for the shared customer name`,
+      ).not.toContain(foreignId);
+      // The search really matched something in office A — otherwise an empty list would
+      // satisfy the absence above for the wrong reason.
+      expect(body.total).toBeGreaterThan(0);
+    }
   });
 });
 

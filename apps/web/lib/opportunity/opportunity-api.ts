@@ -5,6 +5,7 @@
 // insurance-program-api.ts's conventions.
 
 import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import type { Paginated } from '../api/paginated';
 
 export type OpportunityStatus =
   | 'NEEDS_CONFIRMED'
@@ -47,8 +48,42 @@ export function createOpportunity(
   return apiPost('/opportunities', { insuranceProgramId });
 }
 
-export function listOpportunities(customerId: string): Promise<Opportunity[]> {
-  return apiGet(`/opportunities?customerId=${encodeURIComponent(customerId)}`);
+/** 🔴 OWNER DECISION 150 RULING 1 — every list row names its customer, because a reader who
+ *  arrived from the sidebar has none in hand. The customer-scoped branch carries it too, so
+ *  there is one row shape rather than one per branch. */
+export interface OpportunityListRow extends Opportunity {
+  customer: { id: string; legalName: string };
+}
+
+/** One customer's opportunities. Unwrapped to an array so this function keeps the shape its
+ *  callers have always had — the server's envelope is one shape per ENDPOINT, not per branch. */
+export async function listOpportunities(
+  customerId: string,
+): Promise<OpportunityListRow[]> {
+  const page: Paginated<OpportunityListRow> = await apiGet(
+    `/opportunities?customerId=${encodeURIComponent(customerId)}`,
+  );
+  return page.items;
+}
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST.
+ *
+ * With no customer scope the API returns what THIS caller may see: the whole book for a holder
+ * of `customer-file.all-owners.read` (Placement / Manager / Executive), and only opportunities
+ * on customers they own for anyone else. ⛔ The filtering happens in the QUERY, so the page
+ * window narrows matching rows rather than rows scanned.
+ */
+export function listAllOpportunities(
+  params: { search?: string; page?: number } = {},
+): Promise<Paginated<OpportunityListRow>> {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  // Sent only past the first page, so the common request keeps the URL it has always had and
+  // the server's own default decides the size.
+  if (params.page) qs.set('page', String(params.page));
+  const suffix = qs.toString();
+  return apiGet(`/opportunities${suffix ? `?${suffix}` : ''}`);
 }
 
 export function getOpportunity(id: string): Promise<OpportunityWithContext> {

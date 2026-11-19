@@ -44,7 +44,7 @@ import type { Language, TranslationKey } from '../../../../lib/i18n/translations
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 import { Article15DRecord } from '../../../../components/rfq/Article15DRecord';
-import { insurerDisplayName } from '../../../../lib/i18n/names';
+import { insurerDisplayName, lineDisplayName } from '../../../../lib/i18n/names';
 
 
 // The medium of a broker<->insurer exchange. The API accepts the full
@@ -280,7 +280,11 @@ export default function RfqDetailPage() {
 
       {rfq ? (
         <>
-          <h1>{t('rfqDetailHeading', { line: rfq.insuranceLine })}</h1>
+          {/* 🔴 §S1 — the heading read «طلب عرض أسعار — Motor Fleet» after the user had chosen
+              the Arabic line, because it interpolated `rfq.insuranceLine` as STORED. The wire
+              has carried `insuranceLineAr` since message 45 §2; this is the one heading that
+              was not reading it. */}
+          <h1>{t('rfqDetailHeading', { line: lineDisplayName(rfq, language) })}</h1>
           <div style={cardMetaStyle}>
             {t(
               rfq.followUpThresholdDays === 1 ? 'rfqFollowUpThresholdOne' : 'rfqFollowUpThresholdOther',

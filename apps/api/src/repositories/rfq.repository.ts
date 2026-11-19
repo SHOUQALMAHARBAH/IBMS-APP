@@ -53,6 +53,60 @@ export type RfqWithSubmissions = Prisma.RFQGetPayload<{
   include: { insurerSubmissions: true };
 }> & { insurerSubmissions: RfqInsurerWithInsurer[] } & InsuranceLineNameSources;
 
+/**
+ * A LIST ROW: an RFQ, its shortlist, and the customer its Opportunity belongs to.
+ *
+ * 🔴 OWNER DECISION 150 RULING 1 — the book-wide list has to name the customer, because a reader
+ * who arrived from the sidebar has no customer in hand; that is the whole reason the screen was
+ * empty. The customer is reached through `Opportunity`, which is the join
+ * `findRfqsByCustomerId` has always filtered on.
+ *
+ * ⛔ A SEPARATE TYPE FROM `RfqWithSubmissions`, deliberately. That one is consumed INTERNALLY by
+ * the comparison and quotation services; widening it would change what those callers see in
+ * order to serve a screen. ⚠️ And it is written out concretely rather than as a generic `Omit`
+ * over a payload — the recorded exit-134 `tsc` heap death from distributing a conditional across
+ * Prisma's payload types.
+ */
+export type RfqListRow = RfqWithSubmissions & {
+  opportunity: { customer: { id: string; legalName: string } };
+};
+
+const RFQ_LIST_CUSTOMER_INCLUDE = {
+  opportunity: {
+    select: { customer: { select: { id: true, legalName: true } } },
+  },
+} as const;
+
+/**
+ * 🔴 OWNER DECISION 150 RULING 1 — THE BOOK-WIDE LIST'S FILTER. The same shape as
+ * `ListPoliciesFilter`: `<family>.all-owners.read` reaches the whole book, everybody else is
+ * pinned to Customers they own, ⛔ expressed IN the query so the page size can never decide what
+ * the caller cannot see.
+ */
+export interface ListRfqsFilter {
+  /** `null` = this caller reaches the whole book. Otherwise, only RFQs whose Opportunity's
+   *  Customer is owned by this user id. */
+  ownerUserId: string | null;
+  /** Matched against the customer's legal name and the insurance line as stored — the two things
+   *  a person looking for a quote request has to hand. */
+  search?: string;
+}
+
+function buildRfqListWhere(filter: ListRfqsFilter): Prisma.RFQWhereInput {
+  const where: Prisma.RFQWhereInput = {};
+  if (filter.ownerUserId !== null) {
+    where.opportunity = { customer: { ownerUserId: filter.ownerUserId } };
+  }
+  if (filter.search) {
+    const contains = { contains: filter.search, mode: 'insensitive' } as const;
+    where.OR = [
+      { insuranceLine: contains },
+      { opportunity: { customer: { legalName: contains } } },
+    ];
+  }
+  return where;
+}
+
 /** One submission plus the parent RFQ and its Opportunity — visibility for a
  * per-insurer status change is resolved against `rfq.opportunity.customerId`. */
 export type RfqInsurerWithParents = Prisma.RFQInsurerGetPayload<{
@@ -134,13 +188,12 @@ export class RfqRepository {
     });
   }
 
-  findRfqsByOpportunityId(
-    opportunityId: string,
-  ): Promise<RfqWithSubmissions[]> {
+  findRfqsByOpportunityId(opportunityId: string): Promise<RfqListRow[]> {
     return this.prisma.client.rFQ.findMany({
       where: { opportunityId },
       include: {
         ...INSURANCE_LINE_NAME_INCLUDE,
+        ...RFQ_LIST_CUSTOMER_INCLUDE,
         insurerSubmissions: {
           include: { insurer: { select: INSURER_IDENTITY_SELECT } },
           orderBy: { sentAt: 'asc' },
@@ -150,11 +203,12 @@ export class RfqRepository {
     });
   }
 
-  findRfqsByCustomerId(customerId: string): Promise<RfqWithSubmissions[]> {
+  findRfqsByCustomerId(customerId: string): Promise<RfqListRow[]> {
     return this.prisma.client.rFQ.findMany({
       where: { opportunity: { customerId } },
       include: {
         ...INSURANCE_LINE_NAME_INCLUDE,
+        ...RFQ_LIST_CUSTOMER_INCLUDE,
         insurerSubmissions: {
           include: { insurer: { select: INSURER_IDENTITY_SELECT } },
           orderBy: { sentAt: 'asc' },
@@ -162,6 +216,32 @@ export class RfqRepository {
       },
       orderBy: { issuedAt: 'desc' },
     });
+  }
+
+  /** The book-wide list. Every filter is part of the query, so the window bounds the MATCHING
+   *  rows rather than the rows scanned. */
+  findManyForActor(
+    filter: ListRfqsFilter,
+    window: { take: number; skip: number },
+  ): Promise<RfqListRow[]> {
+    return this.prisma.client.rFQ.findMany({
+      where: buildRfqListWhere(filter),
+      include: {
+        ...INSURANCE_LINE_NAME_INCLUDE,
+        ...RFQ_LIST_CUSTOMER_INCLUDE,
+        insurerSubmissions: {
+          include: { insurer: { select: INSURER_IDENTITY_SELECT } },
+          orderBy: { sentAt: 'asc' },
+        },
+      },
+      orderBy: { issuedAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  countForActor(filter: ListRfqsFilter): Promise<number> {
+    return this.prisma.client.rFQ.count({ where: buildRfqListWhere(filter) });
   }
 
   /** The pre-check behind the `@@unique([opportunityId, insuranceLine])`

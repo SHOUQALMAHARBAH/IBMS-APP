@@ -195,13 +195,37 @@ export class DocumentService {
 
   /** Unlocks `deletionLocked` and stamps `deletionOverrideByUserId` — a
    * status-conditional write, so a second concurrent override 409s instead
-   * of silently overwriting who is on record for it. */
+   * of silently overwriting who is on record for it.
+   *
+   * 🔴 OWNER DECISION 142 §٥ CRITERION 5 — «لا مسار يحذف الشهادة». A document whose FILE this
+   * system holds cannot be unlocked at all, and that is checked FIRST, for two reasons that are
+   * each sufficient:
+   *
+   *   - It refuses BEFORE anything is written. Measured 2026-11-18 on db-test: this route used
+   *     to answer 201 on a stored certificate, commit `deletionLocked = false` and stamp
+   *     `deletionOverrideByUserId`, and only the delete AFTER it failed — with a 500, from
+   *     `DocumentContent_documentId_fkey`'s `ON DELETE RESTRICT` (SQLSTATE 23001). The
+   *     certificate survived, but the office was left holding an unlocked certificate and a
+   *     named person on record as having unlocked it.
+   *   - It refuses before it AUDITS. The audit row is an UPDATE claiming the lock moved, and a
+   *     register that records a change which did not happen is worse than one that records
+   *     nothing: `audit-trail`'s whole value is that a reader may take it literally.
+   *
+   * ⛔ The test is `hasStoredContent`, not `category === 'CERTIFICATE_OF_INSURANCE'` — see that
+   * method's own comment. Retention is module 11's question (decision 142 §٤) and is NOT
+   * answered here; until she rules, nothing stored is destroyed. */
   async overrideDeletionLock(
     id: string,
     actorUserId: string,
   ): Promise<Document> {
     const existing = await this.documents.findById(id);
     if (!existing) throw new NotFoundException('Document not found');
+
+    if (await this.documents.hasStoredContent(id)) {
+      throw new ConflictException(
+        `Document ${id} holds a file stored in this system and cannot be unlocked for deletion.`,
+      );
+    }
 
     const updated = await this.documents.setDeletionOverride(id, actorUserId);
     if (!updated) {

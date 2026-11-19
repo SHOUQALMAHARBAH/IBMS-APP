@@ -170,6 +170,21 @@ export default function CustomersPage() {
               ) : (
                 <div key={customer.id} style={{ ...cardStyle, textAlign: 'start', width: '100%' }}>
                   {card}
+                  {/*
+                    AND IT SAYS WHY, rather than being a card that quietly does nothing.
+
+                    The comment above explains that withholding the control is correct; what it
+                    did not do was tell the reader. The owner's second walk reported a row that
+                    looks exactly like the clickable one and refuses to open — which reads as a
+                    broken screen, not as a permission.
+
+                    ⛔ NO NEW SENTENCE IS WRITTEN. `permissionRefusal` is the one place a refusal
+                    is worded, and `customerCrmRefusalAct` + `customer.360-view.read` is the pair
+                    `/customers/[id]` already ships for this very code.
+                  */}
+                  <p style={cardMetaStyle} data-permission-refusal>
+                    {permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}
+                  </p>
                 </div>
               );
             })}
