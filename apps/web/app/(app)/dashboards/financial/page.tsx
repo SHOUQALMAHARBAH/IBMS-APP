@@ -25,16 +25,38 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
+import type { TranslationKey } from '../../../../lib/i18n/translations';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
+/**
+ * 🔴 OWNER DECISION 153 §M3 — `r.label` IS A STORED VALUE AND IT WAS RENDERED RAW.
+ *
+ * The api groups written policies two ways and flattens BOTH into one `label` field
+ * (`finance.config.ts:1426-1427` — `label: key`, where the key is `p.insuranceLine` for
+ * `byLine` and `p.customerType` for `bySegment`). So one field carries two vocabularies and
+ * only the CALL SITE knows which, which is why the map is a prop rather than a lookup here.
+ *
+ * ⚠️ AND `byLine` HAS NO VOCABULARY TO PASS — IT IS A DEBT ON THE API, DECLARED NOT INVENTED.
+ * Its label is the English insurance-line string the policy stored, and this payload sends no
+ * `insuranceLineAr` beside it. Measured in message 47 §3: exactly THREE services send that
+ * field (`rfq`, `policy`, `insurance-program`) and the financial dashboard is not one of them.
+ * A map here would have nothing to map, and `lineDisplayName` would hand back the same English
+ * while claiming a choice the screen cannot make. ⟶ `byLine` passes NO vocabulary, renders as
+ * stored, and joins the `LINE_DECLARED` debt the bilingual-names gate already records.
+ */
 function ProfitabilityTable({
   title,
   rows,
+  vocabulary,
 }: {
   title: string;
   rows: ProfitabilityRow[];
+  /** Omitted where the label has no known vocabulary — see the header. A key the map does not
+   *  carry renders AS STORED, which is owner decision 49's rule. */
+  vocabulary?: Record<string, TranslationKey>;
 }) {
   const { t } = useLanguage();
   return (
@@ -67,7 +89,11 @@ function ProfitabilityTable({
             {rows.map((r) => (
               <Tr key={r.key}>
                 <Td>
-                  <bdi>{r.label}</bdi>
+                  <bdi>
+                    {vocabulary && r.label in vocabulary
+                      ? t(vocabulary[r.label])
+                      : r.label}
+                  </bdi>
                 </Td>
                 <Td>
                   {r.premiumWritten}
@@ -215,10 +241,27 @@ export default function FinancialDashboardPage() {
               <div>
                 {t('commonCurrentLabel')} {summary.receivables.totals.current}
               </div>
-              <div>1-30d: {summary.receivables.totals.d1_30}</div>
-              <div>31-60d: {summary.receivables.totals.d31_60}</div>
-              <div>61-90d: {summary.receivables.totals.d61_90}</div>
-              <div>90+d: {summary.receivables.totals.d90_plus}</div>
+              {/*
+                🔴 OWNER DECISION 153 §M2 — the four buckets were hard-coded English.
+                ⛔ The keys are BORROWED, not written: `frAgeing*` ships on `/financial-report`
+                for these EXACT four receivables buckets, and `finance.ts:29-42` records that
+                they are the owner's own bytes and that they are NOT `dclmAgeing0To30` — the
+                claims bucket starts at day ZERO, which on a receivables report is the
+                `current` column one place to the left. Those two differ by one codepoint, and
+                a header claiming a range its column does not hold is worse than an English one.
+              */}
+              <div>
+                {t('frAgeing1To30')} {summary.receivables.totals.d1_30}
+              </div>
+              <div>
+                {t('frAgeing31To60')} {summary.receivables.totals.d31_60}
+              </div>
+              <div>
+                {t('frAgeing61To90')} {summary.receivables.totals.d61_90}
+              </div>
+              <div>
+                {t('frAgeing90Plus')} {summary.receivables.totals.d90_plus}
+              </div>
             </div>
           </Card>
 
@@ -284,6 +327,7 @@ export default function FinancialDashboardPage() {
             <ProfitabilityTable
               title={t('dfinByClientSegment')}
               rows={summary.profitability.bySegment}
+              vocabulary={ENUM_LABEL.CustomerType}
             />
           </Card>
         </>

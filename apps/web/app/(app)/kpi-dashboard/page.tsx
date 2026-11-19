@@ -23,6 +23,11 @@ import {
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import { LEAD_STATUS_LABEL_KEY } from '../../../lib/lead/lead-status';
+import { OPPORTUNITY_STATUS_LABEL_KEY } from '../../../lib/opportunity/opportunity-status';
+import { INVOICE_STATUS_LABEL_KEY } from '../../../lib/finance/invoice-status';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statRow: CSSProperties = {
@@ -49,7 +54,27 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function StatusTable({ counts }: { counts: Record<string, number> }) {
+/**
+ * 🔴 OWNER DECISION 153 §M1 — THE STATUS IS A STORED VALUE, AND IT WAS RENDERED RAW.
+ *
+ * This table printed `{status}` for all SEVEN breakdowns on this screen, so a reader in Arabic
+ * met `CONVERTED_TO_PROSPECT`, `RECOMMENDATION_DRAFTED`, `EXCEPTION_RAISED` and four more
+ * vocabularies' worth of machine text under Arabic headings.
+ *
+ * ⟶ Each call site passes the vocabulary ITS keys belong to — seven different ones, and ⛔ not
+ *   one shared map, because `leadsByStatus` and `claimsByStatus` are different closed sets that
+ *   happen to be rendered by one component.
+ *
+ * ⛔ A key the map does not carry renders AS STORED (owner decision 49), never blank: an empty
+ * cell is decision 148's defect, where a missing label printed nothing and nobody was told.
+ */
+function StatusTable({
+  counts,
+  vocabulary,
+}: {
+  counts: Record<string, number>;
+  vocabulary: Record<string, TranslationKey>;
+}) {
   const { t } = useLanguage();
   const entries = Object.entries(counts);
   if (entries.length === 0) {
@@ -67,7 +92,7 @@ function StatusTable({ counts }: { counts: Record<string, number> }) {
       <tbody>
         {entries.map(([status, count]) => (
           <Tr key={status}>
-            <Td>{status}</Td>
+            <Td>{status in vocabulary ? t(vocabulary[status]) : status}</Td>
             <Td>{count}</Td>
           </Tr>
         ))}
@@ -142,15 +167,24 @@ export default function KpiDashboardPage() {
             >
               <div>
                 <h3>{t('kpiLeads')}</h3>
-                <StatusTable counts={summary.sales.leadsByStatus} />
+                <StatusTable
+                  counts={summary.sales.leadsByStatus}
+                  vocabulary={LEAD_STATUS_LABEL_KEY}
+                />
               </div>
               <div>
                 <h3>{t('kpiProspects')}</h3>
-                <StatusTable counts={summary.sales.prospectsByStatus} />
+                <StatusTable
+                  counts={summary.sales.prospectsByStatus}
+                  vocabulary={ENUM_LABEL.ProspectStatus}
+                />
               </div>
               <div>
                 <h3>{t('kpiOpportunities')}</h3>
-                <StatusTable counts={summary.sales.opportunitiesByStatus} />
+                <StatusTable
+                  counts={summary.sales.opportunitiesByStatus}
+                  vocabulary={OPPORTUNITY_STATUS_LABEL_KEY}
+                />
               </div>
             </div>
           </section>
@@ -164,13 +198,19 @@ export default function KpiDashboardPage() {
               />
             </div>
             <div style={{ marginTop: '0.75rem' }}>
-              <StatusTable counts={summary.policy.policiesByStatus} />
+              <StatusTable
+                counts={summary.policy.policiesByStatus}
+                vocabulary={ENUM_LABEL.PolicyStatus}
+              />
             </div>
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('kpiClaims')}</h2>
-            <StatusTable counts={summary.claims.claimsByStatus} />
+            <StatusTable
+              counts={summary.claims.claimsByStatus}
+              vocabulary={ENUM_LABEL.ClaimStatus}
+            />
           </section>
 
           <section style={sectionStyle}>
@@ -186,7 +226,10 @@ export default function KpiDashboardPage() {
               />
             </div>
             <div style={{ marginTop: '0.75rem' }}>
-              <StatusTable counts={summary.finance.invoicesByStatus} />
+              <StatusTable
+                counts={summary.finance.invoicesByStatus}
+                vocabulary={INVOICE_STATUS_LABEL_KEY}
+              />
             </div>
           </section>
 
@@ -201,6 +244,7 @@ export default function KpiDashboardPage() {
             <div style={{ marginTop: '0.75rem' }}>
               <StatusTable
                 counts={summary.customerService.complaintsByStatus}
+                vocabulary={ENUM_LABEL.ComplaintStatus}
               />
             </div>
           </section>

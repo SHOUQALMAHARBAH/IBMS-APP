@@ -35,7 +35,7 @@ concluded eighteen had to be written, and every one was already in the product.
 Putting a word on the owner's list that already exists is the worst available
 outcome, so this script prints which enums have a label and which do not.
 
-## TWO SHAPES
+## THREE SHAPES
 
 SHAPE A — a PROPERTY ACCESS rendered raw: `{row.status}` where `status` carries an
 enum. The field names are DERIVED from `schema.prisma` rather than listed, so a
@@ -45,6 +45,27 @@ SHAPE B — a DECLARED VOCABULARY rendered raw: `const STATUSES = ['ALL', …]` 
 then `{STATUSES.map((s) => <button>{s}</button>)}`. Invisible to shape A, because
 `{s}` is a bare identifier with no property access to key on, and invisible to
 every string pattern, because the only literals are in the declaration.
+
+SHAPE C — THE KEY OF A BREAKDOWN, rendered raw: `Object.entries(rows).map(([key,
+count]) => … {key} …)`, where `rows` is a `Record<string, number>` the API sends.
+Added 2026-11-19, owner decision 153 §C1/§M1/§M3.
+
+  INVISIBLE TO BOTH OF THE ABOVE, which is why it needed its own shape and why it
+  survived every sweep until an owner walked the screens. `key` is a bare
+  identifier, so shape A — which requires a PROPERTY ACCESS — cannot see it; and
+  nothing is declared as an array literal, so shape B cannot either. There is no
+  English STRING anywhere on the line.
+
+  SIXTEEN sites across three dashboards were in this shape: seven on
+  `/dashboards/compliance`, seven on `/kpi-dashboard`, two on
+  `/dashboards/financial` — and FIFTEEN of them had a shipping Arabic vocabulary
+  the screen simply did not use, which is this script's own headline finding
+  reappearing on a surface it could not look at.
+
+  ⚠️ IT MATCHES THE BARE `{key}` ONLY. `{k ? t(map[k]) : key}` is a CORRECT render
+  of an unlabelled value (owner decision 49) and must never be flagged — the
+  `TRANSLATED` filter already drops any line containing `t(`, and the pattern
+  requires the braces to hold nothing but the identifier.
 
 ## WHAT WAS NARROWED, AND WHY — MEASURED BOTH WAYS EACH TIME
 
@@ -86,6 +107,34 @@ ATTR = re.compile(r'[A-Za-z-]+=\s*$')
 ATTR_TEMPLATE = re.compile(r'[A-Za-z-]+=\{`[^`]*$')
 TRANSLATED = re.compile(r'\bt\(|ENUM_LABEL|_LABEL\b|LABEL\[|formatD|format\(')
 VOCAB = re.compile(r"(?:const|let)\s+([A-Z][A-Z0-9_]*)\s*(?::[^=]*)?=\s*\[([^\]]*)\]", re.S)
+
+# SHAPE C — the key of a breakdown. Two forms, because both are in the tree:
+#
+#   ONE STEP   `Object.entries(rows).map(([key, count]) => …)`
+#   TWO STEP   `const entries = Object.entries(rows);` … `entries.map(([key, count]) => …)`
+#
+# The two-step form is the one the dashboards actually used, and a matcher that only knew the
+# one-step form would have reported a confident zero over all sixteen sites.
+ENTRIES_DIRECT = re.compile(r'Object\.entries\([^;]{0,200}?\)\s*\.map\(\s*\(?\s*\[\s*(\w+)')
+ENTRIES_CONST = re.compile(r'(?:const|let)\s+(\w+)\s*=\s*Object\.entries\(')
+
+_COMMENT = re.compile(r'/\*.*?\*/|//[^\n]*', re.S)
+
+
+def without_comments(src):
+    """Comments blanked, NEWLINES KEPT — so a reported line number still points at the line.
+
+    🔴 BOTH HALVES ARE LESSONS THIS REPOSITORY PAID FOR.
+
+    Blanking at all, because shape C's first run reported TWO findings that were its own new
+    comments quoting `{key}` and `{status}` while explaining the defect — the
+    comment-quotes-the-pattern blindness, which this repo has now hit seven times, here inside
+    the sentence warning about it.
+
+    Keeping the newlines, because `check:bilingual-names` once stripped them too: line numbering
+    collapsed and it reported fourteen findings that were all comment prose (message 45 §2).
+    """
+    return _COMMENT.sub(lambda m: re.sub(r'[^\n]', ' ', m.group(0)), src)
 
 
 def enum_fields():
@@ -181,7 +230,7 @@ def main():
         sys.stderr.write('REFUSING: parsed only %d ENUM_LABEL entries.\n' % len(have_label))
         return 2
 
-    shape_a, shape_b = {}, {}
+    shape_a, shape_b, shape_c = {}, {}, {}
     scanned = 0
     for path in tsx_files():
         scanned += 1
@@ -227,6 +276,32 @@ def main():
                         continue
                     line_no = src[:mo.end() + tm.start()].count('\n') + 1
                     shape_b.setdefault(rel, []).append((line_no, name, members))
+
+        # SHAPE C — the destructured key of an `Object.entries(...)` walk, rendered bare.
+        # Read off the COMMENT-FREE source: its first run reported two of this script's own
+        # new comments, which quote `{key}` and `{status}` while explaining the defect.
+        code = without_comments(src)
+        key_vars = set(ENTRIES_DIRECT.findall(code))
+        for cm in ENTRIES_CONST.finditer(code):
+            holder = cm.group(1)
+            for mm in re.finditer(
+                    re.escape(holder) + r'\s*\.map\(\s*\(?\s*\[\s*(\w+)', code):
+                key_vars.add(mm.group(1))
+        for var in sorted(key_vars):
+            # `{var}` with NOTHING else inside the braces. A ternary, a `t(...)` or any other
+            # expression is a considered render and is not this defect.
+            for tm in re.finditer(r'\{\s*' + re.escape(var) + r'\s*\}', code):
+                before = code[:tm.start()]
+                line_start = before.rfind('\n') + 1
+                prefix = before[line_start:]
+                # An ATTRIBUTE value is machine, not copy — `key={status}` is React's own
+                # reconciliation key and has never been read by a person.
+                if ATTR.search(prefix):
+                    continue
+                if TRANSLATED.search(code[line_start:code.find('\n', tm.end()) + 1 or None]):
+                    continue
+                line_no = before.count('\n') + 1
+                shape_c.setdefault(rel, []).append((line_no, var))
 
     if scanned < 140:
         sys.stderr.write('REFUSING: scanned only %d tsx files.\n' % scanned)
@@ -279,8 +354,18 @@ def main():
             print('      L%-5s %s -> %s' % (line, name, members[:6]))
             b_total += 1
     print()
+    print('=== SHAPE C -- the key of a breakdown rendered raw ===')
+    c_total = 0
+    for rel in sorted(shape_c):
+        print('  %s' % rel)
+        for line, var in shape_c[rel]:
+            print('      L%-5s {%s}   the key of an Object.entries(...) walk, rendered as stored'
+                  % (line, var))
+            c_total += 1
+    print()
     print('shape A %d render(s) across %d file(s)' % (a_total, len(shape_a)))
     print('shape B %d render(s) across %d file(s)' % (b_total, len(shape_b)))
+    print('shape C %d render(s) across %d file(s)' % (c_total, len(shape_c)))
     print()
     print('ENUMS RENDERED RAW THAT ALREADY HAVE AN ARABIC LABEL — no new words needed,')
     print('the screen simply does not use them:')

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectAbsentWithin } from './support/anchored';
 
 /**
  * THE PRESENTER'S PATH: FROM «NOBODY MAY DECLARE» TO THE DECLARATION CONTROL, BY CLICKING.
@@ -80,14 +81,31 @@ const CATALOGUE = [
   { code: 'claim.read', module: 'claims', description: 'View a claim' },
 ];
 
-async function mockAuth(page: Page, permissions: string[]) {
+/**
+ * ⚠️ `language` ADDED 2026-11-19 (decision 153 §٢ row ٣), and it has to be here rather than in
+ * `localStorage`: `language-context.tsx` treats `/auth/me`'s own `languagePreference` as the
+ * source of truth and OVERWRITES the stored key with it on load. A test that set the key and
+ * then signed in would be reading whatever the mocked account prefers, which is EN.
+ *
+ * It defaults to `ME_BASE`'s EN so the four tests above are untouched.
+ */
+async function mockAuth(
+  page: Page,
+  permissions: string[],
+  language: 'AR' | 'EN' = 'EN',
+) {
   await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ['OFFICE_ADMINISTRATOR'], permissions },
+      json: {
+        ...ME_BASE,
+        languagePreference: language,
+        roles: ['OFFICE_ADMINISTRATOR'],
+        permissions,
+      },
     }),
   );
   /*
@@ -315,8 +333,12 @@ function complianceFixtures() {
   return SERIES_AWAITING;
 }
 
-async function openCompliance(page: Page, permissions: string[]) {
-  await mockAuth(page, permissions);
+async function openCompliance(
+  page: Page,
+  permissions: string[],
+  language: 'AR' | 'EN' = 'EN',
+) {
+  await mockAuth(page, permissions, language);
   /*
    * The SCOPE envelope, copied from `regulatory-compliance.spec.ts`'s own `SCOPE`. The first
    * version here was `{ insuranceTypes: [] }` -- a field the endpoint does not have -- so the
@@ -406,4 +428,116 @@ test('step 3b — AFTER the grant the declaration control is there, with its oat
   await expect(
     page.locator('[data-renewal-awaiting-declaration]'),
   ).toHaveCount(0);
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * 🔴 OWNER DECISION 153 §٢ ROW ٣ — EACH CONTROL CARRIES ITS OWN NAME.
+ *
+ * Her second walk (§T1): this screen rendered `rcRecordRenewalButton` — «تسجيل تقديم طلب
+ * التجديد» — on BOTH the control that FILES the renewal application and the control that
+ * records the DECLARATION. Two acts, one name.
+ *
+ * ## ⚠️ AND THEY CANNOT BOTH BE ON THE SCREEN AT ONCE, WHICH IS MEASURED RATHER THAN ASSUMED
+ *
+ * The message asks for «both labels on the same screen, each on its own control». They are
+ * mutually exclusive by construction, and the product is right:
+ *
+ *   - the FILING block renders on `canManage && !license.renewalRequestedAt` (`:665`);
+ *   - the DECLARATION block renders on `AWAITING_DECLARATION`, which `deriveRenewalUnderStudy`
+ *     only ever returns PAST a timely filing — its own comment says so in as many words:
+ *     *«`renewalRequestedAt` is non-null here — `renewalFiledOnTime` returned true»*.
+ *
+ * ⟶ So the strongest TRUE assertion is the one that actually protects the ruling: each label
+ *   appears on its own control in its own state, and NEITHER leaks into the other's screen. A
+ *   test demanding both at once would need a fixture the product cannot produce, and would be
+ *   pinning a state no office is ever in.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+test('decision 153 §٢ row ٣ — the declaration control says «تسجيل الإقرار», and the filing label is nowhere on that screen', async ({
+  page,
+}) => {
+  await openCompliance(page, ['license.manage', DECLARE_CODE], 'AR');
+
+  const declare = page.locator('[data-renewal-declare]');
+  await expect(declare).toBeVisible();
+  await expect(declare).toHaveText('تسجيل الإقرار');
+
+  // NON-VACUOUS BY ITS ANCHOR: the control above is visible in this same render, so the absence
+  // below is read off a screen that demonstrably loaded.
+  await expect(page.locator('[data-renewal-file]')).toHaveCount(0);
+  await expectAbsentWithin(page.locator('main'), (main) =>
+    main.getByText('تسجيل تقديم طلب التجديد', { exact: true }),
+  );
+});
+
+test('decision 153 §٢ row ٣ — and the FILING control keeps its own label, with no declaration control beside it', async ({
+  page,
+}) => {
+  /*
+   * The same proven fixture with ONE field moved: no renewal filed yet. That is the only
+   * difference that matters — it is what turns the filing block on and the declaration block
+   * off — and moving one field rather than shaping a second fixture from the type is this
+   * file's own rule, written after an invented fixture rendered «This page couldn't load» and
+   * read exactly like a broken screen.
+   */
+  await mockAuth(page, ['license.manage', DECLARE_CODE], 'AR');
+  await page.route('http://localhost:4000/broker-license/scope', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        brokerLicenseId: 'b1f0c0de-0000-4000-8000-000000000001',
+        types: ['GENERAL'],
+        branches: [],
+        branchCountByType: { GENERAL: 0 },
+        staffing: {
+          requiredApprovedStaff: 1,
+          currentApprovedStaff: 0,
+          meetsRequirement: false,
+        },
+        brokerKind: 'CORPORATE',
+        capital: {
+          requiredCapital: '5000.000',
+          paidUpCapital: null,
+          shortfall: null,
+          meetsRequirement: false,
+          capitalIsUnrecorded: true,
+        },
+      },
+    }),
+  );
+  await page.route('http://localhost:4000/broker-license', (route) => {
+    const base = complianceFixtures();
+    route.fulfill({
+      status: 200,
+      json: {
+        ...base,
+        current: {
+          ...base.current,
+          renewalRequestedAt: null,
+          renewalFiledOnTime: false,
+        },
+        standing: {
+          ...base.standing,
+          renewalUnderStudy: { state: 'NO_PROOF' },
+        },
+      },
+    });
+  });
+  await page.route('http://localhost:4000/insurance-lines', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route('http://localhost:4000/compliance-calendar**', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.goto('/regulatory-compliance');
+
+  const file = page.locator('[data-renewal-file]');
+  await expect(file).toBeVisible();
+  await expect(file).toHaveText('تسجيل تقديم طلب التجديد');
+
+  // And the renamed control is not on this screen at all — the rename did not leak sideways.
+  await expect(page.locator('[data-renewal-declare]')).toHaveCount(0);
+  await expectAbsentWithin(page.locator('main'), (main) =>
+    main.getByText('تسجيل الإقرار', { exact: true }),
+  );
 });

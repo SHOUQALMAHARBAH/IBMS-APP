@@ -6,6 +6,7 @@ import { PolicyDeliveryService } from './policy-delivery.service';
 import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
 import { CertificateOfInsuranceDocumentService } from './certificate-of-insurance-document.service';
 import { DocumentRepository } from '../../repositories/document.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
@@ -86,6 +87,10 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
     // OWNER DECISION 142 — the certificate service stores what it issues. Landed in the
     // SAME commit as its constructor dependency, which is what the note above asks for.
     DocumentRepository,
+    // OWNER DECISION 153 RULING 2 — the certificate names the issuing office, which means the
+    // service reads the tenant registry. Landed in the SAME commit as its constructor
+    // dependency, which is what the note at the head of this list asks for.
+    OrganizationRepository,
     PiPolicyRepository,
   ],
   exports: [PolicyRepository],

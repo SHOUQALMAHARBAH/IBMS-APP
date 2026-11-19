@@ -44,6 +44,11 @@ function gate(
           issuedAt: d('2024-01-15'),
           expiresAt: d('2030-12-31'),
           renewalRequestedAt: null,
+          /* OWNER DECISION 153 RULING 2 — the certificate prints the licence number of the term
+             in force, and the gate is what carries it there. Stated in the fixture so the
+             assertion below is about the gate READING it, not about a field the fixture
+             happened to omit. */
+          licenseNumber: 'CBJ-SPEC-TERM',
         },
       ]),
     ),
@@ -88,6 +93,11 @@ function cleanLicence() {
           issuedAt: d('2024-01-15'),
           expiresAt: d('2030-12-31'),
           renewalRequestedAt: null,
+          /* OWNER DECISION 153 RULING 2 — the certificate prints the licence number of the term
+             in force, and the gate is what carries it there. Stated in the fixture so the
+             assertion below is about the gate READING it, not about a field the fixture
+             happened to omit. */
+          licenseNumber: 'CBJ-SPEC-TERM',
         },
       ]),
     ),
@@ -111,7 +121,14 @@ function cleanLicence() {
  * stamp — which is the correct answer for an office inside its printed dates, and the answer that
  * would be wrong if the stamp ever leaked onto an ordinary issuance.
  */
-const UNSTAMPED = { issuedUnderStudyLicenseId: null };
+const UNSTAMPED = {
+  issuedUnderStudyLicenseId: null,
+  /* 🔴 OWNER DECISION 153 RULING 2 — and this half is NOT null, which is the point. The stamp
+     carries the licence number of the term in force at the instant the act was permitted, from
+     the SAME read, so the certificate can print it without asking the licence a second time.
+     A null here would mean the gate found no term, which is the one state that refuses. */
+  currentLicenseNumber: 'CBJ-SPEC-TERM',
+};
 
 describe('art. 21/b/5 at the licence gate', () => {
   it('permits an act in a branch the office is still licensed for', async () => {

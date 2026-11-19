@@ -1422,6 +1422,101 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     ).rejects.toThrow();
   }, 60000);
 
+  it('🔴 OWNER DECISION 153 §١ — the certificate handed over is named by the policy number, and its stored row is too', async () => {
+    /* ─────────────────────────────────────────────────────────────────────────────────────
+     * The owner's second demo walk downloaded one and read it (§U2). Its FILE NAME was
+     * `certificate-of-insurance-ced189b0-6b28-4265-828b-9f1fdf0e9785-AR.pdf` — the policy's
+     * internal id, which her §٦ criterion 2 rules out of what the customer receives.
+     *
+     * ⚠️ WHY THIS IS AN e2e AND THE CONTENT TEST IS NOT. The name is built in the service and
+     * placed into an HTTP HEADER by the controller; a unit test on the template cannot see
+     * either. `certificate-file-name.spec.ts` pins the function, this pins that the function
+     * is what the route actually uses — and that the STORED row took the same name, which is
+     * what an inspector reading the document register sees.
+     *
+     * The fixture is this file's own proven one. ⛔ No fresh fixture was invented: message 44
+     * lost time to one that rendered a broken screen and looked like a product defect.
+     * ───────────────────────────────────────────────────────────────────────────────────── */
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'pol-cert-153-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    const owningSales = await makeUser(
+      app,
+      'pol-cert-153-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const policyId = await issuedPolicy(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'cert-153',
+      'AR',
+    );
+    const policy = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { policyNumber: true },
+    });
+    expect(
+      policy.policyNumber,
+      'the fixture produced a policy with no number, so the assertions below would be vacuous',
+    ).toBeTruthy();
+
+    const res = await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+
+    const disposition = String(res.headers['content-disposition']);
+    expect(
+      disposition,
+      'the download is not named by the policy number — decision 153 ruling 1',
+    ).toContain(policy.policyNumber!);
+    expect(
+      disposition,
+      'the policy uuid is still in the file name the customer saves — §٦ criterion 2',
+    ).not.toContain(policyId);
+    expect(disposition).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
+
+    /*
+     * AND THE STORED ROW CARRIES THE SAME NAME — decision 142's register is what an inspector
+     * reads, and a register naming the uuid while the customer holds a differently-named file
+     * is two names for one document.
+     */
+    const stored = await prisma.document.findMany({
+      where: { policyId, category: 'CERTIFICATE_OF_INSURANCE' },
+      select: { fileName: true, versionNumber: true },
+      orderBy: { versionNumber: 'asc' },
+    });
+    expect(stored).toHaveLength(1);
+    expect(stored[0].fileName).toContain(policy.policyNumber!);
+    expect(stored[0].fileName).not.toContain(policyId);
+
+    /*
+     * ⚠️ AND A SECOND DOWNLOAD WITH NOTHING CHANGED STILL STORES NOTHING NEW — decision 149
+     * criterion 1, re-asserted here because BOTH halves of its key moved in this change: the
+     * file name (ruling 1) and the facts digest (the office, its licence and the Arabic names
+     * are now part of the rendered HTML the digest is taken over). A certificate stored BEFORE
+     * this shipped therefore matches nothing and is stored BESIDE the new one, which is
+     * decision 149 working rather than a defect — but two downloads AFTER it must still be one
+     * row, and that is what would break if the key had become unstable.
+     */
+    await request(app.getHttpServer())
+      .get(`/policies/${policyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect(
+      await prisma.document.count({
+        where: { policyId, category: 'CERTIFICATE_OF_INSURANCE' },
+      }),
+      'the key moved between two identical renders — decision 149 §٤ rules out exactly this',
+    ).toBe(1);
+  }, 60000);
+
   // Process 51 (backlog Part C #51's first checkbox) — "automatically block
   // new business issuance once the license lapses." `BrokerLicense` is a
   // SINGLETON shared by the whole real db-test database, not scoped to this

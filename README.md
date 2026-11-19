@@ -232,7 +232,21 @@ already give).
 * **Money renders through `formatMoney`, everywhere.** Four dashboards were printing
   `{rawValue} JOD` — an ungrouped, unformatted number with a hand-written suffix,
   bypassing the shared formatter entirely. They now read `JOD 37,500.000` like every
-  other figure in the app.
+  other figure in the app. **⚠️ CORRECTED 2026-11-19: "everywhere" is not true and the
+  word is left standing with this marker beside it rather than quietly edited.** That
+  sweep fixed the `{rawValue} JOD` SHAPE; a second shape it never looked at — an amount
+  printed bare, with no suffix to grep for — is still on the dashboards. Measured:
+  `/dashboards/financial` alone prints **nine**. That is message 48 §3 item 3, deferred
+  with the section rather than hidden.
+* **A BREAKDOWN'S KEY IS A STORED VALUE, AND NO STRING SEARCH CAN FIND IT.** Three
+  dashboards printed the key of a `Record<string, number>` the API sends —
+  `COMPLIANCE_REVIEW`, `CONVERTED_TO_PROSPECT`, `EXCEPTION_RAISED` — under Arabic
+  headings, in sixteen places. There is no English literal anywhere on those lines, so
+  every hardcoded-string sweep was blind to them, and so were both existing shapes of
+  `npm run check:raw-values` (one needs a property access, the other an array literal).
+  **Fifteen of the sixteen had a shipping Arabic vocabulary the screen simply did not
+  use** — no new words were needed. The guard learned the shape (`SHAPE C`) in the same
+  commit, and found a fourth site nobody had named.
 * **An unreferenced dictionary key is a question, not a verdict.** `policy.ts`'s 98
   orphans were audited one by one rather than deleted as debt: **15 were missing
   wiring** — the string they were written for was still hard-coded in the component

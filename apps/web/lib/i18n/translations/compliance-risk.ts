@@ -294,6 +294,20 @@ export const COMPLIANCE_RISK = {
     rcRenewalDeclarationSentence:
       'أُقرّ بأنه لم يصل المكتبَ من البنك المركزي رفضٌ لطلب التجديد ولا إشعارُ نقص.',
     /*
+     * 🔴 OWNER DECISION 153 §٢ ROW ٣ — ITS OWN KEY, AND THAT IS THE WHOLE POINT.
+     *
+     * This screen rendered `rcRecordRenewalButton` on TWO controls: the one that FILES the
+     * renewal application and the one that records the standing DECLARATION. Two acts, one
+     * name — «تسجيل تقديم طلب التجديد» — and declaring that no refusal and no deficiency
+     * notice has arrived is not filing an application. Her second walk read it (§T1).
+     *
+     * ⛔ SLICED from `docs/decision-153-answer-sheet-3.md`, never retyped, and re-sliced at
+     * test time by `decision-153.strings.test.ts`. ⛔ And the filing control keeps its label:
+     * one key serving a filing button and a declaration button is one key that cannot move,
+     * which is what `oppListRefusalAct` already taught this dictionary.
+     */
+    rcRecordDeclarationButton: 'تسجيل الإقرار',
+    /*
      * OWNER DECISION 128's two new `RegulatoryActionKind` members. They are NOT suspensions:
      * each ends the renewal-under-study state and does nothing else, which is why
      * `deriveLicenseStanding` reads them in one place and `foldActs` skips them by name.
@@ -902,6 +916,11 @@ export const COMPLIANCE_RISK = {
     rcRenewalDeclarationSentence:
       'I declare that the office has received no refusal of the renewal application and no ' +
       'deficiency notice from the Central Bank.',
+    /* OWNER DECISION 153 §٢ row ٣. The Arabic is HERS and is what the test pins; this half is
+     * a MIRROR, as this block's own header says of every English string beside it — and it is
+     * composed from words already shipping on this screen for these two things: «Record» from
+     * `rcRecordRenewalButton` and «declaration» from `rcRenewalAwaitingDeclaration`. */
+    rcRecordDeclarationButton: 'Record the declaration',
     rcActKindDeficiencyNotice: 'Deficiency notice',
     rcActKindRenewalRefusal: 'Renewal refusal',
     rcRenewalAwaitingDeclaration:

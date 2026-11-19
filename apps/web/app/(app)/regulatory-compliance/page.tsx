@@ -711,8 +711,12 @@ export default function RegulatoryCompliancePage() {
                   onChange={(e) => setRenewalReference(e.target.value)}
                 />
               </label>
+              {/* A stable hook, added with decision 153 §٢ row ٣: this screen now renders two
+                  controls whose labels both open «تسجيل», and a test that located either by
+                  text would follow whichever the DOM happened to give it first. */}
               <button
                 type="button"
+                data-renewal-file=""
                 disabled={busy}
                 onClick={() => void submitRenewalRequest()}
               >
@@ -747,13 +751,17 @@ export default function RegulatoryCompliancePage() {
               <p style={noteStyle} data-renewal-declaration-sentence="">
                 {t('rcRenewalDeclarationSentence')}
               </p>
+              {/* 🔴 OWNER DECISION 153 §٢ ROW ٣ — «تسجيل الإقرار», its OWN key.
+                  This control used to carry `rcRecordRenewalButton`, the FILING control's
+                  label, so the screen offered two different acts under one name. ⛔ The filing
+                  control above keeps that label; one key cannot name both. */}
               <button
                 type="button"
                 data-renewal-declare=""
                 disabled={busy}
                 onClick={() => void submitRenewalDeclaration()}
               >
-                {t('rcRecordRenewalButton')}
+                {t('rcRecordDeclarationButton')}
               </button>
             </div>
           ) : null}

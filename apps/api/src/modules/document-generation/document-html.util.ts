@@ -33,13 +33,79 @@ export function escapeHtml(value: string): string {
  * themselves live in `apps/web` and are not importable from `apps/api`
  * (no shared utility package spans the two apps' runtime code, only
  * `packages/db`), so this is a deliberate, minimal re-implementation. */
+/**
+ * `'ar-JO-u-nu-latn'` — THE LEVANTINE MONTH NAMES, WITH THIS APP'S WESTERN DIGITS.
+ *
+ * 🔴 ADDED 2026-11-19, decision 153 §U2: the certificate printed «18 نوفمبر 2026» while every
+ * screen beside it says «تشرين الثاني». Both are Arabic for November and only one of them is
+ * the word used in Jordan, so a customer reading the paper and the screen was reading two
+ * calendars.
+ *
+ * `apps/web/lib/i18n/format.ts` already measured this and already owns the answer — its
+ * `AR_MONTH_LOCALE`, used by `formatPeriodLabel`. Re-measured here before copying it:
+ *
+ *   `ar`                 2026-11-18 -> «18 نوفمبر 2026»          (Gregorian-Arabic, wrong dialect)
+ *   `ar-JO`              2026-11-18 -> «١٨ تشرين الثاني ٢٠٢٦»    (right word, EASTERN digits)
+ *   `ar-JO-u-nu-latn`    2026-11-18 -> «18 تشرين الثاني 2026»    (right word, Western digits)
+ *
+ * ⛔ The bare `'ar'` tag is NOT restored and ⛔ the region tag is NOT used without the extension:
+ * decision 146 ruling 1 is «كل رقم مكتوب في نصوص النظام غربي», so a tag that switches every
+ * numeral to Eastern Arabic-Indic prints digits the owner has ruled against. The `-u-nu-latn`
+ * extension is what keeps the year in the same digits as the policy number beside it.
+ *
+ * ⟶ It is used for ONE job — spelling a month — and it changes every document this product
+ *   generates, deliberately: there is one formatter here precisely so six templates cannot
+ *   disagree about what month it is. A certificate-only date function would be a second home for
+ *   one question, which is the drift `insurer-identity.ts` records the cost of.
+ */
+const AR_MONTH_LOCALE = 'ar-JO-u-nu-latn';
+
 export function formatDocumentDate(d: Date, lang: 'en' | 'ar'): string {
-  const locale = lang === 'ar' ? 'ar' : 'en-GB';
+  const locale = lang === 'ar' ? AR_MONTH_LOCALE : 'en-GB';
   return d.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
+}
+
+/**
+ * A NAME THAT EXISTS IN BOTH SCRIPTS, PRINTED IN THE READER'S — the api-side mirror of
+ * `apps/web/lib/i18n/names.ts`, for documents.
+ *
+ * 🔴 Decision 153 §U2: the certificate printed `Al-Manara Insurance (demo)` and `Group Life`
+ * beside an Arabic insured name, while the screen the walk came from showed «شركة المنارة
+ * للتأمين» and «تأمين الحياة الجماعي». The Arabic was already on the record and the document was
+ * not reading it.
+ *
+ * The web's `insurerDisplayName` / `lineDisplayName` / `referenceDisplayName` are four copies of
+ * ONE rule, and that rule is all this is. They are not importable from here — no shared utility
+ * package spans the two apps' runtime code, only `packages/db` — which is the same reason
+ * `formatDocumentDate` and `formatDocumentMoney` above exist as api-side equivalents.
+ *
+ * ⛔ NO ARABIC IS WRITTEN HERE AND NONE CAN BE. Every string this returns came out of the
+ * database; an insurer with no Arabic name renders its Latin one, because inventing an Arabic
+ * name for a real company is what decision 125 forbids.
+ *
+ * ⚠️ THE FALLBACK IS ONE-WAY, exactly as the web's is. Arabic missing -> the Latin name. English
+ * requested -> the Latin name, NEVER the Arabic one: a reader who chose English and is handed
+ * Arabic has been handed a string they may not be able to read, while a reader who chose Arabic
+ * and is handed a Latin company name has been handed the name on that company's own licence.
+ *
+ * ⚠️ AND `arabic` IS CHECKED FOR CONTENT, NOT PRESENCE. A whitespace-only value renders as
+ * nothing at all, which is the silent blank-cell shape this repository keeps meeting — decision
+ * 148's own defect, where a missing label printed an empty category cell on four screens.
+ */
+export function preferLanguage(
+  latin: string,
+  arabic: string | null | undefined,
+  lang: 'en' | 'ar',
+): string {
+  if (lang === 'ar') {
+    const ar = arabic?.trim();
+    if (ar) return ar;
+  }
+  return latin;
 }
 
 /** Mirrors `apps/web/lib/i18n/format.ts#formatMoney()`'s exact contract
