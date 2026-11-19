@@ -41,7 +41,20 @@ import { errorStyle } from '../auth/auth-form.styles';
  * checked, which is the half that evidences the conclusion.
  */
 
-const CASE_STATUS_KEY: Record<ScreeningCaseStatus, TranslationKey> = {
+/**
+ * 🔴 PROMOTED 2026-11-19 — `/screening-health` renders these same five states and printed
+ * them AS STORED, which `check:raw-values` found as its shape-C site (the destructured key
+ * of an `Object.entries(...)` walk).
+ *
+ * ⛔ EXPORTED RATHER THAN COPIED. A second map would be a second home for one vocabulary,
+ * and the two would disagree the first time a member moved — the rule `insurerIdentity`
+ * learned the hard way and this repository keeps re-learning. ⚠️ And the MAP is exported
+ * beside `screeningCaseStatusKey` because that function takes a `ScreeningCaseStatus`,
+ * while `caseWorkload` is a `Record<string, number>` whose keys are plain strings: the
+ * caller has to be able to ASK whether a key is known before it can render it, and
+ * decision 49's rule is that a key with no label renders as stored, never blank.
+ */
+export const CASE_STATUS_KEY: Record<ScreeningCaseStatus, TranslationKey> = {
   OPEN: 'smCaseOpen',
   ASSIGNED: 'smCaseAssigned',
   UNDER_REVIEW: 'smCaseUnderReview',

@@ -6,7 +6,8 @@ import { DocumentTemplateRepository } from '../../repositories/document-template
 import { PdfRendererService } from '../document-generation/pdf-renderer.service';
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildInvoiceHtml } from './invoice-document.template';
-import { insurerName } from '../../repositories/insurer-identity';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 
 const INVOICE_TEMPLATE_TYPE = 'invoice';
 
@@ -81,13 +82,28 @@ export class InvoiceDocumentService {
      * decides settlement by SUMMING it.
      */
 
+    const insurerPair = policy?.insurer
+      ? resolveInsurerNamePair(policy.insurer)
+      : null;
+
     const html = buildInvoiceHtml(
       {
         invoiceId: invoice.id,
         customerLegalName: customer.legalName,
         policyNumber: policy?.policyNumber ?? null,
         insuranceLine: policy?.insuranceLine ?? null,
-        insurerName: policy?.insurer ? insurerName(policy.insurer) : null,
+        /*
+         * THE LINE AND THE INSURER IN THE READER'S LANGUAGE — decision 153 §U2, applied to
+         * the invoice. Both are read off the policy `findById` already returned, whose
+         * `POLICY_INCLUDE` carries the insurer identity select AND the catalogue join — so
+         * ⛔ no query changed here.
+         *
+         * ⚠️ `Invoice.policyId` is schema-nullable, so a policy-less invoice sends null for
+         * every one of these four, exactly as it already did for the two Latin halves.
+         */
+        insuranceLineAr: policy ? insuranceLineNameAr(policy) : null,
+        insurerName: insurerPair?.name ?? null,
+        insurerNameAr: insurerPair?.nameAr ?? null,
         invoiceDate: invoice.createdAt,
         dueDate: invoice.dueDate,
         premiumAmount: invoice.premiumAmount,

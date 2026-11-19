@@ -11,6 +11,7 @@ import {
 } from '../../../components/ui';
 import { Fragment, type CSSProperties, useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import { CASE_STATUS_KEY } from '../../../components/screening/ScreeningCasePanel';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
@@ -507,7 +508,24 @@ export default function ScreeningHealthPage() {
                   {Object.entries(overview.caseWorkload).map(
                     ([state, count]) => (
                       <Tr key={state} data-case-state={state}>
-                        <Td>{state}</Td>
+                        {/*
+                          🔴 THE KEY IS A STORED VALUE AND IT WAS RENDERED RAW — the fourth
+                          site `check:raw-values` named when it learned shape C, reported in
+                          message 48 §3 and fixed here. A reader in Arabic met `UNDER_REVIEW`.
+                          ⛔ ZERO new Arabic: `CASE_STATUS_KEY` already ships for these exact
+                          five states on `/screening-matches`, and it is IMPORTED rather than
+                          copied. ⚠️ `caseWorkload` is a `Record<string, number>`, so a key the
+                          map does not carry renders AS STORED — decision 49 — never blank.
+                        */}
+                        <Td>
+                          {state in CASE_STATUS_KEY
+                            ? t(
+                                CASE_STATUS_KEY[
+                                  state as keyof typeof CASE_STATUS_KEY
+                                ],
+                              )
+                            : state}
+                        </Td>
                         <Td>{count}</Td>
                       </Tr>
                     ),

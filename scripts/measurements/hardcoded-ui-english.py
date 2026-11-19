@@ -355,6 +355,12 @@ DECLARED_PARENTHETICALS = {
     #   8. `Premium adjustment` — EndorsementSection, beside a money figure: what the
     #      endorsement changed the premium BY. «التعديل» exists inside
     #      `endorsementCalculateButton` («حساب التعديل») but not as this label.
+    #      ✅ PAID 2026-11-19 by DECISION 146 ruling 6-a: «فرق القسط», now
+    #      `endorsementPremiumAdjustmentLabel`. Its row below is deleted, which is how a
+    #      translation is recorded here — the note stays so the debt is still legible.
+    #      ⚠️ NOTE THIS GATE WAS NEVER BLIND TO IT: the string was reported on every run
+    #      and this declaration is what kept the gate green. The debt was the Arabic word,
+    #      not the detector.
     #   9. `commission reversal` — the same line: the clawback owed because the premium fell.
     #      Process 22's own money consequence, rendered in English.
     #  10. `Checked by` — PolicySection, naming WHO performed the second-pair-of-eyes policy
@@ -373,7 +379,6 @@ DECLARED_PARENTHETICALS = {
     'apps/web/components/policy/CommissionSection.tsx|(pending approval)',
     'apps/web/components/policy/CommissionSection.tsx|(approved)',
     'apps/web/components/policy/CommissionSection.tsx|Insurer statement amount (must equal',
-    'apps/web/components/policy/EndorsementSection.tsx|Premium adjustment',
     'apps/web/components/policy/EndorsementSection.tsx|commission reversal',
     'apps/web/components/policy/PolicySection.tsx|Checked by',
     'apps/web/components/policy/PolicySection.tsx|receipt acknowledged',

@@ -3,6 +3,7 @@ import {
   escapeHtml,
   formatDocumentDate,
   formatDocumentMoney,
+  preferLanguage,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
 import type { CoverageFigureEntry } from './policy.config';
@@ -52,8 +53,16 @@ export interface PolicyScheduleSummaryData {
   policyId: string;
   customerLegalName: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null where none is recorded — decision 153 §U2's
+   *  ruling applied to the second of the five outward documents. Read from the SAME
+   *  source as `insurerName` by `resolveInsurerNamePair`, never coalesced field by
+   *  field; `preferLanguage` falls back to the Latin name one way only. */
+  insurerNameAr: string | null;
   policyNumber: string | null;
   insuranceLine: string;
+  /** The line's Arabic name from the catalogue join the policy already carries, or
+   *  null where none is known — `insurance-line-names.ts` is the one resolver. */
+  insuranceLineAr: string | null;
   inceptionDate: Date | null;
   expiryDate: Date | null;
   requestedPremium: { toString(): string };
@@ -134,14 +143,27 @@ function renderSection(
         : 'ongoing'
   }`;
 
+  /*
+   * THE INSURER AND THE LINE IN THE READER'S LANGUAGE — decision 153 §U2, applied to the
+   * four documents that were REPORTED when the certificate was fixed.
+   *
+   * The same two helpers the certificate uses, and the same one-way fallback: Arabic missing
+   * renders the Latin name, and an English render never shows Arabic.
+   */
+  const insurer = preferLanguage(data.insurerName, data.insurerNameAr, lang);
+  const line = preferLanguage(data.insuranceLine, data.insuranceLineAr, lang);
+
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
           ['رقم المرجع', escapeHtml(data.policyId)],
           ['العميل', escapeHtml(data.customerLegalName)],
-          ['شركة التأمين', escapeHtml(data.insurerName)],
+          ['شركة التأمين', escapeHtml(insurer)],
           ['رقم الوثيقة', escapeHtml(data.policyNumber ?? '—')],
-          ['خط التأمين', escapeHtml(data.insuranceLine)],
+          // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
+          // This label is hard-coded in the api templates rather than in the dictionary, which
+          // is why it was not in her nineteen-string table.
+          ['فرع التأمين', escapeHtml(line)],
           [
             'تاريخ السريان',
             data.inceptionDate
@@ -162,9 +184,9 @@ function renderSection(
       : [
           ['Reference', escapeHtml(data.policyId)],
           ['Customer', escapeHtml(data.customerLegalName)],
-          ['Insurer', escapeHtml(data.insurerName)],
+          ['Insurer', escapeHtml(insurer)],
           ['Policy Number', escapeHtml(data.policyNumber ?? '—')],
-          ['Insurance Line', escapeHtml(data.insuranceLine)],
+          ['Insurance Line', escapeHtml(line)],
           [
             'Inception',
             data.inceptionDate

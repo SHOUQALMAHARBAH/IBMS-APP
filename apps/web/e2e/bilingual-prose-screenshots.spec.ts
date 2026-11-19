@@ -126,10 +126,20 @@ async function openAt(
  * Each was proven present in the shipping text before it was written here, and
  * `check:process-prefix` now holds BOTH languages at budget zero.
  *
- * ⛔ `access-recertification`'s «البند 5.1» / «Part 5.1» pair is NOT touched. Decision 151
- * ruling 2 deletes those internal clause references, but 151 is COPY ONLY this batch — the
- * strings move when it is built, and re-anchoring ahead of the change would leave this file
- * asserting the absence of something still on the screen.
+ * 🔴 AND `access-recertification`'s ARABIC ANCHOR MOVED 2026-11-19, FOR THE THIRD TIME THIS
+ * FILE HAS BEEN THE CREDITOR OF A RULING. The note here used to say the «البند 5.1» / «Part
+ * 5.1» pair was untouched because decision 151 was COPY ONLY — true when written, and it
+ * stopped being true the moment ruling 2-أ was built. «البند 5.1 — » is deleted from
+ * `acrIntro`, so the Arabic anchor is now a DISTINCTIVE PHRASE THAT SURVIVES the ruling,
+ * proven present in the shipping value and proven to occur in exactly ONE dictionary entry
+ * before being written here.
+ *
+ * ⚠️ AND THE ENGLISH ANCHOR «Part 5.1» IS DELIBERATELY LEFT, MEASURED RATHER THAN ASSUMED.
+ * Decision 151's annex §٢ gives an ARABIC span in every «كان» cell and names no English, so
+ * the English halves still read «Part 5.1 — », «(Part 8.2)» and «The Part 4.2 electronic
+ * Insurance File». That is the SAME EMPTY CELL decision 150 left and decision 152 later
+ * filled, and ⛔ deleting the English because the Arabic lost it would be deciding for her.
+ * The pair is reported, not resolved.
  */
 // screen -> [path, a phrase that must be on it in AR, and in EN]
 const SCREENS: Array<[string, string, string, string]> = [
@@ -143,7 +153,15 @@ const SCREENS: Array<[string, string, string, string]> = [
     "برنامج تأمين متعدد فروع التأمين",
     "A multi-line Insurance Program",
   ],
-  ["access-recertification", "/access-recertification", "البند 5.1", "Part 5.1"],
+  [
+    "access-recertification",
+    "/access-recertification",
+    // Decision 151 ruling 2-أ deleted «البند 5.1 — » from `acrIntro`. This phrase opens what
+    // is left of it and occurs in exactly one dictionary value. The English keeps «Part 5.1»:
+    // her annex rules on Arabic spans only — see this file's header.
+    "مراجعة دورية (ربع سنوية)",
+    "Part 5.1",
+  ],
   ["claims-analytics", "/claims-analytics", "معدّل الخسارة", "Loss Ratio"],
 ];
 

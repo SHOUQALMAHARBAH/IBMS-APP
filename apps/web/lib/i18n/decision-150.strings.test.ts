@@ -54,6 +54,30 @@ function ratifiedStrings(): Map<string, string> {
 /** The key that §3 removed, and the reason it is named here rather than filtered out. */
 const DELETED_BY_SECTION_3 = 'rfqNewLineHint';
 
+/**
+ * 🔴 COMPOSED WITH OWNER DECISION 146 RULING 1-أ, ADDED 2026-11-19.
+ *
+ * Decision 150's annex §٥ was generated before decision 146's digit sweep was applied, so its
+ * cells still carry Eastern Arabic-Indic numerals where a string contains a number. Decision
+ * 151's own annex states how the two meet: *«ما يغيّره القراران ١٤٦ و١٥٠ في النصوص نفسها
+ * يُطبَّق بمقاطعه هو»* — each decision is applied by its OWN spans. 150 settles the WORDS; 146
+ * settles the DIGITS, and its annex §٣ is explicit that nothing else moves: *«الرقم وحده
+ * يتبدّل، حرفاً بحرف. لا تتغيّر كلمة.»*
+ *
+ * ⟶ So the annex's text is read unchanged and the DIGIT RULE is applied to it here, rather
+ *   than editing her paper to match the code — which is the one thing this repository never
+ *   does. Measured: exactly ONE of the forty-four carries a digit at all,
+ *   `renARenewalCaseOpensAutomatically`'s «٩٠ يوماً».
+ *
+ * ⛔ This is a character mapping and NOT a normaliser. It cannot hide a changed word, so a
+ *   string that drifted in any other way still fails this comparison by name.
+ */
+function composeWithDecision146(text: string): string {
+  return text.replace(/[٠-٩]/g, (d) =>
+    String.fromCharCode(d.charCodeAt(0) - 0x0660 + 0x30),
+  );
+}
+
 describe('OWNER DECISION 150 — the ratified strings, re-sliced from the annex', () => {
   it('the annex still carries all forty-four keys', () => {
     // Non-vacuity. Every assertion below iterates this map, so an annex that stopped parsing
@@ -65,21 +89,38 @@ describe('OWNER DECISION 150 — the ratified strings, re-sliced from the annex'
     const want = ratifiedStrings();
     const mismatched: string[] = [];
 
+    let composed = 0;
     for (const [key, text] of want) {
       if (key === DELETED_BY_SECTION_3) continue;
+      const expected = composeWithDecision146(text);
+      if (expected !== text) composed += 1;
       // `lookupOptional` rather than the raw map: `translations.ts` exports the lookup and not
       // the object, which is the same reason `article-15-d.strings.test.ts` uses it.
       const got = lookupOptional('AR', key);
-      if (got !== text) {
-        mismatched.push(`${key}\n    want: ${text}\n    got : ${String(got)}`);
+      if (got !== expected) {
+        mismatched.push(`${key}\n    want: ${expected}\n    got : ${String(got)}`);
       }
     }
 
     expect(
       mismatched,
-      'a ratified string does not ship as decision 150 §٥ has it. ⛔ Correct the dictionary, ' +
-        'never the annex: her paper is the authority and this file only reads it.',
+      'a ratified string does not ship as decision 150 §٥ has it, with decision 146 ruling ' +
+        '1-أ’s digits applied. ⛔ Correct the dictionary, never the annex: her papers are the ' +
+        'authority and this file only reads them.',
     ).toEqual([]);
+
+    /*
+     * The non-vacuity floor for the composition itself. If `composeWithDecision146` ever
+     * stopped matching — a changed code range, a regex typo — it would become the identity
+     * function and this whole comparison would silently go back to asserting the PRE-146 text,
+     * which is the direction that passes while being wrong.
+     */
+    expect(
+      composed,
+      'no ratified string needed decision 146’s digit rule applied, so the composition above ' +
+        'proved nothing. Exactly one of the forty-four carries a digit — ' +
+        '`renARenewalCaseOpensAutomatically`’s «٩٠ يوماً».',
+    ).toBe(1);
   });
 
   it(`⚠️ ${DELETED_BY_SECTION_3} is GONE, because the line field became a choice`, () => {

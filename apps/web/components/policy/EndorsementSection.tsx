@@ -270,7 +270,8 @@ export function EndorsementSection({
                 <span style={rfqBadgeStyle}>{t(ENUM_LABEL.EndorsementStatus[e.status])}</span>
               </div>
               <p style={{ margin: '0.4rem 0' }}>
-                Premium adjustment {formatMoney(e.premiumAdjustment, language)}
+                {t('endorsementPremiumAdjustmentLabel')}{' '}
+                {formatMoney(e.premiumAdjustment, language)}
                 {e.commissionReversal
                   ? ` · commission reversal ${formatMoney(e.commissionReversal.amount, language)}`
                   : ''}

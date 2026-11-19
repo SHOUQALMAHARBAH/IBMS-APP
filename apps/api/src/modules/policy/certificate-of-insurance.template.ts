@@ -176,10 +176,9 @@ function renderSection(
           // 🔴 «خط التأمين» -> «فرع التأمين». Decision 150 ruling 5 settled the word for the
           // nineteen DICTIONARY strings; this label is not one of them — it is hard-coded in
           // FIVE api document templates, which is why it was never in her table and is answered
-          // here instead. ⚠️ The other four (quotation comparison, invoice, policy schedule
-          // summary, recommendation report) still say «خط التأمين» and are REPORTED rather than
-          // changed: §1 of this message is the certificate, and four more customer-facing
-          // documents are hers to sweep.
+          // here instead. ✅ UPDATED 2026-11-19: the other four (quotation comparison, invoice,
+          // policy schedule summary, recommendation report) carry it too now — the owner ruled
+          // on the report this comment used to carry, so all five documents agree.
           ['فرع التأمين', escapeHtml(line)],
           ['فترة التأمين', periodRange],
           [

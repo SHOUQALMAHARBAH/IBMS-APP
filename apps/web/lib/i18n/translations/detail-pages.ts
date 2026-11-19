@@ -27,7 +27,7 @@ export const DETAIL_PAGES = {
     empdMarkComplete: 'وضع علامة مكتمل',
     empdTerminateButton: 'إنهاء الخدمة',
     empdFullValue: 'القيمة الكاملة:',
-    empdRevealReason: 'السبب (البند 10.6، 10 أحرف على الأقل)',
+    empdRevealReason: 'السبب (10 أحرف على الأقل)',
     empdActive: 'على رأس عمله',
     empdTerminatedOn: 'انتهت الخدمة في {date}',
     empdStatusLabel: 'الحالة:',
@@ -98,7 +98,7 @@ export const DETAIL_PAGES = {
     empdChecklistCompleteError: 'تعذّر إكمال القائمة.',
     empdRefusalAct: 'عرض هذا الموظف',
     empdDeprovisioningTriggered:
-      'بوشر في {at} — مستحق في يوم العمل نفسه (تصعيد خلال ٢٤ ساعة إلى إدارة تقنية المعلومات إن بقي مفتوحاً).',
+      'بوشر في {at} — مستحق في يوم العمل نفسه (تصعيد خلال 24 ساعة إلى إدارة تقنية المعلومات إن بقي مفتوحاً).',
 
     // ---- Up-sell (list + detail) ---------------------------------------------
     upsHeading: 'البيع الإضافي',

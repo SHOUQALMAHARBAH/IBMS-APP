@@ -63,6 +63,12 @@ export const POLICY = {
     endorsementNoneYet: 'لم يُسجَّل ملحق بعد.',
     endorsementCreateButton: 'طلب ملحق',
     endorsementChangeTypeLabel: 'التغيير',
+    // 🔴 DECISION 146 ruling 6-a — `EndorsementSection.tsx:273` printed the English
+    // `Premium adjustment` INSIDE the page on an Arabic-first platform. It was not a
+    // blind spot: `hardcoded-ui-english.py` reported it and held it in
+    // DECLARED_PARENTHETICALS as a string owed an Arabic word. This is that word,
+    // sliced from the decision 146 annex §٧ and never retyped.
+    endorsementPremiumAdjustmentLabel: 'فرق القسط',
     endorsementRequestHeading: 'طلب ملحق',
     endorsementTypePositive: 'إيجابي (يضيف قسط)',
     endorsementTypeNegative: 'سلبي (يُرجع قسط)',
@@ -393,6 +399,7 @@ export const POLICY = {
     endorsementCoverCeasesHint: 'The first day cover no longer applies.',
     endorsementAdvanceButton: 'Advance to insurer',
     endorsementCalculateButton: 'Calculate adjustment',
+    endorsementPremiumAdjustmentLabel: 'Premium adjustment',
     endorsementCancellationLabel: 'Cancellation',
     endorsementApplyButton: 'Apply',
     endorsementApproveRefundButton: 'Approve refund',

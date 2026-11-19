@@ -5,6 +5,7 @@ import {
   formatDocumentDate,
   formatDocumentMoney,
   formatDocumentPercent,
+  preferLanguage,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
 
@@ -23,6 +24,10 @@ import {
 
 export interface QuotationComparisonRow {
   insurerName: string;
+  /** The insurer's Arabic name, or null where none is recorded. Already resolved by
+   *  `insurerIdentity()` in the comparison VIEW — one source, both names — so the document
+   *  service reads it off the row rather than resolving it a second time. */
+  insurerNameAr: string | null;
   isCurrentVersion: boolean;
   premium: { toString(): string };
   currency: string;
@@ -92,8 +97,10 @@ function supersededTag(lang: 'en' | 'ar'): string {
 }
 
 function renderRow(row: QuotationComparisonRow, lang: 'en' | 'ar'): string {
+  // THE INSURER IN THE READER'S LANGUAGE — decision 153 §U2, applied to this document.
+  const insurer = preferLanguage(row.insurerName, row.insurerNameAr, lang);
   const cells = [
-    `${escapeHtml(row.insurerName)}${row.isCurrentVersion ? '' : supersededTag(lang)}`,
+    `${escapeHtml(insurer)}${row.isCurrentVersion ? '' : supersededTag(lang)}`,
     formatDocumentMoney(row.premium, lang, row.currency),
     formatDocumentMoney(row.deductible, lang, row.currency),
     formatDocumentMoney(row.liabilityLimit, lang, row.currency),
@@ -139,7 +146,13 @@ function renderSection(
       ? [
           ['رقم المرجع', data.comparisonId],
           ['العميل', data.customerLegalName],
-          ['خط التأمين', data.insuranceLine],
+          // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
+          //
+          // ⚠️ THE VALUE BESIDE IT IS STILL THE STORED ENGLISH LINE, reported rather than
+          // fixed: `COMPARISON_INCLUDE` selects the RFQ's `insuranceLine` STRING only — not
+          // the catalogue rows — so there is no Arabic name here to read, and giving it one
+          // is a query change that §1 of this message rules out.
+          ['فرع التأمين', data.insuranceLine],
           ['تاريخ الإعداد', formatDocumentDate(data.builtAt, 'ar')],
         ]
       : [

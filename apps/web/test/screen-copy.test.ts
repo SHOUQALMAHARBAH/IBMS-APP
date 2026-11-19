@@ -662,16 +662,26 @@ describe('owner decision 54: the truncation note still names the real scan limit
    * connects an api constant to an i18n string, and the screen renders whatever the dictionary
    * says.
    *
-   * TIED BY AN ASSERTION RATHER THAN INTERPOLATED, and the reason is the owner's digits.
-   * Interpolating would render the figure through `formatNumber`, which keeps digits WESTERN —
-   * silently overruling her «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
-   * dictionary's established convention (measured: 210 such characters across 14 files, including
-   * `dsrExtendButton`'s «١٥ يوماً»), while `formatNumber`'s Western digits are for figures
-   * rendered from DATA. So her bytes stand and this test is what keeps them true.
+   * TIED BY AN ASSERTION RATHER THAN INTERPOLATED, which is still right, though no longer for
+   * the reason first written here.
    *
-   * BOTH LANGUAGES, each against its own rendering of the same constant — the Arabic in
-   * Arabic-Indic digits, the English in Western ones with a thousands separator. A test checking
-   * only one half would pass while the other went stale.
+   * 🔴 SUPERSEDED 2026-11-19 — OWNER DECISION 146 RULING 1-أ. This paragraph used to say that
+   * Arabic-Indic numerals written INTO prose are this dictionary's established convention
+   * (measured then: 210 such characters across 14 files), and that interpolating would silently
+   * overrule her «٢٠٠٠٠» by rendering Western digits. **She reversed that**: «كل رقم مكتوب في
+   * نصوص النظام غربي» — every number written in this system's text is Western — and annex §٣
+   * names `icTruncatedNote` as row 13 of the fifty-three it applies to, with `dsrExtendButton`
+   * (the other string this paragraph cited as precedent) as row 36.
+   *
+   * ⟶ So BOTH halves assert WESTERN digits now, and the convention that made the two differ is
+   * gone. The assertion STAYS rather than becoming an interpolation, because what it guards is
+   * unchanged: no type connects an api constant to an i18n string, so if
+   * `INTERNAL_CONTROLS_SCAN_LIMIT` moves, the sentence on screen becomes false and only this
+   * test can see it. `check:eastern-digits` is what keeps the digits themselves Western.
+   *
+   * BOTH LANGUAGES still, because they render the same constant differently — the English
+   * carries a thousands separator and the Arabic does not. A test checking only one half would
+   * pass while the other went stale.
    */
   const limit = (() => {
     const source = fs.readFileSync(
@@ -696,17 +706,16 @@ describe('owner decision 54: the truncation note still names the real scan limit
   });
 
   it('both truncation notes name the limit the scan actually uses', () => {
-    const arabicIndic = String(limit).replace(/\d/g, (d) =>
-      String.fromCharCode(0x0660 + Number(d)),
-    );
     const message =
       'The truncation note on /internal-controls names a different number from ' +
       `INTERNAL_CONTROLS_SCAN_LIMIT (${String(limit)}). That note is the only thing telling a ` +
       'reader the scan was INCOMPLETE — there may be self-approval violations past the limit — ' +
       'so a wrong figure there makes a partial scan look like a measured one. Update the string ' +
-      'to match the constant (the Arabic is the OWNER\'S, decision 54: change the digits only, ' +
-      'in Arabic-Indic, and nothing else).';
-    expect(lookupOptional('AR', 'icTruncatedNote') ?? '', message).toContain(arabicIndic);
+      'to match the constant (the Arabic is the OWNER\'S, decision 54: change the digits only ' +
+      'and nothing else — in WESTERN digits, owner decision 146 ruling 1-أ).';
+    expect(lookupOptional('AR', 'icTruncatedNote') ?? '', message).toContain(
+      String(limit),
+    );
     expect(lookupOptional('EN', 'icTruncatedNote') ?? '', message).toContain(
       String(limit).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
     );

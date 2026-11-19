@@ -22,6 +22,7 @@ import {
 } from '../../../components/ui';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatMoney } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { LEAD_STATUS_LABEL_KEY } from '../../../lib/lead/lead-status';
@@ -103,7 +104,10 @@ function StatusTable({
 }
 
 export default function KpiDashboardPage() {
-  const { t } = useLanguage();
+  // 🔴 `language` ADDED — three `Stat` tiles printed the API's raw decimal string. ⚠️ The
+  // OTHER tiles on this screen are COUNTS (customers, leads, open claims) and are correct
+  // unformatted: `formatMoney` would stamp «JOD» on a number of people.
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -194,7 +198,7 @@ export default function KpiDashboardPage() {
             <div style={statRow}>
               <Stat
                 label={t('kpiTotalIssuedPremium')}
-                value={summary.policy.totalIssuedPremiumJod}
+                value={formatMoney(summary.policy.totalIssuedPremiumJod, language)}
               />
             </div>
             <div style={{ marginTop: '0.75rem' }}>
@@ -218,11 +222,17 @@ export default function KpiDashboardPage() {
             <div style={statRow}>
               <Stat
                 label={t('kpiOutstandingInvoiced')}
-                value={summary.finance.outstandingInvoicedJod}
+                value={formatMoney(
+                  summary.finance.outstandingInvoicedJod,
+                  language,
+                )}
               />
               <Stat
                 label={t('kpiCommissionThisMonth')}
-                value={summary.finance.commissionThisMonthJod}
+                value={formatMoney(
+                  summary.finance.commissionThisMonthJod,
+                  language,
+                )}
               />
             </div>
             <div style={{ marginTop: '0.75rem' }}>

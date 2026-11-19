@@ -5,8 +5,21 @@ import {
   type QuotationComparisonRow,
 } from './quotation-comparison.template';
 
+/*
+ * ⚠️ `insurerNameAr` IS NULL ON EVERY FIXTURE BELOW, DELIBERATELY.
+ *
+ * These fixtures put ARABIC TEXT in `insurerName`, which is the LATIN field — so an assertion
+ * that the Arabic render shows an Arabic name passes against a template that never consults
+ * `insurerNameAr` at all. That is the exact vacuity message 45 §2 caught in a Playwright
+ * fixture, and leaving the Arabic half null here keeps these tests exercising the FALLBACK
+ * direction (no Arabic recorded -> render the Latin name) rather than quietly proving nothing.
+ *
+ * The decision 153 §U2 test at the bottom of this file carries its own fixture, with a genuinely
+ * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
+ */
 const ROW_A: QuotationComparisonRow = {
   insurerName: 'الاتحاد للتأمين',
+  insurerNameAr: null,
   isCurrentVersion: true,
   premium: { toString: () => '1250.5' },
   currency: 'JOD',
@@ -22,6 +35,7 @@ const ROW_A: QuotationComparisonRow = {
 
 const ROW_B: QuotationComparisonRow = {
   insurerName: 'Al-Ufuq Insurance',
+  insurerNameAr: null,
   isCurrentVersion: false,
   premium: { toString: () => '1400' },
   currency: 'JOD',
@@ -134,5 +148,48 @@ describe('buildQuotationComparisonHtml', () => {
     );
     expect(html).not.toContain('<b>Evil</b> Insurance');
     expect(html).toContain('&lt;b&gt;Evil&lt;/b&gt; Insurance');
+  });
+
+  /*
+   * 🔴 DECISION 153 §U2, APPLIED TO THE FOUR DOCUMENTS THE CERTIFICATE'S FIX REPORTED.
+   *
+   * «أسماء شركات التأمين وفروع التأمين تُطبَع بالعربية حيث هي موجودة». The fixture below is
+   * NON-VACUOUS BY CONSTRUCTION: the Latin name is genuinely Latin and the Arabic one is a
+   * different string, so a template that ignored `insurerNameAr` would fail the first
+   * assertion, and one that printed Arabic into the English render would fail the last.
+   */
+  it('🔴 decision 153 §U2 — the Arabic comparison says «فرع التأمين» and names the insurer in Arabic', () => {
+    const bilingualRow: QuotationComparisonRow = {
+      ...ROW_A,
+      insurerName: 'Al-Ittihad Insurance',
+      insurerNameAr: 'الاتحاد للتأمين',
+    };
+    const data: QuotationComparisonData = {
+      ...BASE_DATA,
+      rows: [bilingualRow],
+      missingInsurers: [],
+      declinedInsurers: [],
+    };
+
+    const ar = buildQuotationComparisonHtml(data, 'AR');
+    // Decision 150 ruling 5 — the label the certificate already carries.
+    expect(ar).toContain('فرع التأمين');
+    expect(ar).not.toContain('خط التأمين');
+    // The insurer in the reader's language, and NOT the Latin name beside it.
+    expect(ar).toContain('الاتحاد للتأمين');
+    expect(ar).not.toContain('Al-Ittihad Insurance');
+
+    /*
+     * ⚠️ THE LINE IS STILL THE STORED ENGLISH STRING, AND THAT IS ASSERTED RATHER THAN
+     * LEFT UNSAID. `COMPARISON_INCLUDE` selects the RFQ's `insuranceLine` string only, so
+     * there is no Arabic line name to read here; §1 of message 49 rules out the query
+     * change that would give it one. If this ever stops being true, this line fails and
+     * whoever changed the query is told to finish the job.
+     */
+    expect(ar).toContain('Property All Risks');
+
+    const en = buildQuotationComparisonHtml(data, 'EN');
+    expect(en).toContain('Al-Ittihad Insurance');
+    expect(en).not.toContain('الاتحاد للتأمين');
   });
 });

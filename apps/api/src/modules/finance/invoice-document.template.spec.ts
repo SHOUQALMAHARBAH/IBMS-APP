@@ -4,12 +4,26 @@ import {
   type InvoiceDocumentData,
 } from './invoice-document.template';
 
+/*
+ * ⚠️ `insurerNameAr` IS NULL ON EVERY FIXTURE BELOW, DELIBERATELY.
+ *
+ * These fixtures put ARABIC TEXT in `insurerName`, which is the LATIN field — so an assertion
+ * that the Arabic render shows an Arabic name passes against a template that never consults
+ * `insurerNameAr` at all. That is the exact vacuity message 45 §2 caught in a Playwright
+ * fixture, and leaving the Arabic half null here keeps these tests exercising the FALLBACK
+ * direction (no Arabic recorded -> render the Latin name) rather than quietly proving nothing.
+ *
+ * The decision 153 §U2 test at the bottom of this file carries its own fixture, with a genuinely
+ * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
+ */
 const BASE_DATA: InvoiceDocumentData = {
   invoiceId: 'inv-123',
   customerLegalName: 'شركة الأفق للتأمين',
   policyNumber: 'POL-2026-001',
   insuranceLine: 'Property All Risks',
+  insuranceLineAr: null,
   insurerName: 'الاتحاد للتأمين',
+  insurerNameAr: null,
   invoiceDate: new Date('2026-09-01T00:00:00Z'),
   dueDate: new Date('2026-10-01T00:00:00Z'),
   premiumAmount: { toString: () => '120000' },
@@ -205,5 +219,57 @@ describe('buildInvoiceHtml', () => {
       'EN',
     );
     expect(html).toContain('JOD n/a');
+  });
+
+  /*
+   * 🔴 DECISION 153 §U2, APPLIED TO THE FOUR DOCUMENTS THE CERTIFICATE'S FIX REPORTED.
+   *
+   * «أسماء شركات التأمين وفروع التأمين تُطبَع بالعربية حيث هي موجودة». The fixture below is
+   * NON-VACUOUS BY CONSTRUCTION: the Latin name is genuinely Latin and the Arabic one is a
+   * different string, so a template that ignored `insurerNameAr` would fail the first
+   * assertion, and one that printed Arabic into the English render would fail the last.
+   */
+  it('🔴 decision 153 §U2 — the Arabic invoice says «فرع التأمين» and names the insurer and the line in Arabic', () => {
+    const data: InvoiceDocumentData = {
+      ...BASE_DATA,
+      insurerName: 'Al-Ittihad Insurance',
+      insurerNameAr: 'الاتحاد للتأمين',
+      insuranceLine: 'Property All Risks',
+      insuranceLineAr: 'التأمين على الممتلكات ضد جميع الأخطار',
+    };
+
+    const ar = buildInvoiceHtml(data, 'AR');
+    expect(ar).toContain('فرع التأمين');
+    expect(ar).not.toContain('خط التأمين');
+    expect(ar).toContain('الاتحاد للتأمين');
+    expect(ar).not.toContain('Al-Ittihad Insurance');
+    expect(ar).toContain('التأمين على الممتلكات ضد جميع الأخطار');
+    expect(ar).not.toContain('Property All Risks');
+
+    const en = buildInvoiceHtml(data, 'EN');
+    expect(en).toContain('Al-Ittihad Insurance');
+    expect(en).toContain('Property All Risks');
+    expect(en).not.toContain('الاتحاد للتأمين');
+  });
+
+  it('an invoice with no policy still renders both rows as em dashes, never blank', () => {
+    /*
+     * `Invoice.policyId` is schema-nullable. The two Latin halves were already nullable and
+     * printed «—»; the two Arabic halves must not turn that into an empty cell, which is the
+     * silent blank this repository keeps meeting.
+     */
+    const ar = buildInvoiceHtml(
+      {
+        ...BASE_DATA,
+        insurerName: null,
+        insurerNameAr: null,
+        insuranceLine: null,
+        insuranceLineAr: null,
+      },
+      'AR',
+    );
+    expect(ar).toContain('فرع التأمين');
+    expect(ar).toContain('شركة التأمين');
+    expect(ar).toContain('—');
   });
 });
