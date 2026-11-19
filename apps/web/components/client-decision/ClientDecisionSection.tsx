@@ -22,6 +22,7 @@ import type { TranslationKey } from '../../lib/i18n/translations';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { OPPORTUNITY_STATUS_LABEL_KEY } from '../../lib/opportunity/opportunity-status';
 
 interface Props {
   opportunity: OpportunityWithContext;
@@ -50,18 +51,6 @@ const ROUTE_LABEL_KEY: Record<ClientDecisionRoute, TranslationKey> = {
   RENEGOTIATE: 'cdRouteRenegotiate',
 };
 
-const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
-  NEEDS_CONFIRMED: 'oppStatusNeedsConfirmed',
-  RFQ_ISSUED: 'oppStatusRfqIssued',
-  QUOTES_RECEIVED: 'oppStatusQuotesReceived',
-  COMPARISON_BUILT: 'oppStatusComparisonBuilt',
-  RECOMMENDATION_DRAFTED: 'oppStatusRecommendationDrafted',
-  SENT_TO_CLIENT: 'oppStatusSentToClient',
-  CLIENT_DECISION: 'oppStatusClientDecision',
-  PLACEMENT: 'oppStatusPlacement',
-  RENEGOTIATE: 'oppStatusRenegotiate',
-  CLOSED_LOST: 'oppStatusClosedLost',
-};
 
 const DECISION_STATES = new Set([
   'SENT_TO_CLIENT',

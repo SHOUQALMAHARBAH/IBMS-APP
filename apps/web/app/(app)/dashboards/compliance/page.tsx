@@ -21,17 +21,42 @@ import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
+import { KYC_STATUS_LABEL_KEY } from '../../../../lib/kyc/kyc-status-labels';
+import type { TranslationKey } from '../../../../lib/i18n/translations';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
+/**
+ * 🔴 OWNER DECISION 153 §C1 — A BREAKDOWN'S KEY IS A STORED VALUE, AND IT WAS RENDERED RAW.
+ *
+ * This table printed `{key}` for all SEVEN breakdowns on this screen, so a compliance officer
+ * reading Arabic met `COMPLIANCE_REVIEW`, `denied_claim`, `ESCALATED_FULL_DPIA` and four more
+ * vocabularies' worth of machine text in a column beside Arabic headings.
+ *
+ * ⟶ Each call site now passes the vocabulary ITS keys belong to. They are seven different
+ *   vocabularies and there is no one map: KYC stages, complaint states, complaint categories,
+ *   AML pattern types, DSR states, incident states and DPIA outcomes.
+ *
+ * ⛔ AND A KEY THE MAP DOES NOT CARRY RENDERS AS STORED, never blank. That is owner decision
+ * 49's rule — visibly machine text rather than a word invented for it (decision 125) or an
+ * empty cell nobody is told about, which is decision 148's own defect: `translate()` returns
+ * `undefined` for a missing key and React renders `undefined` as NOTHING.
+ */
 function BreakdownTable({
   title,
   rows,
+  vocabulary,
 }: {
   title: string;
   rows: Record<string, number>;
+  /** The label map this breakdown's keys belong to — `ENUM_LABEL.X`, or a screen family's own
+   *  `*_LABEL_KEY`. Keyed on `string` because the key arrives over HTTP; what proves coverage
+   *  is each map's own totality, not this signature. */
+  vocabulary: Record<string, TranslationKey>;
 }) {
+  const { t } = useLanguage();
   const entries = Object.entries(rows);
   return (
     <section style={sectionStyle}>
@@ -40,7 +65,7 @@ function BreakdownTable({
         <tbody>
           {entries.map(([key, count]) => (
             <Tr key={key}>
-              <Td>{key}</Td>
+              <Td>{key in vocabulary ? t(vocabulary[key]) : key}</Td>
               <Td numeric>{count}</Td>
             </Tr>
           ))}
@@ -136,15 +161,18 @@ export default function ComplianceDashboardPage() {
           <BreakdownTable
             title={t('dcmpKycStatus')}
             rows={summary.kyc.byStatus}
+            vocabulary={KYC_STATUS_LABEL_KEY}
           />
 
           <BreakdownTable
             title={t('dcmpComplaintsByStatus')}
             rows={summary.complaints.byStatus}
+            vocabulary={ENUM_LABEL.ComplaintStatus}
           />
           <BreakdownTable
             title={t('dcmpComplaintsByCategory')}
             rows={summary.complaints.byCategory}
+            vocabulary={ENUM_LABEL.ComplaintCategory}
           />
 
           <Card title={t('dcmpExceptions')}>
@@ -185,6 +213,7 @@ export default function ComplianceDashboardPage() {
             <BreakdownTable
               title={t('dcmpAmlByPattern')}
               rows={summary.complianceExceptions.amlByPatternType}
+              vocabulary={ENUM_LABEL.TransactionMonitoringPattern}
             />
           </Card>
 
@@ -216,6 +245,7 @@ export default function ComplianceDashboardPage() {
             <BreakdownTable
               title={t('dcmpByStatus')}
               rows={summary.dsr.byStatus}
+              vocabulary={ENUM_LABEL.DsrStatus}
             />
           </Card>
 
@@ -226,6 +256,7 @@ export default function ComplianceDashboardPage() {
             <BreakdownTable
               title={t('dcmpByStatus')}
               rows={summary.breachRegister.byStatus}
+              vocabulary={ENUM_LABEL.IncidentStatus}
             />
           </Card>
 
@@ -236,6 +267,7 @@ export default function ComplianceDashboardPage() {
             <BreakdownTable
               title={t('dcmpByOutcome')}
               rows={summary.dpiaBacklog.byOutcome}
+              vocabulary={ENUM_LABEL.DpiaOutcome}
             />
           </Card>
         </>

@@ -10,7 +10,6 @@ import {
   reconcileInvoice,
   RECEIPT_METHOD_OPTIONS,
   type Invoice,
-  type InvoiceStatus,
   type ReceiptMethod,
 } from "../../lib/finance/invoice-api";
 import {
@@ -26,21 +25,11 @@ import {
 import { useLanguage } from "../../lib/i18n/language-context";
 import { formatDate, formatMoney } from "../../lib/i18n/format";
 import type { TranslationKey } from "../../lib/i18n/translations";
+import { INVOICE_STATUS_LABEL_KEY } from '../../lib/finance/invoice-status';
 
 /** The select rendered the raw snake_case token (`bank_transfer`) as its own
  *  option text. These four keys were written for exactly this and never
  *  referenced — the same defect `POLICY_STATUS_LABEL_KEY` exists to prevent. */
-/** The invoice status rendered as the raw enum token (`INVOICED`), the same
- *  defect `POLICY_STATUS_LABEL_KEY` exists to prevent: a new member of
- *  `InvoiceStatus` is now a compile error rather than a token on screen. */
-const INVOICE_STATUS_LABEL_KEY: Record<InvoiceStatus, TranslationKey> = {
-  INVOICED: "financeInvoiceStatusInvoiced",
-  COLLECTED: "financeInvoiceStatusCollected",
-  RECONCILED: "financeInvoiceStatusReconciled",
-  REMITTED: "financeInvoiceStatusRemitted",
-  EXCEPTION_RAISED: "financeInvoiceStatusExceptionRaised",
-  EXCEPTION_RESOLVED: "financeInvoiceStatusExceptionResolved",
-};
 
 const RECEIPT_METHOD_LABEL_KEY: Record<ReceiptMethod, TranslationKey> = {
   bank_transfer: "financeMethodBank",
