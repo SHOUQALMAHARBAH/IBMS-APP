@@ -100,11 +100,32 @@ async function makeUser(label: string, roleName: string): Promise<Actor> {
  * -> RFQ and none of it is what this file is about. Owned by somebody else is the ordinary case for
  * an oversight reader and the only one that proves anything — an RFQ the reader owns would be
  * admitted by ownership and would say nothing about the anchor.
+ *
+ * ## 🔴 AND THE SHORTLIST IS PART OF WHAT THIS FIXTURE HAS TO FIND — measured 2026-11-19
+ *
+ * `take: 40` with NO `orderBy` and no `where` asked Postgres for an arbitrary forty rows, and the
+ * one test here that reads the shortlist (*the fourth site of a defect fixed three times*) needs
+ * the RFQ it is handed to HAVE shortlisted insurers. That precondition was never in the selection
+ * criterion, so whether it held was a coin toss over whatever window the planner returned.
+ *
+ * **Measured: 142 of 1703 RFQs on db-test — 8.3% — carry ZERO shortlisted insurers** (dev: 0 of
+ * 119, which is why this never failed here). CI drew the losing side on `85fcb23e`: **1 failed of
+ * 1055**, on a tree byte-identical to one already proven green apart from a `ci.yml` line.
+ *
+ * ⟶ So the requirement is STATED rather than hoped for, and the read is made deterministic. A
+ *   `where` that names what the test needs is the fix; an `orderBy` is what stops the window
+ *   drifting under a cumulative database.
+ *
+ * ⛔ AND THE NON-VACUITY GUARD STAYS. It is what turned this into a red run instead of a `for`
+ *   loop over nothing printing a confident green over its own subject — which is the shape this
+ *   repository keeps catching. A fixture can be re-broken; the guard is what says so.
  */
 async function twoRfqsOnDifferentCustomers(): Promise<
   { rfqId: string; customerId: string }[]
 > {
   const rfqs = await prisma.rFQ.findMany({
+    where: { insurerSubmissions: { some: {} } },
+    orderBy: { id: 'asc' },
     select: { id: true, opportunityId: true },
     take: 40,
   });
@@ -121,7 +142,7 @@ async function twoRfqsOnDifferentCustomers(): Promise<
     if (found.length === 2) return found;
   }
   throw new Error(
-    'db-test needs two RFQs on two different customers for this file; found ' +
+    'db-test needs two RFQs WITH shortlisted insurers on two different customers for this file; found ' +
       String(found.length),
   );
 }
