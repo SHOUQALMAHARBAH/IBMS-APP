@@ -450,7 +450,57 @@ describe('OWNER DECISION 134 — both ratified strings, byte for byte', () => {
     return match![1];
   }
 
+  /**
+   * 🔴 COMPOSED WITH OWNER DECISION 144 §١, 2026-11-19.
+   *
+   * Decision 134's row was written before decision 144 corrected «طلب عرض سعر» ⟶ «طلب عرض
+   * أسعار», and `declared-act.article-15-d.declare` is ROW ONE of that correction table — the
+   * very code this block pins. Her 144 annex is explicit that only the third column moves:
+   * «يتغيّر ما في العمود الثالث وحده. لا تتغيّر كلمة أخرى في أي شرح».
+   *
+   * ⟶ So decision 144's span is applied TO decision 134's text at comparison time. ⛔ Her
+   *   paper is not edited, and ⛔ the hash-style pin is not weakened: this is one declared
+   *   substitution, sliced from the 144 annex, and any OTHER drift still fails by name.
+   *
+   * ⚠️ AND IT IS NOT THE SAME AS `rfqNewRefusalAct`, which KEEPS «طلب عرض سعر» as decision
+   * 150's struck exception. That one is a screen's act phrase; this is a permission
+   * description, and decision 144 §١ names this code and not that key.
+   */
+  function correction144(): { was: string; became: string } {
+    const annex = join(
+      __dirname, '..', '..', '..', '..',
+      'docs', 'decision-144-ratified-strings.md',
+    );
+    const row = readFileSync(annex, 'utf8')
+      // `/\r?\n/`, matching `ratified()` above: both annexes are LF today, and a
+      // CRLF checkout would otherwise leave a trailing carriage return on every row
+      // and silently match nothing.
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('|'))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
+      .find((cells) => cells.length === 3 &&
+        cells[0] === '`declared-act.article-15-d.declare`');
+    expect(
+      row,
+      'decision 144 annex §١ has no row for declared-act.article-15-d.declare — the slice ' +
+        'source moved, and without it the comparison below would assert the PRE-144 text.',
+    ).toBeDefined();
+    return { was: row![1], became: row![2] };
+  }
+
   it("the declaration permission says exactly what she wrote", () => {
+    const { was, became } = correction144();
+    const d134 = ratified('شرح الصلاحية `declared-act.article-15-d.declare`');
+
+    // The non-vacuity floor for the composition: if decision 134's row stopped carrying the
+    // span decision 144 corrects, this would silently become an identity substitution and go
+    // back to asserting the pre-144 text — the direction that passes while being wrong.
+    expect(
+      d134.includes(was),
+      `decision 134's row no longer contains «${was}», so decision 144 §١'s correction has ` +
+        'nothing to apply to. Re-read both papers before changing this.',
+    ).toBe(true);
+
     expect(
       PERMISSIONS.AR[
         permissionDescriptionKey(
@@ -458,9 +508,10 @@ describe('OWNER DECISION 134 — both ratified strings, byte for byte', () => {
         ) as keyof typeof PERMISSIONS.AR
       ],
       "the Arabic for declared-act.article-15-d.declare is not byte-identical to OWNER DECISION " +
-        "134's table. It is HER sentence and it replaced an agent-composed one: re-slice it from " +
-        'docs/decision-134-two-words-ratified.md rather than editing it here.',
-    ).toBe(ratified('شرح الصلاحية `declared-act.article-15-d.declare`'));
+        "134's table with OWNER DECISION 144 §١'s single-span correction applied. Both are HERS: " +
+        're-slice from docs/decision-134-two-words-ratified.md and ' +
+        'docs/decision-144-ratified-strings.md rather than editing it here.',
+    ).toBe(d134.replace(was, became));
   });
 
   it('the dismiss button carries her label, not a word of ours', () => {

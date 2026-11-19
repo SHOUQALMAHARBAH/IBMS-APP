@@ -1,0 +1,14 @@
+{
+  "description-back-to-the-old-span": {
+    "file": "apps/web/lib/i18n/translations/permissions.ts",
+    "from": "    'perm:rfq.create': 'يُنشئ طلب عرض أسعار ويختار الشركات المرشَّحة له',",
+    "to": "    'perm:rfq.create': 'يُنشئ طلب تسعير ويختار الشركات المرشَّحة له',",
+    "why": "Owner decision 144 §١ corrects «طلب تسعير» to «طلب عرض أسعار» in fourteen permission descriptions. `decision-144-146.descriptions.test.ts` re-slices the annex at test time and checks BOTH directions — the new span present AND the old one gone — so reverting one row must kill it by name."
+  },
+  "struck-exception-aligned-against-her-ruling": {
+    "file": "apps/web/lib/i18n/translations/rfq.ts",
+    "from": "إنشاء طلب عرض سعر",
+    "to": "إنشاء طلب عرض أسعار",
+    "why": "⛔ `rfqNewRefusalAct` is decision 150's STRUCK EXCEPTION: the owner was shown that it contradicts decision 144's correction ON THE SAME SCREEN and ruled it so knowing. 'Finishing the sweep' into it must fail — this is the plant that proves nobody can tidy it away silently."
+  }
+}
