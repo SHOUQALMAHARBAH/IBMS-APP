@@ -122,6 +122,21 @@ export interface IssuanceStamp {
   /** The term the office was PAST THE EXPIRY OF when this was issued, or null — which is the
    *  ordinary case and means «issued under a licence that was simply in force». */
   issuedUnderStudyLicenseId: string | null;
+  /**
+   * 🔴 OWNER DECISION 153 RULING 2 — the CBJ licence number of the term in force at this
+   * instant, for the certificate that prints it.
+   *
+   * ⛔ CARRIED FROM THE SAME READ rather than fetched again, for the reason the comment on
+   * `standingWithTerm` already gives about the id beside it: asking the licence a second time
+   * asks at a second INSTANT, and a certificate issued in between would name a term the office
+   * had already left. One read, one instant, one answer.
+   *
+   * ⚠️ Null ONLY where there is no term at all — which `deriveLicenseStanding` answers
+   * `NO_TERM_ON_RECORD` / `mayPractise: false` for, and `assertMayPractise` throws on three
+   * lines below. So every caller that receives a stamp receives a number; the type is nullable
+   * because TypeScript cannot see that refusal, not because the case is reachable.
+   */
+  currentLicenseNumber: string | null;
 }
 
 @Injectable()
@@ -160,6 +175,8 @@ export class LicenseGateService {
   private async standingWithTerm(now: Date = new Date()): Promise<{
     standing: DerivedLicenseStanding;
     currentTermId: string | null;
+    /** OWNER DECISION 153 RULING 2 — the same term's licence number, from the SAME read. */
+    currentLicenseNumber: string | null;
   }> {
     // THREE READS, ONE ROUND TRIP, ONE INSTANT. The legal figures join the terms and the acts
     // rather than being fetched inside the derivation: OWNER DECISION 123 made art. 11's span and
@@ -203,7 +220,11 @@ export class LicenseGateService {
       now,
       figures,
     );
-    return { standing, currentTermId: current?.id ?? null };
+    return {
+      standing,
+      currentTermId: current?.id ?? null,
+      currentLicenseNumber: current?.licenseNumber ?? null,
+    };
   }
 
   /**
@@ -227,7 +248,8 @@ export class LicenseGateService {
     branch: InsuranceBranchSource,
     now: Date = new Date(),
   ): Promise<IssuanceStamp> {
-    const { standing, currentTermId } = await this.standingWithTerm(now);
+    const { standing, currentTermId, currentLicenseNumber } =
+      await this.standingWithTerm(now);
     if (!standing.mayPractise) {
       throw new UnprocessableEntityException(refusal(act, standing));
     }
@@ -250,6 +272,10 @@ export class LicenseGateService {
         standing.renewalUnderStudy.state === 'UNDER_STUDY'
           ? currentTermId
           : null,
+      // OWNER DECISION 153 RULING 2 — unconditional, unlike the stamp above: the certificate
+      // names the licence it was issued under whatever state that licence is in, and the only
+      // state with no number is the one `mayPractise` already refused.
+      currentLicenseNumber,
     };
     if (standing.blockedInsuranceBranchKeys.length === 0) return stamp;
 

@@ -111,7 +111,26 @@ describe('item 3: an insurer has ONE name precedence and every document reads it
     const offenders: string[] = [];
     for (const [rel, reader] of Object.entries(OUTWARD_DOCUMENTS)) {
       const source = stripComments(readFileSync(join(API_SRC, rel), 'utf8'));
-      if (!/\b(insurerName|resolveInsurerName)\s*\(/.test(source)) {
+      /*
+       * ⚠️ `resolveInsurerNamePair` ADDED 2026-11-19, and it is a WIDENING of the accepted
+       * callers rather than of the rule.
+       *
+       * Decision 153 §U2 made the certificate bilingual, and a document that prints the
+       * insurer's name in the reader's language needs BOTH halves — so it calls
+       * `resolveInsurerNamePair`, which picks ONE SOURCE and reads both names from it. Its Latin
+       * half goes through `resolveInsurerName`, the same function `insurerName` delegates to, so
+       * this is the one precedence reached by its bilingual door and not a second answer.
+       *
+       * ⛔ The rule itself is untouched: a document that reads `insurerMaster.legalName` or any
+       * other name field DIRECTLY is still an offender, and the test below — *NOTHING outside
+       * insurer-identity.ts spells the precedence itself* — is what actually catches that, which
+       * is why widening here costs nothing.
+       */
+      if (
+        !/\b(insurerName|resolveInsurerName|resolveInsurerNamePair)\s*\(/.test(
+          source,
+        )
+      ) {
         offenders.push(`${rel} — read by ${reader}`);
       }
     }
@@ -120,8 +139,9 @@ describe('item 3: an insurer has ONE name precedence and every document reads it
       'A document that LEAVES THE OFFICE no longer resolves the insurer name through ' +
         '`insurerName`. Those five are the ones where getting this wrong reaches somebody ' +
         "outside the brokerage: the name on the paper would not be the name on the company's " +
-        'licence. Call `insurerName(insurer)` — it delegates to the one precedence in ' +
-        '`insurer-identity.ts` — rather than reading a name field directly.',
+        'licence. Call `insurerName(insurer)` — or `resolveInsurerNamePair(insurer)` where the ' +
+        'document prints the name in the reader’s language — rather than reading a name field ' +
+        'directly; both reach the one precedence in `insurer-identity.ts`.',
     ).toEqual([]);
   });
 

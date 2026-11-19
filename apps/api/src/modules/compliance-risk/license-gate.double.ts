@@ -50,9 +50,21 @@ export function licensedOffice(): LicenseGateService {
     standing: () => Promise.resolve(standing),
     /* OWNER DECISION 128 — a licensed office issues UNSTAMPED, which is the ordinary case.
        Returning `undefined` here would crash every caller that destructures the stamp, so the
-       double returns the real shape rather than a convenient nothing. */
+       double returns the real shape rather than a convenient nothing.
+
+       🔴 AND `currentLicenseNumber` IS A STRING HERE, NOT NULL — decision 153 ruling 2, 2026-11-19.
+       This object is cast `as unknown as LicenseGateService` below, so the COMPILER cannot catch
+       a field missing from it; a double that fell behind `IssuanceStamp` would hand every caller
+       `undefined` and, on the certificate, would silently drop the licence line the ruling adds.
+       Null would be no better: an office that MAY PRACTISE always has a term, because the state
+       with no term refuses, so a licensed double answering null is a state the product cannot be
+       in. The value is obviously synthetic on purpose — a test reading it should know where it
+       came from. */
     assertMayPractise: () =>
-      Promise.resolve({ issuedUnderStudyLicenseId: null }),
+      Promise.resolve({
+        issuedUnderStudyLicenseId: null,
+        currentLicenseNumber: 'CBJ-DOUBLE-LICENSED',
+      }),
   } as unknown as LicenseGateService;
 }
 

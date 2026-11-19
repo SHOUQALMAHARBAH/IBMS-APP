@@ -6,12 +6,59 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildCertificateOfInsuranceHtml } from './certificate-of-insurance.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { insurerName } from '../../repositories/insurer-identity';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
 import { createHash } from 'node:crypto';
 import { DocumentRepository } from '../../repositories/document.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 
 const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
+
+/**
+ * 🔴 OWNER DECISION 153 RULING 1 — THE FILE NAME CARRIES THE POLICY NUMBER, NOT THE uuid.
+ *
+ * The walk downloaded `certificate-of-insurance-ced189b0-6b28-4265-828b-9f1fdf0e9785-AR.pdf`.
+ * Her §٦ criterion 2 is «ولا تحمل رقماً داخلياً», and a file name is part of what the customer
+ * receives — it is what the document is called on their desk.
+ *
+ * ## 🔴 AND SANITISING IT IS LOAD-BEARING, NOT TIDINESS
+ *
+ * The caller places this straight into an HTTP header — `disposition: attachment;
+ * filename="${fileName}"` (`policy.controller.ts:134`). The uuid it used to carry could not
+ * contain a quote or a newline; `policyNumber` is FREE TEXT, 2–120 characters, trimmed, with **no
+ * character restriction whatever** (`record-policy-issuance.dto.ts:58-63` — `@IsString`,
+ * `@MinLength(2)`, `@MaxLength(120)` and nothing else). So an office typing `2026/014` would put
+ * a path separator in a file name, and one typing a quote or a CR would break the header.
+ *
+ * ⟶ Measured before being treated as a hazard: **0 of 805 policy numbers across both databases
+ *   contain a character outside `[A-Za-z0-9._-]`** (dev 99, db-test 706; longest 31). So nothing
+ *   in the product writes one today — and the sanitiser is what keeps that true of a real office
+ *   rather than of a seed.
+ *
+ * ## AND WHERE THERE IS NO NUMBER, THE SEGMENT IS SIMPLY ABSENT
+ *
+ * `Policy.policyNumber` is nullable in the schema, so this has to answer. ⛔ It does NOT fall
+ * back to the uuid — that is the thing being removed — and ⛔ it does not invent a token, which
+ * would be a word nobody ratified. The segment is omitted and the policy's own id still keys the
+ * stored row (`storeIssuedCertificate` matches on `policyId` + file name + facts digest), so two
+ * policies can never collide on it.
+ *
+ * ⚠️ MEASURED: the branch is unreachable on a path that produces a certificate. 0 of 99
+ * certifiable policies on dev and 0 of 674 on db-test lack a number — a policy with no schedule
+ * or a CANCELLED/EXPIRED one is refused 422 above, and every policy that survives that has one.
+ * The 509 db-test policies without a number are all in the refused set.
+ */
+export function certificateFileName(
+  policyNumber: string | null,
+  language: DocumentLanguage,
+): string {
+  const safe = (policyNumber ?? '').replace(/[^A-Za-z0-9._-]+/g, '-');
+  const trimmed = safe.replace(/^-+|-+$/g, '');
+  return trimmed
+    ? `certificate-of-insurance-${trimmed}-${language}.pdf`
+    : `certificate-of-insurance-${language}.pdf`;
+}
 
 /*
  * 🔴 OWNER DECISION 136(أ) — THE RENEWAL STAMP IS NEVER PRINTED ON THIS DOCUMENT, AND THAT IS A
@@ -102,6 +149,16 @@ export class CertificateOfInsuranceDocumentService {
     private readonly licenseGate: LicenseGateService,
     /** OWNER DECISION 142 — where the issued certificate is stored. */
     private readonly documents: DocumentRepository,
+    /**
+     * 🔴 OWNER DECISION 153 RULING 2 — the issuing office's own name, for the certificate to
+     * carry.
+     *
+     * `Organization` is the tenant rather than a tenant-scoped model, so `tenantScopeExtension`
+     * does not filter this read — which is why it is addressed by `actor.organizationId` and
+     * never by anything a caller can influence. The policy itself is tenant-scoped, so the
+     * office holding it and the caller's own office are the same office.
+     */
+    private readonly organizations: OrganizationRepository,
   ) {}
 
   async generate(
@@ -191,15 +248,54 @@ export class CertificateOfInsuranceDocumentService {
     const language: DocumentLanguage =
       requestedLanguage ?? customer.languagePreference;
 
+    /*
+     * 🔴 OWNER DECISION 153 RULING 2 — WHO ISSUED THIS.
+     *
+     * The office name comes from the tenant registry; the licence number comes from the STAMP,
+     * which the licence gate already decided above at the instant the act was permitted. ⛔ The
+     * licence is NOT read again here: that would ask at a second instant, and a certificate
+     * issued between the two reads would name a term the office had already left — the same
+     * argument `standingWithTerm`'s own comment makes about the id beside it.
+     */
+    const office = await this.organizations.findById(actor.organizationId);
+    if (!office) {
+      // Unreachable through the API: the caller's session resolves its Organization before any
+      // handler runs (`JwtStrategy` rejects a token whose claim disagrees with its session), so
+      // an authenticated actor whose office does not exist is not a state this product can be
+      // in. Thrown rather than rendered with a blank issuer: a certificate that names no office
+      // is the defect decision 153 ruling 2 exists to end, and silently producing one again
+      // would be worse than refusing.
+      throw new UnprocessableEntityException(
+        `The issuing office could not be read, so a certificate naming it cannot be produced.`,
+      );
+    }
+
+    /*
+     * THE INSURER'S AND THE LINE'S ARABIC NAMES, each from the ONE place that resolves it.
+     *
+     * `resolveInsurerNamePair` picks a SOURCE and reads BOTH names from it — ⛔ never coalesced
+     * field by field, which once rendered the catalogue's Latin name beside the office's own
+     * Arabic one. `insuranceLineNameAr` reads the catalogue join the policy already carries
+     * (`POLICY_INCLUDE` selects both), so no query changed here.
+     *
+     * ⚠️ `policy.insurerId` remains the fallback for a policy with no insurer row, exactly as
+     * before, and it has no Arabic — an id is not a name in either language.
+     */
+    const insurerPair = policy.insurer
+      ? resolveInsurerNamePair(policy.insurer)
+      : { name: policy.insurerId, nameAr: null };
+
     const html = buildCertificateOfInsuranceHtml(
       {
-        policyId: policy.id,
         customerLegalName: customer.legalName,
-        insurerName: policy.insurer
-          ? insurerName(policy.insurer)
-          : policy.insurerId,
+        insurerName: insurerPair.name,
+        insurerNameAr: insurerPair.nameAr,
         policyNumber: policy.policyNumber,
         insuranceLine: policy.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(policy),
+        officeLegalName: office.legalName,
+        officeLegalNameAr: office.legalNameAr,
+        brokerLicenseNumber: stamp.currentLicenseNumber,
         inceptionDate: policy.inceptionDate,
         expiryDate: policy.expiryDate,
         currency: policy.currency,
@@ -244,8 +340,22 @@ export class CertificateOfInsuranceDocumentService {
      * certificate issued after an endorsement a SECOND stored copy rather than a silent match.
      *
      * It is also simply truer: both downloads used to arrive called the same thing.
+     *
+     * ⚠️ CORRECTED AGAIN 2026-11-19 (decision 153 ruling 1): the name carried the POLICY'S uuid
+     * and now carries its NUMBER — see `certificateFileName` above for why sanitising it is
+     * load-bearing rather than tidy. The language stays, for the reason this comment already
+     * gives.
+     *
+     * 🔴 AND THIS MOVES THE STORAGE KEY, WHICH IS DECISION 149 WORKING RATHER THAN A DEFECT.
+     * `storeIssuedCertificate` matches on (policy, file name, facts digest) and ALL THREE move
+     * here — the name, and the digest, because the rendered HTML now carries the office and the
+     * Arabic names. So the first certificate downloaded after this ships does not match the one
+     * stored before it and is stored BESIDE it, which is «بجانب القديمة» exactly. ⚠️ It opens a
+     * new version CHAIN rather than extending the old one, because the chain is keyed on
+     * (policy, file name) and the name is part of what changed; the old row is untouched and
+     * `deletionLocked`, so nothing is lost.
      */
-    const fileName = `certificate-of-insurance-${policy.id}-${language}.pdf`;
+    const fileName = certificateFileName(policy.policyNumber, language);
 
     /*
      * 🔴 OWNER DECISION 142 — STORED, AND STORED BEFORE IT IS HANDED OVER.

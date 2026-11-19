@@ -328,7 +328,14 @@ export class EndorsementService {
     /* 🔴 OWNER DECISION 128 — the stamp, and it is null for a NEGATIVE endorsement by
        construction: the gate does not run on one, because reducing cover continues in all
        three states and is not an issuance act. */
-    let stamp: IssuanceStamp = { issuedUnderStudyLicenseId: null };
+    /* `currentLicenseNumber` is null here for the same reason and with the same meaning: the
+       gate never ran, so nothing was read, and this path writes no certificate that would print
+       it. ⛔ It is not filled in with a read of its own — a number nobody asked for, taken at an
+       instant no act happened at, is worse than its absence. */
+    let stamp: IssuanceStamp = {
+      issuedUnderStudyLicenseId: null,
+      currentLicenseNumber: null,
+    };
     if (dto.type === 'POSITIVE') {
       stamp = await this.licenseGate.assertMayPractise('INCREASE_COVER', () =>
         // Art. 21/b/5 — LAZY, so it costs no extra query unless the office has a partial
