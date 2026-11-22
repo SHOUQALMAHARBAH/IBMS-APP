@@ -60,7 +60,7 @@ export const COMPLIANCE_SCREENING = {
       'أسنِد الملف وابدأ المراجعة قبل تسجيل القرار — قرار على ملف لم يفتحه أحد ليس مراجعة.',
     smCaseActionFailed: 'تعذّر تنفيذ الإجراء على الملف — حاول مرة أخرى.',
     smCaseNoReviewers:
-      'لا يوجد مستخدم نشط يملك صلاحية sanctions-pep.screen غيرك، فلا أحد يمكن الإسناد إليه.',
+      'لا يوجد مستخدم نشط يملك صلاحية «فحص العقوبات» غيرك، فلا أحد يمكن الإسناد إليه.',
     smComplianceOfficerOnly: 'مسؤول الالتزام فقط',
     smReviewReasonAria: 'سبب المراجعة لـ {name}',
     slapRefusalAct: 'عرض سياسات مستويات الخدمة',

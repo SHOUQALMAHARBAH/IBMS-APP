@@ -146,20 +146,20 @@ export const COMMON = {
     // «مسؤول المكتب» would be a sentence that can be false in any given office. The code goes in the
     // parenthetical, never in the sentence. See lib/i18n/permission-refusal.ts.
     permissionRefusal:
-      'ليست لديك صلاحية {act} — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+      'ليست لديك صلاحية {act} — اطلبها ممن يدير الصلاحيات في مكتبك. ({name})',
     // أي واحدة — a ROUTE guard, which ORs its codes (`required.some`).
     permissionRefusalAnyOf:
-      'ليست لديك صلاحية {act}، وتكفي أي واحدة من هذه الصلاحيات — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+      'ليست لديك صلاحية {act}، وتكفي أي واحدة من هذه الصلاحيات — اطلبها ممن يدير الصلاحيات في مكتبك. ({name})',
     // كلها — a SCREEN that loads several endpoints together and closes if any one of them refuses.
     permissionRefusalAllOf:
-      'ليست لديك صلاحية {act}، وهي تحتاج إلى هذه الصلاحيات كلها — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+      'ليست لديك صلاحية {act}، وهي تحتاج إلى هذه الصلاحيات كلها — اطلبها ممن يدير الصلاحيات في مكتبك. ({name})',
     // THE SECOND SHAPE — a reader who is partially enabled rather than refused. Keeps the half that says
     // what still works, and adds the grantor the eight originals all lacked.
     reducedCapability:
-      'يمكنك {can}، لكن لا يمكنك {cannot} — اطلب ذلك ممن يدير الصلاحيات في مكتبك. ({code})',
+      'يمكنك {can}، لكن لا يمكنك {cannot} — اطلب ذلك ممن يدير الصلاحيات في مكتبك. ({name})',
     // An action that FAILED where a missing grant is the likely cause, not a certainty.
     permissionMayBeMissing:
-      'تعذّر {act} — قد لا تكون لديك الصلاحية اللازمة. اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+      'تعذّر {act} — قد لا تكون لديك الصلاحية اللازمة. اطلبها ممن يدير الصلاحيات في مكتبك. ({name})',
     // Rendered by app/(app)/layout.tsx above EVERY authenticated screen while no authenticator is
     // paired. Without it the first sign-in lands on a home page whose every link answers 403, and
     // nothing on screen connects that to enrolment.

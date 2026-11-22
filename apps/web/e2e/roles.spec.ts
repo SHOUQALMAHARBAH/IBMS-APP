@@ -1331,7 +1331,9 @@ test('OWNER DECISION 134 — the create form shows the mark and no dismiss butto
 
   await page.goto('/settings/roles');
   const create = page.locator('[data-permission-matrix]').first();
-  await create.locator('details[data-module="compliance-risk"] summary').click();
+  await create
+    .locator('details[data-module="compliance-risk"] summary')
+    .click();
 
   // The mark IS shown: knowing a code is new is reading, and the create form is where a new role
   // most needs it. Non-vacuity for the assertion below — without this the absence proves nothing.
@@ -1341,4 +1343,86 @@ test('OWNER DECISION 134 — the create form shows the mark and no dismiss butto
   await expect(
     create.locator('[data-dismiss-new="incident.classify"]'),
   ).toHaveCount(0);
+});
+
+/*
+ * 🔴 OWNER DECISION 127 — NO PERMISSION CODE REACHES AN ARABIC READER.
+ *
+ * «ما في رمز صلاحية يظهر للمستخدم في أي شاشة أو رسالة: لكل صلاحية اسم عربي قصير صريح مقتطَع من
+ * شرحها.» The matrix was a wall of dotted machine identifiers, and the demo's whole point is an
+ * office manager granting a permission in front of the people who will have to use it.
+ *
+ * Asserted as an ABSENCE over the matrix's own rendered text, ANCHORED twice — the matrix must be
+ * visible and it must have rows — because an absence over a scope that never rendered is
+ * trivially true, which is how this class of test passes against the defect it names.
+ */
+test('the Arabic matrix renders names, and not one permission code', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR'], 'AR');
+  await mockRoles(page);
+  await page.goto('/settings/roles');
+
+  const matrix = page.locator('form [data-permission-matrix]');
+  await expect(matrix).toBeVisible();
+
+  // Open every module: a collapsed matrix hides the very rows this test is about.
+  const modules = matrix.locator('details[data-module]');
+  await expect(modules).not.toHaveCount(0);
+  for (const detail of await modules.all()) {
+    await detail.locator('summary').click();
+  }
+  const rows = matrix.locator('[data-code], [data-crud-family]');
+  await expect(rows).not.toHaveCount(0);
+
+  // The NAME is there — «المطالبات · عرض» is `claim.read`, which the fixture renders as a toggle
+  // because `claim.register` is not a CRUD verb, so its name comes from its family.
+  await expect(matrix).toContainText('المطالبات · عرض');
+
+  // And no code is. Read from the rendered text rather than from a locator, so a code appearing
+  // anywhere in the matrix — a label, a heading, a description — fails this.
+  const shown = (await matrix.innerText()).trim();
+  expect(shown.length).toBeGreaterThan(0);
+  for (const code of [
+    'claim.read',
+    'claim.register',
+    'incident.classify',
+    'incident.classification.co-sign',
+  ]) {
+    expect(shown, `the Arabic matrix renders the code ${code}`).not.toContain(
+      code,
+    );
+  }
+});
+
+/*
+ * The search had to move with the names. It matched the CODE alone, so on an Arabic screen full of
+ * Arabic an administrator typing an Arabic word would have found nothing — a search over text that
+ * is no longer on the page.
+ */
+test('the Arabic search finds a row by a word from its name', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR'], 'AR');
+  await mockRoles(page);
+  await page.goto('/settings/roles');
+
+  const matrix = page.locator('form [data-permission-matrix]');
+  await expect(matrix).toBeVisible();
+
+  // «المطالبات» is the `claim` family's ratified name (annex 144 §٢). Typing it finds the row,
+  // which the old code-only search could not do.
+  await matrix.locator('[data-matrix-search]').fill('المطالبات');
+  await expect(matrix.locator('input[data-code="claim.read"]')).toBeVisible();
+
+  // The code stays matchable: it is what a support conversation names, and keeping the haystack
+  // wider than the page costs nothing.
+  await matrix.locator('[data-matrix-search]').fill('incident.classify');
+  await expect(
+    matrix.locator('input[data-code="incident.classify"]'),
+  ).toBeVisible();
+
+  // And a word that is in neither still finds nothing, so the search is not matching everything.
+  await matrix.locator('[data-matrix-search]').fill('zzz-nothing-matches');
+  await expect(matrix.getByRole('status')).toBeVisible();
 });

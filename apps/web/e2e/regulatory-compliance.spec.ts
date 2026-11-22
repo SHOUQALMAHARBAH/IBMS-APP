@@ -571,8 +571,11 @@ test('the licence scope shows derived TYPES and its branches', async ({
   await expect(page.locator('[data-licence-branches]')).toContainText(
     'Motor comprehensive',
   );
+  // OWNER DECISION 156 ruling 1 — the capital cells go through `formatMoney`, the one money
+  // format message 49 settled. This asserted the RAW decimal `5000.000`, which cannot survive
+  // the currency prefix or the grouping comma.
   await expect(page.locator('[data-required-capital]')).toContainText(
-    '5000.000',
+    'JOD 5,000.000',
   );
 });
 

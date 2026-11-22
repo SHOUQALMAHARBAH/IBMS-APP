@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { permissionsForRoles } from './fixtures/role-permissions';
+import { expectAbsentWithin } from './support/anchored';
 
 /*
  * THE REFUSAL SENTENCE, PROVEN AGAINST THE REAL SCREENS.
@@ -147,9 +148,23 @@ test('the Arabic refusal is the Arabic sentence, not a translated English one', 
   await expect(
     page.getByText('اطلبها ممن يدير الصلاحيات في مكتبك', { exact: false }),
   ).toBeVisible();
+  /*
+   * 🔴 OWNER DECISION 127 — THE PARENTHETICAL NAMES THE PERMISSION NOW, IT DOES NOT SPELL ITS CODE.
+   *
+   * `payment-channel.read` is one of the 59 codes a FAMILY row covers, so its name is composed as
+   * «اسم العائلة · الفعل» from annex 144 §٢ and the matrix's own verb word — which is what §٤ of
+   * that annex means by «كما تُعرَض في المصفوفة».
+   *
+   * BOTH DIRECTIONS, because the presence check alone would pass against a sentence carrying the
+   * name AND the code. The absence is anchored on the act above already being visible, so it
+   * cannot pass on a page that never rendered.
+   */
   await expect(
-    page.getByText('(payment-channel.read)', { exact: false }),
+    page.getByText('(وسائل الدفع المعتمَدة · عرض)', { exact: false }),
   ).toBeVisible();
+  await expectAbsentWithin(page.locator('main'), (scope) =>
+    scope.getByText('payment-channel.read', { exact: false }),
+  );
   // And no English leaked into the Arabic rendering — anchored on the Arabic act above.
   await expect(
     page.getByText('ask whoever manages', { exact: false }),

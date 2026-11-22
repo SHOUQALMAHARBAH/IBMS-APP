@@ -17,7 +17,11 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { formatMoney } from '../../../../lib/i18n/format';
+import {
+  formatDate,
+  formatMoney,
+  formatPeriodLabel,
+} from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
@@ -122,7 +126,11 @@ export default function ExecutiveDashboardPage() {
           label={t('execBranchId')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+          }}
         >
           {t('execInsuranceLine')}
           <input
@@ -131,7 +139,11 @@ export default function ExecutiveDashboardPage() {
           />
         </label>
         <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+          }}
         >
           <label htmlFor="exec-as-of">{t('execAsOf')}</label>
           <input
@@ -147,16 +159,14 @@ export default function ExecutiveDashboardPage() {
         <button type="submit">{t('execApplyFilters')}</button>
       </form>
 
-      {loadError ? (
-        <ErrorState title={loadError} />
-      ) : null}
+      {loadError ? <ErrorState title={loadError} /> : null}
 
       {summary && h ? (
         <>
           <p style={{ color: 'var(--ink-secondary)' }}>
             {t('execPeriodAsOf', {
-              period: summary.periodLabel,
-              asOf: summary.asOf.slice(0, 10),
+              period: formatPeriodLabel(summary.periodLabel, language),
+              asOf: formatDate(summary.asOf, language),
             })}
           </p>
 

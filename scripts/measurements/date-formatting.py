@@ -36,12 +36,59 @@ import re
 import subprocess
 import sys
 
+# This gate's self-test prints ⛔ beside its non-findings, and Windows hands Python a cp1252
+# stdout which raises UnicodeEncodeError on the first such character. CI is Linux and defaults
+# to UTF-8, so the crash appears ONLY on the machine the gate is developed on — green in CI,
+# broken locally, which is the worst direction. Same device as `eastern-digits.py`.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCANNED = os.path.join("apps", "web")
 HOME = os.path.join("apps", "web", "lib", "i18n", "format.ts")
 EXCLUDED_DIR = os.path.join("apps", "web", "e2e") + os.sep
 
 CALL = re.compile(r"\.toLocale(?:Date|Time)?String\s*\(")
+
+#: 🔴 THE SECOND SHAPE — OWNER DECISION 156 RULING 1 (message 50).
+#:
+#: `toLocaleDateString` was never the only way to write a date by hand. The dashboards and the
+#: licence screen CUT THE CHARACTERS out of the ISO string the api sent — `.slice(0, 10)` for a
+#: day and `.replace('T', ' ').slice(0, 16)` for a stamp — so twenty-odd dates rendered
+#: «2026-11-19» while every other screen rendered «19/11/2026». That is invisible to `CALL`:
+#: there is no locale and no formatter on the line at all.
+#:
+#: ⚠️ AND IT IS NOT ONLY A SECOND SHAPE, IT IS A SECOND DAY. A slice prints the UTC day, and
+#: Amman is UTC+3 — measured, `2026-11-20T01:30:00Z` slices to «2026-11-19» while Amman is
+#: already on the 20th.
+SLICED = re.compile(r"\.slice\(\s*0\s*,\s*(?:10|16)\s*\)|\.replace\(\s*['\"]T['\"]")
+
+#: ⛔ WHERE THE SLICE IS CORRECT, AND IT IS A REAL CASE RATHER THAN AN AMNESTY.
+#:
+#: `<input type="date">` requires exactly `YYYY-MM-DD`; handing it a formatted date gives an
+#: empty control. Two lines on the licence screen feed one, and both are SETTERS rather than
+#: renders — so the exemption is keyed on the assignment, not on the file.
+INPUT_FEEDER = re.compile(r"(?:^|[^A-Za-z0-9_])set[A-Z]\w*\(")
+
+#: ⛔ THE SLICE CLASS IS SCOPED TO WHAT DECISION 156 ACTUALLY RULED, AND THE REST IS REPORTED.
+#:
+#: Her ruling names the seven dashboards, the licence screen, and the two shared components that
+#: serve them. MEASURED when this class was first switched on over the whole of `apps/web`: it
+#: found SIXTY MORE sites outside that scope — consent widgets, screening panels, the holiday
+#: calendar, employee-record corrections.
+#:
+#: Those are a real finding and they are REPORTED rather than failed, because turning them red
+#: would be enforcing a ruling she has not made over screens she has not walked. ⛔ Widening this
+#: tuple is a decision, not a build: the report prints the out-of-scope count on every run so the
+#: debt stays visible instead of becoming a habit.
+SLICE_SCOPE = (
+    os.path.join("apps", "web", "app", "(app)", "dashboards") + os.sep,
+    os.path.join("apps", "web", "app", "(app)", "regulatory-compliance") + os.sep,
+    os.path.join("apps", "web", "components", "ui") + os.sep,
+)
 
 
 def _strip_comments(text: str) -> str:
@@ -84,6 +131,8 @@ def _files(root: str) -> list[str]:
 
 def measure(root: str) -> tuple[list[str], list[str]]:
     findings: list[str] = []
+    sliced: list[str] = []
+    out_of_scope: list[str] = []
     scanned = 0
     for rel in _files(root):
         norm = rel.replace("/", os.sep)
@@ -103,11 +152,23 @@ def measure(root: str) -> tuple[list[str], list[str]]:
                     f"toLocaleDateString under 'ar-JO' prints EASTERN digits, which owner "
                     f"decision 146 ruling 1 rules against"
                 )
+            elif SLICED.search(line) and not INPUT_FEEDER.search(line):
+                if not norm.startswith(SLICE_SCOPE):
+                    out_of_scope.append(f"{rel}:{n}")
+                    continue
+                sliced.append(
+                    f"{rel}:{n}: cuts a date out of its ISO string -- call formatDate / "
+                    f"formatDateTime from lib/i18n/format.ts. Owner decision 156 ruling 1: one "
+                    f"date shape on screens. A slice is also the UTC day, so in Amman it prints "
+                    f"YESTERDAY between midnight and 03:00"
+                )
     lines = [
         f"  files scanned under apps/web (excl. e2e)     {scanned}",
         f"  self-formatted dates (budget 0)              {len(findings)}",
+        f"  dates sliced out of an ISO string (budget 0) {len(sliced)}",
+        f"  ... and outside decision 156's scope, REPORTED {len(out_of_scope)}",
     ]
-    return findings, lines
+    return findings + sliced, lines
 
 
 def run(root: str, check: bool) -> int:
@@ -126,6 +187,25 @@ def run(root: str, check: bool) -> int:
         return 1 if check else 0
     print("  ok     every date a person reads is formatted by lib/i18n/format.ts")
     return 0
+
+
+def _in(tmp: str, *parts: str):
+    """Write a file inside one of the SLICE_SCOPE directories of a synthetic tree."""
+    path = os.path.join(tmp, *parts)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return lambda body: open(path, "wb").write(body)
+
+
+def _dash(tmp: str, body: bytes):
+    return _in(tmp, "apps", "web", "app", "(app)", "dashboards", "policy", "page.tsx")(body)
+
+
+def _ui(tmp: str, body: bytes):
+    return _in(tmp, "apps", "web", "components", "ui", "ReportProvenance.tsx")(body)
+
+
+def _licence(tmp: str, body: bytes):
+    return _in(tmp, "apps", "web", "app", "(app)", "regulatory-compliance", "page.tsx")(body)
 
 
 def _self_test() -> int:
@@ -166,6 +246,30 @@ def _self_test() -> int:
         ("an e2e spec building an expected string is OUT OF SCOPE",
          lambda t: open(os.path.join(t, "apps", "web", "e2e", "a.spec.ts"), "wb")
          .write(b"const want = new Date(x).toLocaleDateString('en-GB');\n"),
+         None),
+        # --- the SLICE class, decision 156 ruling 1 -------------------------------------
+        ("a dashboard slicing the day out of an ISO string",
+         lambda t: _dash(t, b"<Td>{c.cancelledAt.slice(0, 10)}</Td>\n"),
+         "cuts a date out of its ISO string"),
+        ("the STAMP form -- .replace('T', ' ') -- on a shared component",
+         lambda t: _ui(t, b"return iso.replace('T', ' ').slice(0, 16);\n"),
+         "cuts a date out of its ISO string"),
+        ("the licence screen is in scope too",
+         lambda t: _licence(t, b"<Td>{term.expiresAt.slice(0, 10)}</Td>\n"),
+         "cuts a date out of its ISO string"),
+        # ⛔ THE THREE NON-FINDINGS, which are what keep the matcher honest.
+        ("⛔ a setter feeding an <input type=\"date\"> is NOT a finding",
+         lambda t: _licence(t, b"setExpiresAt(license.expiresAt.slice(0, 10));\n"),
+         None),
+        ("⛔ a slice OUTSIDE decision 156's scope is reported, not failed",
+         lambda t: open(os.path.join(t, "apps", "web", "app", "p6.tsx"), "wb")
+         .write(b"<span>{x.createdAt.slice(0, 10)}</span>\n"),
+         None),
+        ("⛔ a COMMENT describing the slice is NOT a finding",
+         lambda t: _dash(t, b"// it used to .slice(0, 10) here\n/* and .replace('T', ' ') */\n"),
+         None),
+        ("⛔ a slice that is not a date boundary is NOT a finding",
+         lambda t: _dash(t, b"const initials = name.slice(0, 2);\n"),
          None),
     ]
     passed = failed = 0

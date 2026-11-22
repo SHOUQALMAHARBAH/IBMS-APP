@@ -2,6 +2,11 @@
 
 import type { CSSProperties } from 'react';
 import { useLanguage } from '../../lib/i18n/language-context';
+import {
+  formatDate,
+  formatDateTime,
+  formatPeriodLabel,
+} from '../../lib/i18n/format';
 
 /**
  * THE LINE THAT SAYS WHEN A REPORT'S FIGURES ARE FROM — one component, both languages.
@@ -44,22 +49,35 @@ const lineStyle: CSSProperties = {
   fontSize: '0.85rem',
 };
 
-/**
- * `2026-09-29T14:32:11.482Z` -> `2026-09-29 14:32`. Deliberately NOT `toLocaleString`: these are
- * provenance stamps, and a reader comparing two screens or quoting a figure in an email needs the same
- * characters both times. The DATE ITSELF is language-independent; only the sentence around it translates.
+/*
+ * 🔴 OWNER DECISION 156 RULING 1 — ONE DATE SHAPE ON SCREENS, AND THIS FILE IS WHY IT IS SMALL.
+ *
+ * These two helpers used to cut the characters out of the ISO string the api sent:
+ * `.replace('T', ' ').slice(0, 16)` and `.slice(0, 10)`, giving «2026-11-19 10:15» and
+ * «2026-11-19». Every other screen in the product renders «19/11/2026» through `formatDate`, so
+ * the dashboards and the licence screen were a second shape for one thing.
+ *
+ * ⟶ They go through the shipping formatters now. ⛔ The paper certificate and the four documents
+ *   keep their written month name — her ruling says so in its own words — and they do not come
+ *   through here.
+ *
+ * ## The comment that stood here said the slicing was DELIBERATE, and it was
+ *
+ * It argued that a provenance stamp should give two readers comparing two screens the same
+ * characters, and that the date itself is language-independent. Her ruling replaces that
+ * judgement: a reader who meets «19/11/2026» everywhere else in the product and «2026-11-19»
+ * here is being shown two systems.
+ *
+ * ## And the slicing was not only a different shape, it was a different DAY
+ *
+ * `.slice(0, 10)` prints the UTC day. Amman is UTC+3, so an instant between midnight and 03:00
+ * local printed YESTERDAY's date — measured: `2026-11-20T01:30:00Z` sliced to «2026-11-19» while
+ * Amman was already on the 20th. The formatters use the reader's own zone, so that class is gone
+ * rather than reshaped.
  */
-function stamp(iso: string): string {
-  return iso.replace('T', ' ').slice(0, 16);
-}
-
-/** `2026-09-29T00:00:00.000Z` -> `2026-09-29`. */
-function day(iso: string): string {
-  return iso.slice(0, 10);
-}
 
 export function ReportProvenance(props: ReportProvenanceProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // `<bdi>` around every value: a Latin-digit date inside an Arabic sentence is a bidi run, and without
   // isolation the trailing full stop jumps to the wrong end of the line.
@@ -67,21 +85,21 @@ export function ReportProvenance(props: ReportProvenanceProps) {
     case 'generatedAt':
       return (
         <p style={lineStyle} data-testid="report-provenance">
-          {t('provGeneratedAt', { at: stamp(props.at) })}
+          {t('provGeneratedAt', { at: formatDateTime(props.at, language) })}
         </p>
       );
     case 'asOf':
       return (
         <p style={lineStyle} data-testid="report-provenance">
-          {t('provAsOf', { at: day(props.at) })}
+          {t('provAsOf', { at: formatDate(props.at, language) })}
         </p>
       );
     case 'generatedAtWithPeriod':
       return (
         <p style={lineStyle} data-testid="report-provenance">
           {t('provGeneratedAtWithPeriod', {
-            at: stamp(props.at),
-            period: props.periodLabel,
+            at: formatDateTime(props.at, language),
+            period: formatPeriodLabel(props.periodLabel, language),
           })}
         </p>
       );
@@ -89,9 +107,9 @@ export function ReportProvenance(props: ReportProvenanceProps) {
       return (
         <p style={lineStyle} data-testid="report-provenance">
           {t('provPeriod', {
-            period: props.periodLabel,
-            from: day(props.from),
-            to: day(props.to),
+            period: formatPeriodLabel(props.periodLabel, language),
+            from: formatDate(props.from, language),
+            to: formatDate(props.to, language),
           })}
         </p>
       );

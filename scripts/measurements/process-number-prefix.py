@@ -89,7 +89,18 @@ PREFIX = re.compile(
 # ⚠️ SEARCHED ANYWHERE IN THE VALUE, not anchored like PREFIX. Five of the seven carried the
 # reference MID-SENTENCE and only two opened with it, so a `^` would have caught two of seven
 # and reported a clean tree over the other five.
-CLAUSE = re.compile(r"(?:البند|الجزء)\s+[0-9٠-٩]")
+#
+# 🔴 AND THE ENGLISH HALF JOINED IT ON 2026-11-19 — OWNER DECISION 155 RULING 4.
+#
+# Decision 151's annex names an ARABIC span in every «كان» cell, so when it shipped the English
+# halves still read «(Part 5.1)», «(Part 10.6, logged)», «Part 4.2» and «Part 5.1 — ». That was
+# reported as an EMPTY CELL rather than guessed at, exactly as decision 150's English prefix was.
+# Decision 155 ruling 4 fills it: *««Part N» في النصوص السبعة وجملة التسجيل الذاتي تُحذَف من
+# الإنجليزية بالحذف نفسه»* — the same deletion, and ⛔ «لا كلمة أخرى تتغيّر».
+#
+# ⚠️ `Part` IS AN ORDINARY ENGLISH WORD, so the digits are what make this a reference: `Part 5.1`
+# matches and «part of the policy» does not. The self-test carries that as a NON-finding.
+CLAUSE = re.compile(r"(?:البند|الجزء)\s+[0-9٠-٩]|\bPart\s+\d+\.\d+")
 
 # ⛔ THE ONE EXEMPTION, AND IT IS HERS, NOT A CONVENIENCE.
 #
@@ -103,6 +114,17 @@ CLAUSE = re.compile(r"(?:البند|الجزء)\s+[0-9٠-٩]")
 # through the moment somebody wrote them. And it is checked in BOTH directions — a declared
 # exemption whose span has gone is STALE and fails, so the day `iassetIntro` is reworded this
 # list cannot quietly keep an entry for a string that no longer exists.
+#
+# ⚠️ AND THE ENGLISH HALF OF THAT SAME STRING NEEDS NO EXEMPTION, WHICH THIS LIST PROVED.
+#
+# `iassetIntro` reads «The ISO 27001 Clause 8.1 asset inventory» in English. Declaring it here
+# was the first thing tried, and the STALENESS check refused it: the English matcher is
+# `Part N.N`, and that value says **Clause**, so it never meets the matcher and an exemption for
+# it would be a row describing a finding that cannot occur. ⟶ The external ISO reference is
+# outside this gate in English by its own words rather than by a declaration, and the four
+# internal references decision 155 deleted all said «Part». ⛔ Do not widen the matcher to
+# `Clause N.N` to make the symmetry look tidier: it would flag the one reference the owner
+# ruled must stay.
 CLAUSE_EXEMPT = {
     ("iassetIntro", "البند 8.1 من معيار ISO 27001"),
 }
@@ -355,6 +377,35 @@ def _self_test() -> int:
         # ruling just cleaned.
         ("«بند» as an ordinary word with no number is NOT a finding",
          plant("s.ts", "    sIntro: 'أكّد كل بند أدناه أو ألغِه أو ضع عليه علامة.',\n"),
+         None),
+        # 🔴 DECISION 155 RULING 4 — the ENGLISH half, added 2026-11-19. Decision 151's annex
+        # named Arabic spans only, so these four shapes shipped on in English for three days
+        # after the Arabic lost them. They are the real strings, one case each.
+        ("«(Part 5.1)» mid-sentence in ENGLISH IS a finding",
+         plant("t.ts", "    tIntro: \"The External Auditor's read-only lens (Part 5.1): logs.\",\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("«(Part 10.6, logged)» in ENGLISH IS a finding",
+         plant("u.ts", "    uLabel: 'Justification for revealing {field} (Part 10.6, logged)',\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("«Part 5.1 — » opening an ENGLISH value IS a finding",
+         plant("v.ts", "    vIntro: 'Part 5.1 — periodic review of who holds access.',\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("an ENGLISH clause reference in a WRAPPED value IS a finding",
+         plant("w.ts", "    wIntro:\n      'This cycle covered no administrator account. That is the ' +\n      'condition Part 5.1 exists to prevent.',\n"),
+         "cites one of OUR OWN documents by clause"),
+        # ⛔ THE THREE ENGLISH NON-FINDINGS, and the first is why the digits are in the matcher:
+        # «Part» is an ordinary English word and this product says it in ordinary sentences.
+        ("«part» as an ordinary English word is NOT a finding",
+         plant("x.ts", "    xIntro: 'Part of the premium is refundable once the policy is cancelled.',\n"),
+         None),
+        # ⛔ The ISO reference in ENGLISH says «Clause», not «Part», so it is outside this
+        # matcher by its own words. Without this case, widening to `Clause N.N` for symmetry
+        # would flag the one reference decision 151 ruled must STAY.
+        ("the ENGLISH ISO 27001 reference is NOT a finding",
+         plant("y.ts", "    yIntro: 'The ISO 27001 Clause 8.1 asset inventory — every information asset.',\n"),
+         None),
+        ("a bare part number with no decimal is NOT a finding",
+         plant("z.ts", "    zIntro: 'Part 5 of the schedule lists the excesses.',\n"),
          None),
         # 🔴 THE STALE DIRECTION. `exempt.ts` is overwritten so the declared span is gone;
         # without this case CLAUSE_EXEMPT could outlive the string it describes, and a

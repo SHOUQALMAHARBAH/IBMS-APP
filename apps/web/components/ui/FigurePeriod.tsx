@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useLanguage } from '../../lib/i18n/language-context';
-import { formatPeriodLabel } from '../../lib/i18n/format';
+import { formatDate, formatPeriodLabel } from '../../lib/i18n/format';
 import type { FigureScope } from '../../lib/management-reporting/sales-dashboard-api';
 
 /**
@@ -79,7 +79,9 @@ export function FigurePeriod({
           ? t('dashFigureDuringPeriod', {
               period: formatPeriodLabel(periodLabel, language),
             })
-          : t('dashFigureAsOf', { at: generatedAt.slice(0, 10) })}
+          : /* OWNER DECISION 156 ruling 1 — the one date shape. This was
+               `generatedAt.slice(0, 10)`, which is both a second shape and the UTC day. */
+            t('dashFigureAsOf', { at: formatDate(generatedAt, language) })}
       </bdi>
     </div>
   );

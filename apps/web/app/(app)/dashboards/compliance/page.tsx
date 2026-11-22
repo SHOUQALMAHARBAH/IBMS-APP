@@ -19,6 +19,7 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDate } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
@@ -76,7 +77,7 @@ function BreakdownTable({
 }
 
 export default function ComplianceDashboardPage() {
-  const { t, tPlural } = useLanguage();
+  const { t, tPlural, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -128,10 +129,7 @@ export default function ComplianceDashboardPage() {
 
   return (
     <main style={pageStackStyle}>
-      <PageHeader
-        title={t('dcmpHeading')}
-        description={t('dcmpIntro')}
-      />
+      <PageHeader title={t('dcmpHeading')} description={t('dcmpIntro')} />
 
       <form
         onSubmit={applyFilters}
@@ -152,9 +150,7 @@ export default function ComplianceDashboardPage() {
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
-      {loadError ? (
-        <ErrorState title={loadError} />
-      ) : null}
+      {loadError ? <ErrorState title={loadError} /> : null}
 
       {summary ? (
         <>
@@ -201,9 +197,10 @@ export default function ComplianceDashboardPage() {
                   {t('dcmpSelfApprovalViolations')}
                   {summary.complianceExceptions.lastSelfApprovalScan
                     ? ` ${t('dcmpScanAsOf', {
-                        at: summary.complianceExceptions.lastSelfApprovalScan.asOf.slice(
-                          0,
-                          10,
+                        at: formatDate(
+                          summary.complianceExceptions.lastSelfApprovalScan
+                            .asOf,
+                          language,
                         ),
                       })}`
                     : ` ${t('dcmpNoScanYet')}`}
