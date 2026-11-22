@@ -406,7 +406,7 @@ export const CUSTOMERS = {
     customerFieldGrandfatherName: "Grandfather's name",
     customerFieldFamilyName: "Family name",
     customerRevealJustificationLabel:
-      "Justification for revealing {field} (Part 10.6, logged)",
+      "Justification for revealing {field} (logged)",
     customerRevealJustificationRequired:
       "A written justification is required to reveal this field.",
     customerRevealConfirmButton: "Confirm reveal",

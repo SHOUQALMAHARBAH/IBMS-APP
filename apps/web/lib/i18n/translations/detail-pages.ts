@@ -548,7 +548,7 @@ export const DETAIL_PAGES = {
     empdMarkComplete: 'Mark complete',
     empdTerminateButton: 'Terminate employment',
     empdFullValue: 'Full value:',
-    empdRevealReason: 'Reason (Part 10.6, min. 10 characters)',
+    empdRevealReason: 'Reason (min. 10 characters)',
     empdActive: 'Active',
     empdTerminatedOn: 'Terminated {date}',
     empdStatusLabel: 'Status:',

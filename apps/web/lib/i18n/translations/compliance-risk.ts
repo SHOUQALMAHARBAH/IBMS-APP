@@ -1175,7 +1175,7 @@ export const COMPLIANCE_RISK = {
 
     atHeading: 'Audit Trail',
     atIntro:
-      "The External Auditor's read-only lens (Part 5.1): logs, document history, and workflow-state transition history for a defined engagement period. Access itself is time-boxed via each user's own account settings, not configured here.",
+      "The External Auditor's read-only lens: logs, document history, and workflow-state transition history for a defined engagement period. Access itself is time-boxed via each user's own account settings, not configured here.",
     atColOccurred: 'Occurred',
     atColAction: 'Action',
     atColEntity: 'Entity',

@@ -789,7 +789,7 @@ export const OPERATIONS = {
 
     empHeading: 'Employees',
     empIntro:
-      'Employee records, licensing/certification tracking, and security awareness training (Part 8.2).',
+      'Employee records, licensing/certification tracking, and security awareness training.',
     empNone: 'No employees recorded yet.',
     empColName: 'Name',
     empColPosition: 'Position',
@@ -898,7 +898,7 @@ export const OPERATIONS = {
 
     docHeading: 'Documents',
     docIntro:
-      'The Part 4.2 electronic Insurance File — version control and the deletion lock override for one policy’s documents.',
+      'The electronic Insurance File — version control and the deletion lock override for one policy’s documents.',
     docLookUp: 'Look up documents',
     docDownloadStoredButton: 'Download the file',
     docNone: 'No documents recorded for this policy.',
@@ -1015,8 +1015,7 @@ export const OPERATIONS = {
     acrConfirmButton: 'Confirm',
     acrAdminNoCycles: 'No review cycle has been opened yet.',
     acrAdminNoneCovered:
-      'This cycle covered no administrator account. That is the condition Part 5.1 exists to ' +
-      'prevent — review the cycle.',
+      'This cycle covered no administrator account. Review the cycle.',
     acrAdminColSubject: 'Account',
     acrAdminColReviewer: 'Reviewer',
     acrAdminColDecision: 'Decision',
@@ -1182,7 +1181,7 @@ export const OPERATIONS = {
     usrThatActionFailedTryAgain: 'That action failed — try again.',
     usrUsersRoles: 'Users & roles',
     usrSelfServiceSignupCreatesAn:
-      'Self-service signup creates an account with no roles — and therefore no permissions. Roles are granted only here. Revoking stamps the withdrawal date; the grant record is never deleted.',
+      'Roles are granted only here. Revoking stamps the withdrawal date; the grant record is never deleted.',
     usrFullName: 'Full name',
     usrEmail: 'Email',
     usrPasswordMin12CharsWith:
@@ -1281,7 +1280,7 @@ export const OPERATIONS = {
     secChangingPasswordButton: 'Changing…',
     secPasswordChanged: 'Your password has been changed.',
     acrIntro:
-      'Part 5.1 — periodic (quarterly) review of who holds access. Confirm, ' +
+      'Periodic (quarterly) review of who holds access. Confirm, ' +
       "revoke, or flag each item below; a System/Security Administrator's own " +
       "access is included and reviewed the same as anyone else's.",
     iprogIntro:
