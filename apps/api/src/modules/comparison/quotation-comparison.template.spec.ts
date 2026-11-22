@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import {
   buildQuotationComparisonHtml,
@@ -50,7 +53,6 @@ const ROW_B: QuotationComparisonRow = {
 };
 
 const BASE_DATA: QuotationComparisonData = {
-  comparisonId: 'cmp-123',
   insuranceLine: 'Property All Risks',
   customerLegalName: 'شركة الأفق للتأمين',
   builtAt: new Date('2026-03-05T00:00:00Z'),
@@ -92,9 +94,25 @@ describe('buildQuotationComparisonHtml', () => {
     expect(html).toContain('JOD 1,250.500');
   });
 
-  it('includes the comparison reference number so a client can cite it back', () => {
-    const html = buildQuotationComparisonHtml(BASE_DATA, 'EN');
-    expect(html).toContain('cmp-123');
+  /*
+   * 🔴 REVERSED BY OWNER DECISION 155 RULING 3, and kept rather than deleted.
+   *
+   * This asserted the opposite: that the comparison’s internal id is printed «so a client
+   * can cite it back». Measured for her: no model behind this document carries a
+   * customer-facing number at all — not the comparison, not the RFQ, not the opportunity —
+   * so what a client could cite back was a 36-character uuid nobody had ever shown them. Her
+   * ruling removes the row; the paper is identified by the customer, the line and the date.
+   *
+   * ⛔ And the id left `QuotationComparisonData` entirely, so this is structural rather than
+   * disciplinary: the renderer does not HAVE an internal id and cannot print one.
+   */
+  it('⛔ prints NO internal reference, in either language (decision 155 ruling 3)', () => {
+    for (const lang of ['EN', 'AR'] as const) {
+      const html = buildQuotationComparisonHtml(BASE_DATA, lang);
+      expect(html).not.toContain('cmp-123');
+      expect(html).not.toContain('Reference');
+      expect(html).not.toContain('رقم المرجع');
+    }
   });
 
   it('marks a non-current-version quotation as superseded', () => {
@@ -191,5 +209,104 @@ describe('buildQuotationComparisonHtml', () => {
     const en = buildQuotationComparisonHtml(data, 'EN');
     expect(en).toContain('Al-Ittihad Insurance');
     expect(en).not.toContain('الاتحاد للتأمين');
+  });
+});
+
+/**
+ * 🔴 OWNER DECISION 155 RULING 3 — THE STATUS WORDS, AND THE TWO HOMES PINNED TOGETHER.
+ *
+ * This template renders a flagged insurer's response state in words rather than as the stored
+ * token. It CANNOT import the screens' dictionary — `apps/web` and `apps/api` are separate
+ * builds — so the five words are copied in, the way every other label in this file's template
+ * is copied in.
+ *
+ * ⚠️ A COPIED STRING IS A SECOND HOME, so it is pinned: this reads the dictionary at test time
+ * and compares byte for byte. Without it, a reword on the screen would leave the customer's
+ * paper saying the old word, and nothing anywhere would notice.
+ */
+describe('decision 155 ruling 3 — the insurer response state in words', () => {
+  const WEB_RFQ = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'web',
+    'lib',
+    'i18n',
+    'translations',
+    'rfq.ts',
+  );
+
+  /** `key -> value`, for one half of the dictionary file. */
+  function dictionary(half: 'AR' | 'EN'): Map<string, string> {
+    const src = readFileSync(WEB_RFQ, 'utf8');
+    const at = src.indexOf(`  ${half}: {`);
+    expect(at, `the ${half} half is not in rfq.ts`).toBeGreaterThan(-1);
+    const out = new Map<string, string>();
+    for (const line of src.slice(at).split('\n')) {
+      const m = /^\s*(rfqInsurerStatus[A-Za-z]+):\s*'([^']*)',/.exec(line);
+      if (m && !out.has(m[1])) out.set(m[1], m[2]);
+    }
+    return out;
+  }
+
+  it.each([
+    ['SENT', 'rfqInsurerStatusSent'],
+    ['VIEWED', 'rfqInsurerStatusViewed'],
+    ['QUOTED', 'rfqInsurerStatusQuoted'],
+    ['DECLINED', 'rfqInsurerStatusDeclined'],
+    ['NO_RESPONSE', 'rfqInsurerStatusNoResponse'],
+  ])('%s renders the same Arabic word the screens use', (status, key) => {
+    const want = dictionary('AR').get(key);
+    expect(want, `${key} is not in rfq.ts's AR half`).toBeTruthy();
+    const html = buildQuotationComparisonHtml(
+      {
+        ...BASE_DATA,
+        missingInsurers: [{ name: 'Middle East Assurance', status }],
+      },
+      'AR',
+    );
+    expect(html).toContain(`Middle East Assurance (${want})`);
+  });
+
+  it('⛔ and the stored token never reaches the Arabic paper', () => {
+    const html = buildQuotationComparisonHtml(
+      {
+        ...BASE_DATA,
+        missingInsurers: [
+          { name: 'Middle East Assurance', status: 'NO_RESPONSE' },
+        ],
+      },
+      'AR',
+    );
+    // The whole finding: «شركة الشرق الأوسط (NO_RESPONSE)» on a customer's document.
+    expect(html).not.toContain('(NO_RESPONSE)');
+  });
+
+  it('⚠️ an unknown value renders AS STORED rather than blank (decision 49)', () => {
+    // Unreachable today — the column is a Prisma enum — but an unreachable fallback that prints
+    // the token beats a reachable one that prints nothing.
+    const html = buildQuotationComparisonHtml(
+      {
+        ...BASE_DATA,
+        missingInsurers: [
+          { name: 'Middle East Assurance', status: 'WITHDRAWN' },
+        ],
+      },
+      'AR',
+    );
+    expect(html).toContain('Middle East Assurance (WITHDRAWN)');
+  });
+
+  it('⛔ AND THE REFERENCE ROW IS GONE FROM BOTH HALVES (ruling 3)', () => {
+    const html = [
+      buildQuotationComparisonHtml(BASE_DATA, 'AR'),
+      buildQuotationComparisonHtml(BASE_DATA, 'EN'),
+    ].join('');
+    expect(html).not.toContain('رقم المرجع');
+    expect(html).not.toContain('>Reference<');
+    // Structural, not disciplinary: the renderer does not HAVE the id, so it cannot print one.
+    expect(html).not.toContain('cmp-');
   });
 });

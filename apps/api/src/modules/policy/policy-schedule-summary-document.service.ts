@@ -80,7 +80,6 @@ export class PolicyScheduleSummaryDocumentService {
 
     const html = buildPolicyScheduleSummaryHtml(
       {
-        policyId: policy.id,
         customerLegalName: customer.legalName,
         /*
          * BOTH NAMES FROM ONE SOURCE — decision 153 §U2 applied to this document.

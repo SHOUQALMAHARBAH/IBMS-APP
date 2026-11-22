@@ -184,8 +184,21 @@ export default function InsuranceProgramDetailPage() {
                       router.push(`/needs-assessments/${ctx.needsAssessmentId}`)
                     }
                   >
-                    {ctx.needsAssessmentId.slice(0, 8)} (
-                    {ctx.needsAssessmentStatus})
+                    {/* DECISION 157 table ج row ٨ — «تقييم الاحتياجات ({status})».
+                        ⛔ NO part of the internal id, not even eight characters of it:
+                        decision 153 §٦ criterion 4. The control still opens the
+                        assessment; what it is named no longer leaks the number. */}
+                    {t('iprogdNeedsAssessmentLabel', {
+                      // The two fields are independently nullable on the wire even though
+                      // they come off one row, so the status is guarded rather than assumed.
+                      status: ctx.needsAssessmentStatus
+                        ? t(
+                            ENUM_LABEL.NeedsAssessmentStatus[
+                              ctx.needsAssessmentStatus
+                            ],
+                          )
+                        : '—',
+                    })}
                   </button>
                 ) : (
                   '—'
@@ -195,8 +208,12 @@ export default function InsuranceProgramDetailPage() {
             <div>
               <div style={profileFieldLabelStyle}>{t('iprogdAssetSurvey')}</div>
               <div style={profileFieldValueStyle}>
+                {/* DECISION 157 table ج row ٧ — «عدد الأصول: {count}». Her text counts
+                    rather than pluralises, so there is no plural rule to write. */}
                 {ctx.surveyComplete
-                  ? `${ctx.sumInsured.assetCount} asset${ctx.sumInsured.assetCount === 1 ? '' : 's'} surveyed`
+                  ? t('iprogdAssetCountLabel', {
+                      count: String(ctx.sumInsured.assetCount),
+                    })
                   : t('iprogdNotStarted')}
               </div>
             </div>
@@ -264,7 +281,8 @@ export default function InsuranceProgramDetailPage() {
                       <bdi>{lineDisplayName(line, language)}</bdi>
                     </td>
                     <td style={programCellNumStyle}>
-                      {line.sumInsuredBasis ?? 'set at quotation'}
+                      {/* OWNER DECISION 153 §٢ row ١٢. */}
+                      {line.sumInsuredBasis ?? t('iprogdSumInsuredAtQuotation')}
                     </td>
                   </tr>
                 ))}

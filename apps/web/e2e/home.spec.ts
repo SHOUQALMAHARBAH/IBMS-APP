@@ -20,7 +20,19 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        roles,
+        // DECISION 157 — the home page greets a person with their role's NAME. `roles` is the
+        // MACHINE name (`OFFICE_ADMINISTRATOR`); the display names ride beside it. A fixture
+        // without this field makes `user.roleNames.length` throw and the home page render
+        // "This page couldn't load", which reads as a broken SCREEN rather than a stale mock.
+        roleNames: roles.map((r) => ({ ar: `عربي ${r}`, en: `Name of ${r}` })),
+        permissions: permissionsForRoles(roles),
+      },
+    }),
   );
 }
 

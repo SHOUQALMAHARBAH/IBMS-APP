@@ -405,20 +405,32 @@ export function PolicySection({
               ''
             )}
           </p>
+          {/* OWNER DECISION 153 §٢ rows ٤-٥ and DECISION 157 tables ب (٢-١, ٢-٢) and ج (٣).
+              The « · » separator between parts of one line stays as it is — 157's own note
+              under table ج says so — so it lives in the JSX and never inside a key. */}
           <p style={{ margin: '0.4rem 0' }}>
-            Requested {formatMoney(policy.requestedPremium, language, policy.currency)}
+            {t('policySectionRequestedPremium', {
+              amount: formatMoney(policy.requestedPremium, language, policy.currency),
+            })}
             {policy.issuedPremium
-              ? ` · Issued ${formatMoney(policy.issuedPremium, language, policy.currency)}` +
+              ? ` · ${t('policySectionIssuedPremium', {
+                  amount: formatMoney(policy.issuedPremium, language, policy.currency),
+                })}` +
                 (policy.premiumVariance
-                  ? ` (Δ ${formatMoney(policy.premiumVariance, language, policy.currency)})`
+                  ? ` ${t('policySectionPremiumVariance', {
+                      amount: formatMoney(policy.premiumVariance, language, policy.currency),
+                    })}`
                   : '')
               : ''}
           </p>
           <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.4rem 0' }}>
-            Inception{' '}
-            {policy.inceptionDate ? formatDate(policy.inceptionDate, language) : '—'}
+            {t('policySectionInception', {
+              date: policy.inceptionDate ? formatDate(policy.inceptionDate, language) : '—',
+            })}
             {' · '}
-            Expiry {policy.expiryDate ? formatDate(policy.expiryDate, language) : '—'}
+            {t('policySectionExpiry', {
+              date: policy.expiryDate ? formatDate(policy.expiryDate, language) : '—',
+            })}
           </p>
 
           {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement && !policy.discard ? (
@@ -514,15 +526,21 @@ export function PolicySection({
           {policy.schedules.length > 0 ? (
             <div style={{ marginTop: '0.8rem' }}>
               <p style={{ fontWeight: 600 }}>{t('policyCoverageScheduleHeading')}</p>
+              {/* DECISION 157 table ب rows ٢-٣, ٢-٤, ٢-٥ and DECISION 153 §٢ row ٦.
+                  The « – » range separator and the « · » part separator both stay. */}
               {policy.schedules.map((s) => (
                 <div key={s.id} style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
-                  Effective {formatDate(s.effectiveFrom, language)}
+                  {t('policySectionScheduleEffective', {
+                    date: formatDate(s.effectiveFrom, language),
+                  })}
                   {s.effectiveTo
                     ? ` – ${formatDate(s.effectiveTo, language)}`
-                    : ' – ongoing'}
-                  {' · perils: '}
+                    : ` – ${t('policySectionScheduleOngoing')}`}
+                  {' · '}
+                  {t('policySectionNamedPerils')}{' '}
                   {s.namedPerils.join(', ') || '—'}
-                  {' · extensions: '}
+                  {' · '}
+                  {t('policySectionExtensions')}{' '}
                   {s.extensions.join(', ') || '—'}
                 </div>
               ))}
@@ -624,10 +642,16 @@ export function PolicySection({
                 testId="combined-duty-policy-checking"
               />
               <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
-                Checked by {policy.checking.checkedByUserId ?? '—'}
-                {policy.checking.checkedAt
-                  ? ` on ${formatDateTime(policy.checking.checkedAt, language)}`
-                  : ''}
+                {/* OWNER DECISION 153 §٢ row ٧ as amended by DECISION 157 table أ: the
+                    EMPLOYEE'S NAME and the date, in one sentence. ⛔ `checkedByUserId` is not
+                    rendered — 153 §٦ criterion 4 — and the name comes from the wire, resolved
+                    server-side through `displayNameForUserId`. */}
+                {t('policySectionCheckedBy', {
+                  name: policy.checking.checkedByName ?? '—',
+                  date: policy.checking.checkedAt
+                    ? formatDateTime(policy.checking.checkedAt, language)
+                    : '—',
+                })}
               </p>
             </div>
           ) : null}
@@ -650,11 +674,19 @@ export function PolicySection({
             <div style={{ marginTop: '0.8rem' }}>
               <p style={{ fontWeight: 600 }}>{t('policyDeliveryHeading')}</p>
               <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
-                {t(ENUM_LABEL.DeliveryMethod[policy.delivery.method])} · to {policy.delivery.recipient} ·{' '}
+                {/* DECISION 157 table ب row ٢-٦ and DECISION 153 §٢ row ٨. */}
+                {t(ENUM_LABEL.DeliveryMethod[policy.delivery.method])}
+                {' · '}
+                {t('policySectionDeliveryRecipient', {
+                  name: policy.delivery.recipient,
+                })}
+                {' · '}
                 {formatDate(policy.delivery.deliveredAt, language)}
                 {' · '}
                 {policy.delivery.receiptAcknowledgedAt
-                  ? `receipt acknowledged ${formatDate(policy.delivery.receiptAcknowledgedAt, language)}`
+                  ? t('policySectionReceiptAcknowledged', {
+                      date: formatDate(policy.delivery.receiptAcknowledgedAt, language),
+                    })
                   : t('policyAwaitingAcknowledgement')}
               </p>
               {canDeliver && !policy.delivery.receiptAcknowledgedAt ? (

@@ -17,7 +17,6 @@ import {
  * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
  */
 const BASE_DATA: RecommendationReportData = {
-  recommendationId: 'rec-123',
   customerLegalName: 'شركة الأفق للتأمين',
   insuranceLine: 'Property All Risks',
   createdAt: new Date('2026-03-05T00:00:00Z'),
@@ -69,9 +68,30 @@ describe('buildRecommendationReportHtml', () => {
     expect(html.indexOf('dir="rtl"')).toBeLessThan(html.indexOf('dir="ltr"'));
   });
 
-  it('includes the recommendation reference number so a client can cite it back', () => {
+  /*
+   * 🔴 REVERSED BY OWNER DECISION 155 RULING 3, and kept rather than deleted.
+   *
+   * This asserted the opposite — that the internal id is printed «so a client can cite
+   * it back». Measured for her: no model behind this report carries a customer-facing number,
+   * so what a client could cite back was a 36-character uuid nobody had ever shown them.
+   * Her ruling removes the row; the paper is identified by the customer, the line and the
+   * date.
+   *
+   * ⛔ And the id left `RecommendationReportData` entirely, so this is STRUCTURAL rather than
+   * disciplinary: the renderer does not HAVE an internal id and cannot print one.
+   */
+  it('⛔ prints NO internal reference, in either language (decision 155 ruling 3)', () => {
+    for (const lang of ['EN', 'AR'] as const) {
+      const html = buildRecommendationReportHtml(BASE_DATA, lang);
+      expect(html).not.toContain('rec-123');
+      expect(html).not.toContain('Reference');
+      expect(html).not.toContain('رقم المرجع');
+    }
+  });
+
+  it('and what it DOES carry still identifies the paper', () => {
     const html = buildRecommendationReportHtml(BASE_DATA, 'EN');
-    expect(html).toContain('rec-123');
+    expect(html).toContain('شركة الأفق للتأمين');
   });
 
   it("includes the recommended insurer and the quote's full commercial terms", () => {

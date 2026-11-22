@@ -716,6 +716,11 @@ async function mockRfqApi(
             ? {
                 placedByUserId: "someone-else",
                 checkedByUserId: "chk-1",
+                // OWNER DECISION 153 §٢ row ٧ (amended by 157 table أ) — the wire carries the
+                // checker's NAME now, resolved server-side. A fixture that left this out would
+                // render «—» and the Arabic-no-English assertion below would still pass, so it
+                // is a real name and the test asserts the name is on the screen.
+                checkedByName: "سامر الحديد",
                 checkedAt: "2026-10-05T00:00:00.000Z",
                 discrepancyFound: false,
                 discrepancyDetail: null,
@@ -894,6 +899,8 @@ async function mockRfqApi(
         checking: {
           placedByUserId: "user-1",
           checkedByUserId: "chk-1",
+          // DECISION 153 §٢ row ٧ — the name the line renders; see the seeded fixture above.
+          checkedByName: "سامر الحديد",
           checkedAt: "2026-10-05T00:00:00.000Z",
           discrepancyFound: mismatch,
           discrepancyDetail: mismatch
@@ -3760,4 +3767,204 @@ test("OWNER DECISION 145 criterion 4 — a failed attach says «تعذّر إر�
   await expect(
     record.locator('[data-article-15-d="lacks-evidence"]'),
   ).toBeVisible();
+});
+
+/**
+ * 🔴 OWNER DECISIONS 153 §٢ AND 157 — NO ENGLISH LEFT ON THE POLICY SECTION, IN ARABIC.
+ *
+ * The owner's fourth answer sheet is about a reader who opens an opportunity carrying a policy
+ * and meets: «Requested JOD 1,200.000 · Issued JOD 1,180.000 (Δ JOD 20.000)» then «Inception
+ * 01/11/2026 · Expiry 31/10/2027» then «Checked by 8f3c1a92-…». Five English words and a
+ * 36-character internal id, on the screen the demo walks.
+ *
+ * ## ⚠️ ANCHORED, AND ASSERTED NON-EMPTY FIRST
+ *
+ * A page-wide `not.toContainText('Requested')` passes on a screen that failed to load, and it
+ * passes on a screen whose policy section never rendered — which is the shape this spec's own
+ * `/insurance-programs` paragraph already records. So the section is located, proven VISIBLE and
+ * proven to carry real content, and only then is the English asserted absent from it.
+ */
+test("the policy section says nothing in English to an Arabic reader", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page, { seedActivePolicy: true });
+  await page.goto("/opportunities/opp-1");
+
+  const section = page.locator("section", {
+    has: page.getByRole("heading", { name: "الوثيقة", exact: true }),
+  });
+  await expect(section).toBeVisible();
+
+  // NON-VACUITY, in both directions: the section is rendered AND it is rendering the facts the
+  // English used to sit beside. Without this, every absence below is satisfied by an empty box.
+  await expect(section).toContainText("القسط المطلوب:");
+  await expect(section).toContainText("تاريخ بدء التغطية:");
+  await expect(section).toContainText("دقّقها:");
+  // The checker is named, which is the half of row ٧ that needed the wire to change.
+  await expect(section).toContainText("سامر الحديد");
+
+  for (const english of [
+    "Requested",
+    "Issued",
+    "Inception",
+    "Expiry",
+    "Checked by",
+    "receipt acknowledged",
+    "perils:",
+    "extensions:",
+    "Effective",
+  ]) {
+    await expect(
+      section,
+      `«${english}» is still on the policy section in Arabic`,
+    ).not.toContainText(english);
+  }
+
+  // ⛔ AND THE INTERNAL ID IS GONE FROM THE LINE, which is decision 153 §٦ criterion 4 — not a
+  // translation question at all. `chk-1` is what this fixture's `checkedByUserId` holds.
+  await expect(section).not.toContainText("chk-1");
+});
+
+/**
+ * 🔴 OWNER DECISION 157 RULING 1 — THE REFUSAL NAMES THE STAGE IT IS REFUSING.
+ *
+ * Decision 153 §٢ row ١٦ ratified «…لأنها في مرحلة التنسيب», and the server refuses an RFQ in
+ * EVERY opportunity status other than `NEEDS_CONFIRMED` and `RFQ_ISSUED` — so the sentence was
+ * true of one stage in eight and said «placement» to someone looking at a closed-lost file.
+ *
+ * Both ends are asserted, because one would not be enough: a screen hard-coding «التنسيب» passes
+ * a PLACEMENT-only test perfectly.
+ */
+for (const [status, label] of [
+  ["PLACEMENT", "التنسيب"],
+  ["CLOSED_LOST", "مغلقة (خسارة)"],
+] as const) {
+  test(`the RFQ refusal names «${label}» when the opportunity is ${status}`, async ({
+    page,
+  }) => {
+    await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+    await mockRfqApi(page, {});
+
+    // The real refusal shape: the stable code and the status, as `rfq.service.ts` sends them.
+    await page.route("http://localhost:4000/rfqs", (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      return route.fulfill({
+        status: 422,
+        json: {
+          code: "OPPORTUNITY_NOT_OPEN_FOR_RFQ",
+          message: `Opportunity opp-1 is ${status}; an RFQ can only be issued while it is NEEDS_CONFIRMED or RFQ_ISSUED.`,
+          opportunityStatus: status,
+        },
+      });
+    });
+
+    await page.goto("/rfqs/new?opportunityId=opp-1");
+    // The same flow the English create test uses, in Arabic: the line is a CHOICE and the
+    // shortlist a checkbox, and the submit control stays disabled until both are set.
+    await page
+      .getByLabel("فرع التأمين")
+      .selectOption({ value: "Property All Risks" });
+    // The insurer row goes through `insurerDisplayName`, so in Arabic ins-1 renders its
+    // ARABIC name — which is the fix message 45 §2 shipped and this flow has to respect.
+    await page.getByLabel("وادي رم التعاونية · A-").check();
+    const submit = page.getByRole("button", {
+      name: "إنشاء طلب عرض الأسعار",
+    });
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
+    // SCOPED TO `main`, the convention four other specs already use: Next.js renders its own
+    // route announcer as `role="alert"` at the document root, so an unscoped lookup is a
+    // strict-mode violation rather than a missing element.
+    const error = page.locator("main").getByRole("alert");
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText(
+      `لا يُنشأ طلب عرض أسعار على هذه الفرصة لأنها في مرحلة «${label}».`,
+    );
+    // ⛔ AND NOT THE SERVER'S ENGLISH, which is what a code mismatch would fall back to.
+    await expect(error).not.toContainText("an RFQ can only be issued");
+  });
+}
+
+/**
+ * 🔴 THE ART. 15/d SECTION IS IN VIEW WHEN IT APPEARS — the owner's walk, §S3.
+ *
+ * «خالد يختار الشركة الثانية في طلب العرض. يظهر سؤال الإعفاء تحت، خارج ما يراه، فيظنّ أن شيئاً
+ * لم يحصل.» The section was rendered AFTER the follow-up threshold field, so on an ordinary
+ * window it appeared below the fold — triggered by a click the employee had just made somewhere
+ * else. Nothing scrolled to it and nothing pointed at it.
+ *
+ * ⟶ MOVED rather than scrolled to. This asserts the OUTCOME (in the viewport) rather than the
+ *   mechanism, so the test still holds if that choice is ever revisited.
+ *
+ * ⚠️ AND THE VIEWPORT IS SET SMALL ON PURPOSE. Playwright's default is 1280×720, which is tall
+ *   enough to have shown the section even where it was — so a test at the default size would
+ *   have passed against the defect and proved nothing. 720 is a real laptop's content height.
+ */
+test("the art. 15/d question is in view the moment the shortlist raises it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page, {});
+
+  await page.route(
+    "http://localhost:4000/rfqs/article-15-d/options**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          required: true,
+          minInsurers: 3,
+          premiumCeilingJod: "2000.000",
+          exemptions: [
+            {
+              exemption: "AT_CUSTOMER_REQUEST",
+              because: "the customer asked for this insurer",
+            },
+          ],
+          mayDeclare: true,
+          evidence: [],
+          window: {
+            title: "المادة ١٥/د",
+            text: "نص المستشار",
+            reasonHint: "السبب",
+            acknowledgement: "إقرار",
+            reasonMinLength: 20,
+          },
+        },
+      }),
+  );
+
+  await page.goto("/rfqs/new?opportunityId=opp-1");
+  await page
+    .getByLabel("فرع التأمين")
+    .selectOption({ value: "Property All Risks" });
+
+  const question = page.locator('[data-article-15-d="question"]');
+  // NON-VACUITY: it is NOT on the screen before the shortlist is short of the minimum, so what
+  // the assertion below observes is the appearance and not a section that was always there.
+  await expect(question).toHaveCount(0);
+
+  await page.getByLabel("وادي رم التعاونية · A-").check();
+
+  await expect(question).toBeVisible();
+  // ⛔ IN THE VIEWPORT, not merely in the DOM. `toBeVisible` passes on an element below the
+  // fold — it is exactly what the screen did before this change — so the box is compared with
+  // the window's own height.
+  const box = await question.boundingBox();
+  expect(box, "the art. 15/d section has no box").not.toBeNull();
+  const viewport = page.viewportSize();
+  expect(
+    box!.y,
+    `the art. 15/d section starts at y=${box!.y} on a ${viewport!.height}px window — ` +
+      "it appeared below the fold, which is the whole finding of walk §S3",
+  ).toBeLessThan(viewport!.height);
+
+  // AND IT IS ABOVE THE THRESHOLD FIELD, which is the arrangement that makes it reachable by
+  // pressing Tab once from the control that raised it.
+  const thresholdBox = await page.locator("#threshold").boundingBox();
+  expect(thresholdBox).not.toBeNull();
+  expect(box!.y).toBeLessThan(thresholdBox!.y);
 });

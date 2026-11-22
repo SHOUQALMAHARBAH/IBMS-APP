@@ -20,6 +20,11 @@ const ME = {
   fullName: "Branch Manager",
   languagePreference: "EN",
   roles: ROLES,
+  // DECISION 157 - the home page greets a person with their role's NAME, so
+  // /auth/me carries the display names beside the machine names. A fixture that
+  // omits this makes `user.roleNames.length` throw and the shell render
+  // "This page couldn't load" - a broken SCREEN rather than a stale mock.
+  roleNames: ROLES.map((r) => ({ ar: r, en: r })),
   permissions: permissionsForRoles(ROLES),
   mfaEnabled: true,
   mfaPolicySatisfied: true,

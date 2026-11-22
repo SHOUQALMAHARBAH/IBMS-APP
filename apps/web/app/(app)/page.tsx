@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import Link from 'next/link';
 import { pageStackStyle } from '../../components/lead/lead.styles';
 import { useRouter } from 'next/navigation';
@@ -50,7 +49,7 @@ const BLURBS: Partial<Record<string, TranslationKey>> = {
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -81,16 +80,19 @@ export default function HomePage() {
       <p style={{ opacity: 0.8 }}>
         {t('homeSignedInAs', {
           roles:
-            user.roles.length > 0
-              ? user.roles
-                  // A role an office defines has no translation key, so it shows
-                  // its own name. `/auth/me` returns names for display only —
-                  // authorization reads `permissions`.
-                  .map((r) => {
-                    const key =
-                      ENUM_LABEL.RoleName[r as keyof typeof ENUM_LABEL.RoleName];
-                    return key ? t(key) : r;
-                  })
+            user.roleNames.length > 0
+              ? /*
+                 * DECISION 157 («ما لا يحتاج قراراً») — a role by its NAME, never its code.
+                 *
+                 * This read `user.roles` and fell back to the raw machine name whenever
+                 * `ENUM_LABEL.RoleName` had no key. That map holds ELEVEN roles and has no key
+                 * for `OFFICE_ADMINISTRATOR`, nor for any role an office defines for itself —
+                 * so the one administrator every office has was greeted by their own role code,
+                 * and so was every custom role. There is no fallback here because there is
+                 * nothing to fall back to: `Role.nameAr` and `Role.nameEn` are both NOT NULL.
+                 */
+                user.roleNames
+                  .map((r) => (language === 'AR' ? r.ar : r.en))
                   .join(', ')
               : t('homeNoRole'),
         })}

@@ -17,7 +17,6 @@ import {
  * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
  */
 const BASE_DATA: PolicyScheduleSummaryData = {
-  policyId: 'pol-123',
   customerLegalName: 'شركة الأفق للتأمين',
   insurerName: 'الاتحاد للتأمين',
   insurerNameAr: null,
@@ -70,10 +69,31 @@ describe('buildPolicyScheduleSummaryHtml', () => {
     expect(html.indexOf('dir="rtl"')).toBeLessThan(html.indexOf('dir="ltr"'));
   });
 
-  it('includes the policy reference number and policy number so a client can cite them back', () => {
+  /*
+   * 🔴 REVERSED BY OWNER DECISION 155 RULING 3, and kept rather than deleted.
+   *
+   * This asserted the opposite — that the internal id is printed «so a client can cite
+   * it back». Measured for her: the policy NUMBER is printed two rows below, so the uuid said the same fact twice,
+   * so what a client could cite back was a 36-character uuid nobody had ever shown them.
+   * Her ruling removes the row; the paper is identified by the customer, the line and the
+   * date.
+   *
+   * ⛔ And the id left `PolicyScheduleSummaryData` entirely, so this is STRUCTURAL rather than
+   * disciplinary: the renderer does not HAVE an internal id and cannot print one.
+   */
+  it('⛔ prints NO internal reference, in either language (decision 155 ruling 3)', () => {
+    for (const lang of ['EN', 'AR'] as const) {
+      const html = buildPolicyScheduleSummaryHtml(BASE_DATA, lang);
+      expect(html).not.toContain('pol-123');
+      expect(html).not.toContain('Reference');
+      expect(html).not.toContain('رقم المرجع');
+    }
+  });
+
+  it('and what it DOES carry still identifies the paper', () => {
     const html = buildPolicyScheduleSummaryHtml(BASE_DATA, 'EN');
-    expect(html).toContain('pol-123');
     expect(html).toContain('POL-2026-001');
+    expect(html).toContain('شركة الأفق للتأمين');
   });
 
   it('includes the insurer, insurance line, dates and both premiums with the variance', () => {
@@ -232,5 +252,39 @@ describe('buildPolicyScheduleSummaryHtml', () => {
     );
     expect(ar).toContain('Al-Ittihad Insurance');
     expect(ar).toContain('Property All Risks');
+  });
+});
+
+/**
+ * ⛔ OWNER DECISION 155 RULING 3 STOPS SHORT OF THE COVERAGE KEYS — PINNED IN THE NOT-BUILT
+ * DIRECTION.
+ *
+ * The measurement that prepared this batch is explicit about why: `limits` and `sumsInsured` are
+ * free-form JSON whose key names are TYPED BY THE EMPLOYEE entering the schedule
+ * (`policy.config.ts#assertCoverageFigures` checks only «non-empty flat object of scalar
+ * values»). They are not an enum, not a vocabulary, and not a closed set — so there is no
+ * dictionary that could name them and nothing to map them to.
+ *
+ * ⟶ Where the demo's keys read in English (`perOccurrence`, `aggregate`, `total`) that is the
+ *   SEED having written them that way (`apps/api/scripts/seed-demo.script.ts`), and the repair is
+ *   in the seed, waiting for the owner's words. ⛔ Not here.
+ *
+ * This is ASSERTED rather than left to discipline, because a later batch sweeping «the rest of
+ * the raw values on the four papers» would otherwise walk straight into it and invent a
+ * vocabulary for something a user named.
+ */
+describe('⛔ coverage keys are printed as the employee typed them', () => {
+  it('renders an unusual key verbatim rather than mapping or dropping it', () => {
+    const html = buildPolicyScheduleSummaryHtml(
+      {
+        ...BASE_DATA,
+        limits: [{ key: 'flood – basement only', value: '25000.000' }],
+        sumsInsured: [{ key: 'stock at the Zarqa depot', value: '40000.000' }],
+      },
+      'AR',
+    );
+    // Both keys reach the paper exactly as written. A map would have rendered neither.
+    expect(html).toContain('flood – basement only');
+    expect(html).toContain('stock at the Zarqa depot');
   });
 });

@@ -703,7 +703,10 @@ export default function RoleAdminPage() {
           <Table>
             <thead>
               <tr>
-                <Th>{t('dutySegColOperation')}</Th>
+                {/* DECISION 157 ruling 11 — the OPERATION column is removed. It printed the
+                    programmatic entity name (`KYCRecord`, `PolicyChecking`), which is the one
+                    thing on this table a reader cannot act on. The permission column stays and
+                    carries the permission’s ratified Arabic name (DECISION 127). */}
                 <Th>{t('dutySegColPermission')}</Th>
                 <Th>{t('dutySegColHolders')}</Th>
                 <Th>{t('dutySegColStatus')}</Th>
@@ -724,7 +727,6 @@ export default function RoleAdminPage() {
                     key={row.constraint ?? row.entityType + row.pairLabel}
                     data-duty-row={row.status}
                   >
-                    <Td>{row.entityType}</Td>
                     <Td>
                       {/* OWNER DECISION 127 — the approver's permission by its ratified name.
                           English keeps the code: no decision rules an English name. */}

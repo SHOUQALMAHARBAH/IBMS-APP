@@ -954,7 +954,8 @@ export default function RegulatoryCompliancePage() {
                   value={branchLineId}
                   onChange={(e) => setBranchLineId(e.target.value)}
                 >
-                  <option value="">—</option>
+                  {/* OWNER DECISION 153 §٢ row ٢٠-ب. */}
+                  <option value="">{t('rcLineChoosePlaceholder')}</option>
                   {lines.map((line) => (
                     <option key={line.id} value={line.id}>
                       {(language === 'AR' ? line.nameAr : line.nameEn) +

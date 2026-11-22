@@ -216,9 +216,12 @@ export function CommissionSection({
                 <span>{t('polCommManualOverride')}</span>
                 <span>
                   {formatMoney(entry.overrideAmount, language)}{' '}
+                  {/* DECISION 157 table ج row ٦-أ and table ب row ٢-٨. «(معتمد)» is its OWN
+                      key here: `claimSettlementApprovedSeparator` carries the same word on the
+                      claim card, and one key serving two screens is one key that cannot move. */}
                   {entry.overridePending
-                    ? '(pending approval)'
-                    : '(approved)'}
+                    ? t('polCommOverridePendingApproval')
+                    : t('polCommOverrideApproved')}
                 </span>
               </div>
               {entry.overrideReason ? (
@@ -348,7 +351,11 @@ export function CommissionSection({
               }}
             >
               <label>
-                Insurer statement amount (must equal {formatMoney(entry.amount, language)})
+                {/* DECISION 157 table ب row ٢-٩ and table ج row ٦-ب. */}
+                {t('polCommStatementAmountInline')}{' '}
+                {t('polCommStatementMustEqual', {
+                  amount: formatMoney(entry.amount, language),
+                })}
                 <input
                   aria-label={t('polCommStatementAmount')}
                   value={statementAmount}

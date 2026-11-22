@@ -39,7 +39,6 @@ import {
  * client needs, only this broker's own internal workflow record of it. */
 
 export interface RecommendationReportData {
-  recommendationId: string;
   customerLegalName: string;
   insuranceLine: string;
   createdAt: Date;
@@ -104,7 +103,6 @@ function renderSection(
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
-          ['رقم المرجع', escapeHtml(data.recommendationId)],
           ['العميل', escapeHtml(data.customerLegalName)],
           // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
           //
@@ -138,7 +136,6 @@ function renderSection(
           ],
         ]
       : [
-          ['Reference', escapeHtml(data.recommendationId)],
           ['Customer', escapeHtml(data.customerLegalName)],
           ['Insurance Line', escapeHtml(data.insuranceLine)],
           ['Prepared', formatDocumentDate(data.createdAt, 'en')],

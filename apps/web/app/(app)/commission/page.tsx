@@ -274,7 +274,8 @@ export default function CommissionRatesPage() {
                       {r.effectiveTo ? r.effectiveTo.slice(0, 10) : '—'}
                     </Td>
                     <Td>
-                      {r.isOpen ? <strong>{t('crateOpen')}</strong> : 'Closed'}
+                      {/* DECISION 157 table ب row ٢-١٣. */}
+                      {r.isOpen ? <strong>{t('crateOpen')}</strong> : t('crateStatusClosed')}
                     </Td>
                   </Tr>
                 ))}

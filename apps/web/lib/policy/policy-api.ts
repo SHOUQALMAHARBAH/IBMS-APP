@@ -74,6 +74,14 @@ export interface PolicySchedule {
 export interface PolicyChecking {
   placedByUserId: string;
   checkedByUserId: string | null;
+  /**
+   * The checker's display name, resolved on the server through `displayNameForUserId`.
+   *
+   * OWNER DECISION 153 §٢ row ٧ (amended by 157 table أ): the checking line reads
+   * «دقّقها: {name} في {date}». ⛔ `checkedByUserId` is NOT rendered — 153 §٦ criterion 4.
+   * Null when nobody has checked, or when the account is gone.
+   */
+  checkedByName: string | null;
   checkedAt: string | null;
   discrepancyFound: boolean;
   discrepancyDetail: string | null;

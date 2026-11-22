@@ -66,7 +66,6 @@ export class RecommendationReportDocumentService {
     const insurerPair = resolveInsurerNamePair(q.insurer);
     const html = buildRecommendationReportHtml(
       {
-        recommendationId: view.id,
         customerLegalName: customer.legalName,
         insuranceLine: q.rfq.insuranceLine,
         createdAt: view.createdAt,

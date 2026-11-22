@@ -56,9 +56,8 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
         ...(dutyReason.trim() ? { combinedDutyReason: dutyReason.trim() } : {}),
       });
-      setMessage(
-        `Cycle "${cycle.cycleLabel}" started — your review queue below now reflects it.`,
-      );
+      // DECISION 157 table ج row ١٠.
+      setMessage(t("acrCycleStartedMessage", { name: cycle.cycleLabel }));
       setCycleLabel("");
       setDueAt("");
       setDutyReason("");
@@ -115,7 +114,8 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
             disabled={isSubmitting}
             style={{ ...buttonStyle, marginTop: 0, width: "auto" }}
           >
-            {isSubmitting ? t("secStartingButton") : "Start cycle"}
+            {/* Measurement §2 (walk §A3): «بدء دورة» has shipped unused since it was written. */}
+            {isSubmitting ? t("secStartingButton") : t("acrStartCycleButton")}
           </button>
         </div>
         {message ? <p style={successStyle}>{message}</p> : null}

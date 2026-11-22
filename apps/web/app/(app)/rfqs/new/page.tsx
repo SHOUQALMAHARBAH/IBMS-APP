@@ -13,7 +13,12 @@ import {
   type Article15DChoice,
   type Article15DOptions,
   type SelectableInsurer,
+  OPPORTUNITY_NOT_OPEN_FOR_RFQ,
 } from '../../../../lib/rfq/rfq-api';
+import {
+  OPPORTUNITY_STATUS_LABEL_KEY,
+} from '../../../../lib/opportunity/opportunity-status';
+import type { OpportunityStatus } from '../../../../lib/opportunity/opportunity-api';
 import { Article15DWindow } from '../../../../components/rfq/Article15DWindow';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
@@ -197,11 +202,36 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       });
       router.push(`/rfqs/${rfq.id}`);
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError ? err.message : t('rfqNewCreateError'),
-      );
+      setSubmitError(refusalText(err));
       setSubmitting(false);
     }
+  }
+
+  /**
+   * OWNER DECISION 157 ruling 1 — her sentence, with the opportunity's stage NAMED.
+   *
+   * Decision 153 §٢ row ١٦ ratified «…لأنها في مرحلة التنسيب», and the server refuses in every
+   * status but `NEEDS_CONFIRMED` and `RFQ_ISSUED` — so six of the eight stages the sentence can
+   * be shown for made it untrue. 157 keeps the sentence and lets the stage name itself.
+   *
+   * ⛔ Read off the refusal's stable CODE and its `opportunityStatus` field, never its prose.
+   * This screen holds only `?opportunityId=` and never fetches the record, so the refusal is the
+   * only thing that can tell it the stage. An unknown stage falls back to the server's own
+   * message rather than printing a raw enum token at a reader.
+   */
+  function refusalText(err: unknown): string {
+    if (!(err instanceof ApiError)) return t('rfqNewCreateError');
+    if (err.code === OPPORTUNITY_NOT_OPEN_FOR_RFQ) {
+      const status = err.details?.opportunityStatus;
+      const key =
+        typeof status === 'string'
+          ? OPPORTUNITY_STATUS_LABEL_KEY[status as OpportunityStatus]
+          : undefined;
+      if (key) {
+        return t('rfqOpportunityStatusRefusal', { status: t(key) });
+      }
+    }
+    return err.message;
   }
 
   if (loadError) {
@@ -296,6 +326,38 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         </div>
       </fieldset>
 
+      {/*
+        🔴 DIRECTLY UNDER THE INSURER LIST, which is what makes it visible at all.
+
+        The owner’s walk (§S3): «خالد يختار الشركة الثانية في طلب العرض. يظهر سؤال الإعفاء
+        تحت، خارج ما يراه، فيظنّ أن شيئاً لم يحصل.» This section is what art. 15/d asks when a
+        shortlist falls short of the minimum, and it was rendered AFTER the follow-up threshold
+        field — so on an ordinary window it appeared below the fold, triggered by a click the
+        employee had just made somewhere else entirely. Nothing scrolled to it and nothing
+        pointed at it.
+
+        ⟶ MOVED rather than scrolled to, deliberately. A scroll-on-appearance moves the page
+          under a mouse that has not been told to expect it, and for a KEYBOARD user it is worse:
+          focus stays on the insurer checkbox while the viewport jumps somewhere else, which is
+          the one thing a screen must not do to someone who cannot see where it went. Moving the
+          markup costs nothing at runtime and puts the question beside its own cause.
+
+        ⟶ For a keyboard user the tab order now runs: the last insurer checkbox, then the
+          exemption controls, then the threshold field, then submit. The question is reached by
+          pressing Tab once from the control that raised it — no scroll, no focus move, and
+          nothing is announced that the reader did not navigate to.
+
+        ⛔ NOT ONE WORD CHANGES. `Article15DWindow` is untouched.
+      */}
+      {a15d ? (
+        <Article15DWindow
+          options={a15d}
+          choice={choice}
+          onChange={setChoice}
+          disabled={submitting}
+        />
+      ) : null}
+
       <label
         htmlFor="threshold"
         style={{ display: 'block', fontWeight: 600, marginTop: '1.5rem' }}
@@ -312,15 +374,6 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         onChange={(e) => setThreshold(e.target.value)}
         style={{ width: '6rem', marginTop: '0.35rem' }}
       />
-
-      {a15d ? (
-        <Article15DWindow
-          options={a15d}
-          choice={choice}
-          onChange={setChoice}
-          disabled={submitting}
-        />
-      ) : null}
 
       <div style={{ marginTop: '1.5rem' }}>
         <button type="submit" disabled={!canSubmit} style={buttonStyle}>

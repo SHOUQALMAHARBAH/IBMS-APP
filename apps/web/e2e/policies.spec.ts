@@ -31,7 +31,15 @@ async function mockAuth(page: Page, roles: string[]) {
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+      json: {
+        ...ME_BASE,
+        roles,
+        // DECISION 157 - the home page greets a person by their role's NAME, so
+        // /auth/me carries the display names. Required of every spec that can reach `/`;
+        // `home-shell-fixtures.test.ts` is the guard.
+        roleNames: roles.map((r) => ({ ar: r, en: r })),
+        permissions: permissionsForRoles(roles),
+      },
     }),
   );
 }
