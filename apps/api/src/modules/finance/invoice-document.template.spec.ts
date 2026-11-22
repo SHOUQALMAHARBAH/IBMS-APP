@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import {
   buildInvoiceHtml,
@@ -17,7 +20,6 @@ import {
  * Latin name and a DIFFERENT Arabic one, so it fails unless the pair is really being read.
  */
 const BASE_DATA: InvoiceDocumentData = {
-  invoiceId: 'inv-123',
   customerLegalName: 'شركة الأفق للتأمين',
   policyNumber: 'POL-2026-001',
   insuranceLine: 'Property All Risks',
@@ -63,10 +65,31 @@ describe('buildInvoiceHtml', () => {
     expect(html.indexOf('dir="rtl"')).toBeLessThan(html.indexOf('dir="ltr"'));
   });
 
-  it('includes the invoice reference and policy number so a client can cite them back', () => {
+  /*
+   * 🔴 REVERSED BY OWNER DECISION 155 RULING 3, and kept rather than deleted.
+   *
+   * This asserted the opposite — that the internal id is printed «so a client can cite
+   * it back». Measured for her: no invoice number exists in this system at all,
+   * so what a client could cite back was a 36-character uuid nobody had ever shown them.
+   * Her ruling removes the row; the paper is identified by the customer, the line and the
+   * date.
+   *
+   * ⛔ And the id left `InvoiceDocumentData` entirely, so this is STRUCTURAL rather than
+   * disciplinary: the renderer does not HAVE an internal id and cannot print one.
+   */
+  it('⛔ prints NO internal reference, in either language (decision 155 ruling 3)', () => {
+    for (const lang of ['EN', 'AR'] as const) {
+      const html = buildInvoiceHtml(BASE_DATA, lang);
+      expect(html).not.toContain('inv-123');
+      expect(html).not.toContain('Reference');
+      expect(html).not.toContain('رقم المرجع');
+    }
+  });
+
+  it('and what it DOES carry still identifies the paper', () => {
     const html = buildInvoiceHtml(BASE_DATA, 'EN');
-    expect(html).toContain('inv-123');
     expect(html).toContain('POL-2026-001');
+    expect(html).toContain('شركة الأفق للتأمين');
   });
 
   it('includes the insurer, insurance line, dates, a client-facing status and the four money figures', () => {
@@ -134,7 +157,10 @@ describe('buildInvoiceHtml', () => {
     );
     expect(html).toContain('Payment Received');
     expect(html).toContain('JOD 115,350.000');
-    expect(html).toContain('bank_transfer');
+    // DECISION 155 RULING 3 — the method in WORDS. This asserted the raw `bank_transfer`
+    // token, which is what the paper used to print at a customer.
+    expect(html).toContain('Bank transfer');
+    expect(html).not.toContain('bank_transfer');
     // Still "Paid" — this instalment settles the whole 115,350 total, so the sum-based test and
     // the old existence test agree here. The two tests below are where they disagree.
     expect(html).toContain('Paid');
@@ -191,8 +217,10 @@ describe('buildInvoiceHtml', () => {
     // Both instalments, both methods — the second was invisible before.
     expect(html).toContain('JOD 15,350.000');
     expect(html).toContain('JOD 100,000.000');
-    expect(html).toContain('cash');
-    expect(html).toContain('bank_transfer');
+    // DECISION 155 RULING 3 — both methods in WORDS, not as stored tokens.
+    expect(html).toContain('Cash');
+    expect(html).toContain('Bank transfer');
+    expect(html).not.toContain('bank_transfer');
     // 15,350 + 100,000 = 115,350 = the total, so this one IS settled. The old code would have
     // called it settled on the strength of the 15,350 alone, which is the same answer reached by
     // luck rather than by arithmetic.
@@ -271,5 +299,115 @@ describe('buildInvoiceHtml', () => {
     expect(ar).toContain('فرع التأمين');
     expect(ar).toContain('شركة التأمين');
     expect(ar).toContain('—');
+  });
+});
+
+/**
+ * 🔴 OWNER DECISION 155 RULING 3 — THE RECEIPT METHOD, AND THE TWO HOMES PINNED TOGETHER.
+ *
+ * The receipt block rendered `Receipt.method` AS STORED, so an Arabic invoice said «طريقة الدفع:
+ * bank_transfer» — a snake_case database token on a paper a customer is handed.
+ *
+ * The four words are COPIED from the screens' dictionary, because an api template cannot import
+ * `apps/web`. ⚠️ A copied string is a second home, so it is pinned: this reads
+ * `apps/web/lib/i18n/translations/policy.ts` at test time and compares byte for byte.
+ */
+describe('decision 155 ruling 3 — the receipt method in words', () => {
+  const WEB_POLICY = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'web',
+    'lib',
+    'i18n',
+    'translations',
+    'policy.ts',
+  );
+
+  function dictionary(half: 'AR' | 'EN'): Map<string, string> {
+    const src = readFileSync(WEB_POLICY, 'utf8');
+    const at = src.indexOf(`  ${half}: {`);
+    expect(at, `the ${half} half is not in policy.ts`).toBeGreaterThan(-1);
+    const out = new Map<string, string>();
+    for (const line of src.slice(at).split('\n')) {
+      const m = /^\s*(financeMethod[A-Za-z]+):\s*'([^']*)',/.exec(line);
+      if (m && !out.has(m[1])) out.set(m[1], m[2]);
+    }
+    return out;
+  }
+
+  function withMethod(method: string, lang: 'AR' | 'EN'): string {
+    return buildInvoiceHtml(
+      {
+        ...BASE_DATA,
+        receipts: [
+          {
+            amount: { toString: () => '115350' },
+            method,
+            receivedAt: new Date('2026-04-02T00:00:00Z'),
+          },
+        ],
+      },
+      lang,
+    );
+  }
+
+  it.each([
+    ['bank_transfer', 'financeMethodBank'],
+    ['cheque', 'financeMethodCheque'],
+    ['card', 'financeMethodCard'],
+    ['cash', 'financeMethodCash'],
+  ])(
+    '%s renders the same words the screens use, in both halves',
+    (method, key) => {
+      for (const half of ['AR', 'EN'] as const) {
+        const want = dictionary(half).get(key);
+        expect(want, `${key} is not in policy.ts's ${half} half`).toBeTruthy();
+        expect(withMethod(method, half)).toContain(want!);
+      }
+    },
+  );
+
+  it('⛔ and the stored token never reaches either paper', () => {
+    for (const half of ['AR', 'EN'] as const) {
+      expect(withMethod('bank_transfer', half)).not.toContain('bank_transfer');
+    }
+  });
+
+  /*
+   * 🔴 WHAT A FIFTH VALUE RENDERS, which the message asks for by name.
+   *
+   * `Receipt.method` is a FREE STRING in the schema (`method String?`) — not an enum — and the
+   * schema's own comment names four values rather than constraining them. So a fifth is
+   * representable, and it renders AS STORED (owner decision 49) rather than blank.
+   *
+   * ⟶ That is the honest answer: the alternative is a receipt that omits how the customer paid.
+   *   It is also WHY the map is a lookup with a fallback rather than a total `Record`.
+   */
+  it('⚠️ a fifth value renders AS STORED, never blank (decision 49)', () => {
+    const html = withMethod('crypto', 'AR');
+    expect(html).toContain('crypto');
+    // And the row is still there with its label, rather than collapsing to a dash.
+    expect(html).toContain('طريقة الدفع');
+  });
+
+  it('and a receipt with NO method keeps the dash it always had', () => {
+    const html = buildInvoiceHtml(
+      {
+        ...BASE_DATA,
+        receipts: [
+          {
+            amount: { toString: () => '115350' },
+            method: null,
+            receivedAt: new Date('2026-04-02T00:00:00Z'),
+          },
+        ],
+      },
+      'AR',
+    );
+    expect(html).toContain('طريقة الدفع');
+    expect(html).toContain('—');
   });
 });

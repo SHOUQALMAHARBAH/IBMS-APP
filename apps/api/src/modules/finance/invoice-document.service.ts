@@ -88,7 +88,6 @@ export class InvoiceDocumentService {
 
     const html = buildInvoiceHtml(
       {
-        invoiceId: invoice.id,
         customerLegalName: customer.legalName,
         policyNumber: policy?.policyNumber ?? null,
         insuranceLine: policy?.insuranceLine ?? null,

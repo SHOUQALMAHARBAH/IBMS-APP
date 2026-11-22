@@ -43,7 +43,6 @@ export interface InvoiceReceiptData {
 }
 
 export interface InvoiceDocumentData {
-  invoiceId: string;
   customerLegalName: string;
   /** Null when the invoice carries no `policyId` (schema-permitted, though
    * every invoice created by #31 today always has one). */
@@ -82,6 +81,46 @@ export interface InvoiceDocumentData {
    * fallback otherwise (see `invoice-document.service.ts`). */
   bodyEn: string;
   bodyAr: string;
+}
+
+/**
+ * 🔴 OWNER DECISION 155 RULING 3 — how the money arrived, in words.
+ *
+ * The receipt block printed `Receipt.method` AS STORED, so an Arabic invoice handed to a
+ * customer said «طريقة الدفع: bank_transfer» — a snake_case database token on a paper. Decision
+ * 49's subject, on an outward document.
+ *
+ * ⚠️ `Receipt.method` IS A FREE STRING, not an enum (`schema.prisma`: `method String?`), and the
+ * schema's own comment names four values. So this is a LOOKUP WITH A FALLBACK rather than a
+ * total map, and the fallback is the stored value itself (decision 49) — never blank. A FIFTH
+ * value renders exactly as it is stored, which is honest: the alternative is a paper that omits
+ * how the customer paid.
+ *
+ * ⚠️ COPIED from `apps/web/lib/i18n/translations/policy.ts`, not imported — separate builds —
+ * and `invoice-document.template.spec.ts` asserts these eight strings byte-equal to
+ * `financeMethod*` so the two cannot drift. ⛔ Do not reword one half.
+ */
+const RECEIPT_METHOD_LABEL: Record<'en' | 'ar', Record<string, string>> = {
+  ar: {
+    bank_transfer: 'تحويل بنكي',
+    cheque: 'شيك',
+    card: 'بطاقة',
+    cash: 'نقد',
+  },
+  en: {
+    bank_transfer: 'Bank transfer',
+    cheque: 'Cheque',
+    card: 'Card',
+    cash: 'Cash',
+  },
+};
+
+function receiptMethodLabel(
+  method: string | null | undefined,
+  lang: 'en' | 'ar',
+): string {
+  if (!method) return '—';
+  return RECEIPT_METHOD_LABEL[lang][method] ?? method;
 }
 
 function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
@@ -131,7 +170,6 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
-          ['رقم المرجع', escapeHtml(data.invoiceId)],
           ['العميل', escapeHtml(data.customerLegalName)],
           ['رقم الوثيقة', escapeHtml(data.policyNumber ?? '—')],
           // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
@@ -142,7 +180,6 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
           ['الحالة', clientStatus],
         ]
       : [
-          ['Reference', escapeHtml(data.invoiceId)],
           ['Customer', escapeHtml(data.customerLegalName)],
           ['Policy Number', escapeHtml(data.policyNumber ?? '—')],
           ['Insurance Line', escapeHtml(line ?? '—')],
@@ -203,7 +240,7 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
         data.currency,
       )}</td></tr>
       <tr><th>${escapeHtml(lang === 'ar' ? 'طريقة الدفع' : 'Method')}</th><td>${escapeHtml(
-        receipt.method ?? '—',
+        receiptMethodLabel(receipt.method, lang),
       )}</td></tr>
       <tr><th>${escapeHtml(lang === 'ar' ? 'تاريخ الاستلام' : 'Received')}</th><td>${formatDocumentDate(
         receipt.receivedAt,

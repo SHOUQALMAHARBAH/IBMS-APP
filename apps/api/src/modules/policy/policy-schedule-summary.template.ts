@@ -50,7 +50,6 @@ import type { CoverageFigureEntry } from './policy.config';
 export type { CoverageFigureEntry };
 
 export interface PolicyScheduleSummaryData {
-  policyId: string;
   customerLegalName: string;
   insurerName: string;
   /** The insurer's Arabic name, or null where none is recorded — decision 153 §U2's
@@ -156,7 +155,6 @@ function renderSection(
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
-          ['رقم المرجع', escapeHtml(data.policyId)],
           ['العميل', escapeHtml(data.customerLegalName)],
           ['شركة التأمين', escapeHtml(insurer)],
           ['رقم الوثيقة', escapeHtml(data.policyNumber ?? '—')],
@@ -182,7 +180,6 @@ function renderSection(
           ['فترة سريان الجدول', scheduleRange],
         ]
       : [
-          ['Reference', escapeHtml(data.policyId)],
           ['Customer', escapeHtml(data.customerLegalName)],
           ['Insurer', escapeHtml(insurer)],
           ['Policy Number', escapeHtml(data.policyNumber ?? '—')],

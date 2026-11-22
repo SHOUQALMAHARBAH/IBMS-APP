@@ -41,13 +41,27 @@ export interface QuotationComparisonRow {
   conditions: string | null;
 }
 
+/**
+ * ⚠️ REPORTED, NOT FIXED — this type carries ONE name where the rest of the table carries two.
+ *
+ * `QuotationComparisonRow` holds `insurerName` AND `insurerNameAr`, and the template resolves
+ * the pair by language. This does not: `comparison.service.ts` fills it through `insurerName()`,
+ * the single-name resolver, so an insurer that never responded and one that declined print in
+ * LATIN on the Arabic comparison while every insurer in the table above prints in Arabic. One
+ * paper, two rules about the same company's name.
+ *
+ * ⛔ Not fixed here. Message 51 §3 item 5 says report it, and the fix is the same shape as the
+ * Arabic LINE name the message defers: the resolver and the service both move to the bilingual
+ * pair (`resolveInsurerNamePair`), which is a query-and-view change on two more call sites.
+ * Doing half of it — widening the type without filling it — would put a field on the wire that
+ * is always null and read as done.
+ */
 export interface FlaggedInsurerData {
   name: string;
   status: string | null;
 }
 
 export interface QuotationComparisonData {
-  comparisonId: string;
   insuranceLine: string;
   customerLegalName: string;
   builtAt: Date;
@@ -118,6 +132,42 @@ function renderRow(row: QuotationComparisonRow, lang: 'en' | 'ar'): string {
   return `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
 }
 
+/**
+ * 🔴 OWNER DECISION 155 RULING 3 — the insurer's response state, in words.
+ *
+ * This printed `submission.status` AS STORED, so an Arabic comparison handed to a customer said
+ * «شركة الشرق الأوسط (NO_RESPONSE)». It is a database token, in English, inside a sentence the
+ * customer is meant to read — decision 49's subject exactly.
+ *
+ * ⚠️ COPIED, not imported. An api template cannot read `apps/web`'s dictionary — they are
+ * separate builds — and every other label in this file is copied the same way. What stops the
+ * two drifting is `quotation-comparison.template.spec.ts`, which reads
+ * `apps/web/lib/i18n/translations/rfq.ts` and asserts these ten strings are byte-equal to
+ * `rfqInsurerStatus*`. ⛔ Do not reword one half.
+ *
+ * TOTAL over `RfqInsurerStatus`, so a sixth member is a TYPE ERROR here rather than a raw token
+ * on a customer's paper.
+ */
+const INSURER_STATUS_LABEL: Record<
+  'en' | 'ar',
+  Record<'SENT' | 'VIEWED' | 'QUOTED' | 'DECLINED' | 'NO_RESPONSE', string>
+> = {
+  ar: {
+    SENT: 'أُرسل',
+    VIEWED: 'اطُّلع عليه',
+    QUOTED: 'قدَّم عرضاً',
+    DECLINED: 'رفض',
+    NO_RESPONSE: 'لا استجابة',
+  },
+  en: {
+    SENT: 'Sent',
+    VIEWED: 'Viewed',
+    QUOTED: 'Quoted',
+    DECLINED: 'Declined',
+    NO_RESPONSE: 'No response',
+  },
+};
+
 function flaggedList(
   insurers: FlaggedInsurerData[],
   lang: 'en' | 'ar',
@@ -127,7 +177,16 @@ function flaggedList(
     .map((i) => {
       const name = escapeHtml(i.name);
       if (!withStatus || !i.status) return name;
-      return `${name} (${escapeHtml(i.status)})`;
+      /*
+       * A status the map does not know renders AS STORED (decision 49) rather than blank. The
+       * column is a Prisma enum, so this branch is unreachable today — and an unreachable
+       * fallback that prints the token beats a reachable one that prints nothing.
+       */
+      const shown =
+        INSURER_STATUS_LABEL[lang][
+          i.status as keyof (typeof INSURER_STATUS_LABEL)['ar']
+        ] ?? i.status;
+      return `${name} (${escapeHtml(shown)})`;
     })
     .join(', ');
 }
@@ -144,7 +203,6 @@ function renderSection(
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
-          ['رقم المرجع', data.comparisonId],
           ['العميل', data.customerLegalName],
           // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
           //
@@ -156,7 +214,6 @@ function renderSection(
           ['تاريخ الإعداد', formatDocumentDate(data.builtAt, 'ar')],
         ]
       : [
-          ['Reference', data.comparisonId],
           ['Customer', data.customerLegalName],
           ['Insurance Line', data.insuranceLine],
           ['Prepared', formatDocumentDate(data.builtAt, 'en')],
