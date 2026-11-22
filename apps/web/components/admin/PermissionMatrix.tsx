@@ -11,6 +11,12 @@ import type { PermissionCatalogueEntry } from '../../lib/admin/role-admin-api';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { describePermission } from '../../lib/admin/permission-descriptions';
 import {
+  VERB_LABEL,
+  familyDisplayName,
+  permissionDisplayName,
+  permissionSearchHaystack,
+} from '../../lib/admin/permission-names';
+import {
   matrixCountStyle,
   matrixModuleStyle,
   matrixRowStyle,
@@ -75,20 +81,6 @@ export function PermissionMatrix({
   const modules = useMemo(() => buildMatrix(catalogue), [catalogue]);
   const normalisedQuery = query.trim().toLowerCase();
 
-  const visible = useMemo(() => {
-    if (!normalisedQuery) return modules;
-    return modules
-      .map((m) => ({
-        ...m,
-        rows: m.rows.filter((row) =>
-          codesOfRow(row).some((code) => code.toLowerCase().includes(normalisedQuery)),
-        ),
-      }))
-      .filter((m) => m.rows.length > 0);
-  }, [modules, normalisedQuery]);
-
-  const totalGranted = catalogue.reduce((n, p) => (selected.has(p.code) ? n + 1 : n), 0);
-
   /** Stored description per code, so the explanation line can be looked up without rescanning. */
   const stored = useMemo(() => {
     const map = new Map<string, string>();
@@ -96,8 +88,51 @@ export function PermissionMatrix({
     return map;
   }, [catalogue]);
 
+  /*
+   * SEARCH MATCHES WHAT THE READER CAN SEE, and the code as well.
+   *
+   * It matched the CODE alone, which was serviceable while the code was what the row rendered.
+   * Once decision 127's names ship, an administrator typing «مطالبات» into a screen full of
+   * Arabic would have found nothing, because the only thing being matched was `claim.read` —
+   * a search over text that is no longer on the page.
+   *
+   * The code stays matchable deliberately: it is what a support conversation names, and nothing
+   * is lost by keeping a haystack wider than the page. The DESCRIPTION is matched too, because
+   * it is rendered beneath the name and a reader who can see a word expects to find it.
+   */
+  const visible = useMemo(() => {
+    if (!normalisedQuery) return modules;
+    return modules
+      .map((m) => ({
+        ...m,
+        rows: m.rows.filter((row) => {
+          const family =
+            row.kind === 'crud'
+              ? familyDisplayName(row.family, language).toLowerCase()
+              : '';
+          return (
+            family.includes(normalisedQuery) ||
+            codesOfRow(row).some((code) =>
+              permissionSearchHaystack(
+                code,
+                language,
+                describePermission(code, language, stored.get(code)),
+              ).includes(normalisedQuery),
+            )
+          );
+        }),
+      }))
+      .filter((m) => m.rows.length > 0);
+  }, [modules, normalisedQuery, language, stored]);
+
+  const totalGranted = catalogue.reduce(
+    (n, p) => (selected.has(p.code) ? n + 1 : n),
+    0,
+  );
+
   /** The line under a checkbox. `null` when there is nothing honest to show yet. */
-  const explain = (code: string) => describePermission(code, language, stored.get(code));
+  const explain = (code: string) =>
+    describePermission(code, language, stored.get(code));
 
   /**
    * OWNER DECISION 131 — the codes this office has not decided on yet, marked «جديدة» in green.
@@ -157,18 +192,22 @@ export function PermissionMatrix({
           />
           <span>
             {/* 🔴 OWNER DECISION 127 (2026-11-03) — NO PERMISSION CODE IS EVER SHOWN TO A USER.
-                Every permission is to carry a short plain Arabic NAME, sliced from its own shipped
+                Every permission carries a short plain Arabic NAME, sliced from its own shipped
                 Arabic description, and the code stays inside the system as a reference: on
                 `data-code` for the tests, matched by search, never rendered. An office manager
                 handing out `rfq.read` is being asked to grant something they cannot read.
 
-                NOT BUILT. Three render sites carry the code today — this one, the family header
-                below, and `settings/roles/page.tsx` — plus five Arabic refusal messages ending in
-                `({code})`. The name table is a derivation from the descriptions and the owner
-                ratifies it before any name ships; the first name is hers already
-                (`retention.archive.retrieve` → «استخراج سجل مؤرشف/محجوب»). See
-                `docs/decision-127-no-permission-code-shown-an-arabic-name.md`. */}
-            <code>{row.code}</code>
+                BUILT in message 50, from the 196 ratified names in `lib/admin/permission-names.ts`
+                — this site, the family header below, the two on `settings/roles/page.tsx`, the six
+                refusal templates and the nine Arabic texts that wrote a code inside a sentence.
+
+                ⛔ ENGLISH STILL RENDERS THE CODE, and that is an empty cell rather than a choice:
+                every ratified name is Arabic and no decision says what an English reader sees.
+                `permissionDisplayName` is where that branch lives. */}
+            {/* ⛔ NO `data-code` HERE: the checkbox above already carries it, and a second one
+                on this element makes `[data-code="x"]` match twice — a Playwright strict-mode
+                violation in the specs that check a box by its code. */}
+            <code>{permissionDisplayName(row.code, language)}</code>
             {/* 🔴 OWNER DECISION 131 — «معلم عليها بالاخضر ع انها جديدة».
                 A permission this office has not decided on: it arrived after the office was
                 created, no role here holds it, and nobody here has ruled on it. Granting it to
@@ -221,8 +260,16 @@ export function PermissionMatrix({
     const all = codesOfRow(row);
     const every = all.every((c) => selected.has(c));
     return (
-      <div key={row.family} style={matrixRowStyle} data-crud-family={row.family}>
-        <code>{row.family}</code>
+      <div
+        key={row.family}
+        style={matrixRowStyle}
+        data-crud-family={row.family}
+      >
+        {/* OWNER DECISION 127 — the family's own ratified name (annex 144 §٢), with its verbs
+            rendered as the checkbox labels beside it. That is «الاسم · الفعل» as decision 156's
+            own example reads it: «أدوار المكتب» وتحتها «عرض · إنشاء · تعديل · تعطيل».
+            `data-crud-family` keeps the family string for the tests. */}
+        <code>{familyDisplayName(row.family, language)}</code>
         <span style={matrixVerbStyle}>
           {/* Full is a convenience over the same codes, never a separate grant — so a role can never
               hold "full" while missing one of the codes it is supposed to mean. */}
@@ -258,7 +305,11 @@ export function PermissionMatrix({
             {Object.entries(row.codes).map(([verb, code]) => {
               const line = explain(code);
               return line ? (
-                <span key={code} style={matrixDescriptionStyle} data-describes={code}>
+                <span
+                  key={code}
+                  style={matrixDescriptionStyle}
+                  data-describes={code}
+                >
                   {t(VERB_LABEL[verb] ?? 'roleVerbOther')}: {line}
                 </span>
               ) : null;
@@ -272,7 +323,10 @@ export function PermissionMatrix({
   return (
     <div data-permission-matrix>
       <p style={matrixSummaryStyle} data-matrix-summary>
-        {t('roleMatrixSummary', { granted: totalGranted, total: catalogue.length })}
+        {t('roleMatrixSummary', {
+          granted: totalGranted,
+          total: catalogue.length,
+        })}
       </p>
 
       <label style={{ display: 'block' }}>
@@ -286,12 +340,15 @@ export function PermissionMatrix({
         />
       </label>
 
-      {visible.length === 0 ? <p role="status">{t('roleMatrixNoMatch')}</p> : null}
+      {visible.length === 0 ? (
+        <p role="status">{t('roleMatrixNoMatch')}</p>
+      ) : null}
 
       {visible.map((moduleEntry) => {
         // A search result opens what it matched: making someone expand a module to see the row they
         // just searched for is the same as not finding it.
-        const isOpen = normalisedQuery.length > 0 || open.has(moduleEntry.module);
+        const isOpen =
+          normalisedQuery.length > 0 || open.has(moduleEntry.module);
         return (
           <details
             key={moduleEntry.module}
@@ -301,15 +358,20 @@ export function PermissionMatrix({
             onToggle={(e) => {
               if (normalisedQuery) return;
               const next = new Set(open);
-              if ((e.currentTarget as HTMLDetailsElement).open) next.add(moduleEntry.module);
+              if ((e.currentTarget as HTMLDetailsElement).open)
+                next.add(moduleEntry.module);
               else next.delete(moduleEntry.module);
               setOpen(next);
             }}
           >
             <summary>
               {t(MODULE_LABEL[moduleEntry.module] ?? 'roleModuleOther')}
-              <span style={matrixCountStyle} data-module-count={moduleEntry.module}>
-                {grantedInModule(moduleEntry, selected)} / {moduleEntry.codes.length}
+              <span
+                style={matrixCountStyle}
+                data-module-count={moduleEntry.module}
+              >
+                {grantedInModule(moduleEntry, selected)} /{' '}
+                {moduleEntry.codes.length}
               </span>
             </summary>
             {/* SECTION-level select-all, which the owner expected the row-level "الكل" to be. It
@@ -318,18 +380,25 @@ export function PermissionMatrix({
                 disclosure control, so a checkbox within it nests interactive controls — axe flagged
                 76 nodes for exactly that, and it also made the disclosure's own click target depend
                 on where the label happened to end. */}
-            <label style={matrixSectionAllStyle} data-select-all-label={moduleEntry.module}>
+            <label
+              style={matrixSectionAllStyle}
+              data-select-all-label={moduleEntry.module}
+            >
               <input
                 type="checkbox"
                 data-select-all={moduleEntry.module}
-                checked={grantedInModule(moduleEntry, selected) === moduleEntry.codes.length}
+                checked={
+                  grantedInModule(moduleEntry, selected) ===
+                  moduleEntry.codes.length
+                }
                 disabled={disabled}
                 ref={(el) => {
                   if (!el) return;
                   // Partly granted reads as neither on nor off, which is the truth and stops the box
                   // from claiming the section is empty when it is half full.
                   const granted = grantedInModule(moduleEntry, selected);
-                  el.indeterminate = granted > 0 && granted < moduleEntry.codes.length;
+                  el.indeterminate =
+                    granted > 0 && granted < moduleEntry.codes.length;
                 }}
                 onChange={(e) => apply(moduleEntry.codes, e.target.checked)}
               />
@@ -343,22 +412,23 @@ export function PermissionMatrix({
   );
 }
 
-/** Verb -> label key. A verb with no entry falls back to a generic label rather than rendering the
- *  raw English word on an Arabic page. */
-const VERB_LABEL: Record<string, 'roleVerbView' | 'roleVerbCreate' | 'roleVerbEdit' | 'roleVerbDelete' | 'roleVerbDeactivate' | 'roleVerbManage'> = {
-  read: 'roleVerbView',
-  view: 'roleVerbView',
-  create: 'roleVerbCreate',
-  update: 'roleVerbEdit',
-  delete: 'roleVerbDelete',
-  // Named for what it does to the record, not for the word in the code.
-  deactivate: 'roleVerbDeactivate',
-  manage: 'roleVerbManage',
-};
-
 /** The 12 `Permission.module` values, named in both languages. Keyed by the stored value so a new
  *  module shows a generic heading rather than crashing. */
-const MODULE_LABEL: Record<string, 'roleModuleAdmin' | 'roleModuleClaims' | 'roleModuleCommercial' | 'roleModuleCompliance' | 'roleModuleCustomer' | 'roleModuleCustomerService' | 'roleModuleFinance' | 'roleModuleInsuranceOps' | 'roleModuleReporting' | 'roleModulePdpl' | 'roleModuleSla' | 'roleModuleSupporting'> = {
+const MODULE_LABEL: Record<
+  string,
+  | 'roleModuleAdmin'
+  | 'roleModuleClaims'
+  | 'roleModuleCommercial'
+  | 'roleModuleCompliance'
+  | 'roleModuleCustomer'
+  | 'roleModuleCustomerService'
+  | 'roleModuleFinance'
+  | 'roleModuleInsuranceOps'
+  | 'roleModuleReporting'
+  | 'roleModulePdpl'
+  | 'roleModuleSla'
+  | 'roleModuleSupporting'
+> = {
   admin: 'roleModuleAdmin',
   claims: 'roleModuleClaims',
   'commercial-front-office': 'roleModuleCommercial',

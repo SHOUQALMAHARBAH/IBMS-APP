@@ -1,4 +1,5 @@
 import type { TranslationKey } from './translations';
+import { permissionNameAr } from '../admin/permission-names';
 
 /**
  * THE ONE PLACE A PERMISSION REFUSAL IS WORDED.
@@ -54,6 +55,32 @@ import type { TranslationKey } from './translations';
  * route guard, generalised to a screen that does not live at that layer.
  */
 
+/*
+ * 🔴 OWNER DECISION 127 — THE PARENTHETICAL NAMES THE PERMISSION, IT DOES NOT SPELL ITS CODE.
+ *
+ * «ما في رمز صلاحية يظهر للمستخدم في أي شاشة أو رسالة.» A refusal is one of the messages that
+ * sentence is about, and these five are where all 132 of them are worded.
+ *
+ * ## Why no `language` parameter, which is the thing to understand before changing this
+ *
+ * Each template is resolved by `t` in the reader's own language, and `translate` substitutes ONLY
+ * the placeholders the resolved string actually contains — a param a template does not mention is
+ * ignored. So both values are passed every time and each half of the dictionary takes the one it
+ * wants:
+ *
+ *   * the ARABIC template ends `({name})` and renders her ratified name;
+ *   * the ENGLISH template still ends `({code})` and renders exactly what it rendered before.
+ *
+ * ⛔ That is an EMPTY CELL, not a decision: every ratified name is Arabic and no ruling says what
+ * an English reader should see. It is also why these five functions did not have to grow a
+ * `language` argument and 132 call sites did not have to change — which would have been 132
+ * chances to half-convert a screen, and a screen with some names and some codes is worse than
+ * either.
+ *
+ * `permissionNameAr` is Arabic by construction for the same reason: a name is either wholly hers
+ * or it is not her name.
+ */
+
 type Translate = (
   key: TranslationKey,
   params?: Record<string, string | number>,
@@ -65,7 +92,11 @@ export function permissionRefusal(
   act: TranslationKey,
   code: string,
 ): string {
-  return t('permissionRefusal', { act: t(act), code });
+  return t('permissionRefusal', {
+    act: t(act),
+    code,
+    name: permissionNameAr(code),
+  });
 }
 
 /**
@@ -77,7 +108,11 @@ export function permissionRefusalAnyOf(
   act: TranslationKey,
   codes: readonly string[],
 ): string {
-  return t('permissionRefusalAnyOf', { act: t(act), code: codes.join(', ') });
+  return t('permissionRefusalAnyOf', {
+    act: t(act),
+    code: codes.join(', '),
+    name: codes.map(permissionNameAr).join('، '),
+  });
 }
 
 /**
@@ -89,7 +124,11 @@ export function permissionRefusalAllOf(
   act: TranslationKey,
   codes: readonly string[],
 ): string {
-  return t('permissionRefusalAllOf', { act: t(act), code: codes.join(', ') });
+  return t('permissionRefusalAllOf', {
+    act: t(act),
+    code: codes.join(', '),
+    name: codes.map(permissionNameAr).join('، '),
+  });
 }
 
 /*
@@ -128,7 +167,12 @@ export function reducedCapability(
   cannot: TranslationKey,
   code: string,
 ): string {
-  return t('reducedCapability', { can: t(can), cannot: t(cannot), code });
+  return t('reducedCapability', {
+    can: t(can),
+    cannot: t(cannot),
+    code,
+    name: permissionNameAr(code),
+  });
 }
 
 /**
@@ -140,5 +184,9 @@ export function permissionMayBeMissing(
   act: TranslationKey,
   code: string,
 ): string {
-  return t('permissionMayBeMissing', { act: t(act), code });
+  return t('permissionMayBeMissing', {
+    act: t(act),
+    code,
+    name: permissionNameAr(code),
+  });
 }

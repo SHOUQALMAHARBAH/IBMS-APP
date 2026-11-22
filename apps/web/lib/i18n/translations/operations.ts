@@ -643,7 +643,7 @@ export const OPERATIONS = {
     // route as declared-unreached until this word arrived.
     roleMatrixDismissNew: 'إزالة علامة جديدة',
     roleMatrixNeedsCatalogue:
-      'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
+      'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية «يرى قائمة الصلاحيات التي يمكن إسنادها إلى دور». يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
     roleMatrixSearchLabel: 'ابحث في الصلاحيات',
     roleMatrixNoMatch: 'لا توجد صلاحية مطابقة لهذا البحث.',
     roleVerbFull: 'الكل',
@@ -652,7 +652,7 @@ export const OPERATIONS = {
     roleVerbCreate: 'إنشاء',
     roleVerbEdit: 'تعديل',
     roleVerbDelete: 'حذف',
-    roleVerbDeactivate: 'تقاعد',
+    roleVerbDeactivate: 'تعطيل',
     roleVerbManage: 'إدارة',
     roleVerbOther: 'أخرى',
     roleModuleAdmin: 'الإدارة والنظام',
@@ -693,10 +693,10 @@ export const OPERATIONS = {
     roleTableMfa: 'المصادقة',
     roleTableActions: 'إجراءات',
     roleStatusActive: 'نشط',
-    roleStatusInactive: 'متقاعد',
+    roleStatusInactive: 'معطّل',
     roleSystemBadge: 'دور نظامي',
     roleSystemExplain:
-      'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تقاعده ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
+      'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تعطيله ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
     roleNoRoles: 'لا توجد أدوار بعد.',
     dutySegHeading: 'عمليات تحتاج شخصين مختلفين',
     dutySegIntro:
@@ -720,7 +720,7 @@ export const OPERATIONS = {
     roleFieldDescription: 'الوصف',
     roleCreateButton: 'إنشاء الدور',
     roleCreating: 'جارٍ الإنشاء…',
-    roleRetireButton: 'تقاعد الدور',
+    roleRetireButton: 'تعطيل الدور',
     roleReactivateButton: 'إعادة التنشيط',
     roleEditButton: 'الصلاحيات',
     roleSaveNamesButton: 'حفظ الأسماء',

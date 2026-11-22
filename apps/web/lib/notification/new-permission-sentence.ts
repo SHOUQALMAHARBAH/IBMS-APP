@@ -1,5 +1,6 @@
 import { DESTINATION_GROUPS } from '../../components/app/destinations';
 import { describePermission } from '../admin/permission-descriptions';
+import { permissionNameAr } from '../admin/permission-names';
 import type { Language, TranslationKey } from '../i18n/translations';
 import type { NewPermissionNotice } from './notification-api';
 
@@ -14,28 +15,17 @@ import type { NewPermissionNotice } from './notification-api';
  */
 
 /**
- * 🔴 THE PERMISSION NAMES — OWNER DECISION 127, AND THE TABLE IS NOT BUILT.
+ * 🔴 THE PERMISSION NAMES — OWNER DECISION 127, AND THEY ARE BUILT NOW.
  *
- * «ما في رمز صلاحية يظهر للمستخدم في أي شاشة أو رسالة: لكل صلاحية اسم عربي قصير صريح مقتطَع من
- * شرحها.» Every permission is to have a short plain Arabic name, and the CODE is never shown.
+ * This file used to carry `OWNER_SUPPLIED_PERMISSION_NAMES`, a one-row map holding the single
+ * name the owner had written out by hand while the other 233 were still owed. It is DELETED
+ * rather than extended: all 196 names are ratified and they live in
+ * `lib/admin/permission-names.ts`, which is their one home. A second map here would be a second
+ * home for a name, and two homes disagree the first time one of them moves.
  *
- * Measured 2026-11-14: exactly ONE name exists — `retention.archive.retrieve` ⟶
- * «استخراج سجل مؤرشف/محجوب», which she supplied herself on 2026-11-10. The derivation pass over
- * the other 231 is deferred (message 38 §4 puts it after message 39) and a name is HERS, so the
- * two codes that can actually be marked today have none.
- *
- * ⟶ WHICH IS WHY `newPermissionSentence` HAS A NO-NAME BRANCH. The three options were: show the
- *   code (decision 127 forbids it, in those words), invent a name (the standing rule forbids it,
- *   and it is hers), or render her sentence without the clause it has no value for. Only the
- *   third neither lies nor invents. It is reported rather than quietly shipped.
- *
- * ⚠️ This map is NOT a place to add a name you derived. A row here is a row she gave.
+ * Its one row is not lost — `retention.archive.retrieve` is annex 144 §٣'s «كلمة الإدارة» row,
+ * byte-identical to what stood here, and `permission-names.test.ts` pins it with the other 195.
  */
-export const OWNER_SUPPLIED_PERMISSION_NAMES: Readonly<Record<string, string>> =
-  {
-    // Hers, 2026-11-10 — decision 127's first and so far only row.
-    'retention.archive.retrieve': 'استخراج سجل مؤرشف/محجوب',
-  };
 
 /**
  * What the code controls, for the «تتحكّم في» slot.
@@ -64,6 +54,20 @@ export function controlsLabel(
 }
 
 /**
+ * OWNER DECISION 156 RULING 2's second half — «الشرح الذي ينتهي بنقطة لا تُضاف بعده نقطة ثانية».
+ *
+ * Her template writes its own full stop after the description slot, and 17 of the 234 Arabic
+ * descriptions already end in one, so the bell printed «…إصدار الوثائق.. تتحكّم في».
+ *
+ * ⛔ The TEMPLATE is not edited — not one word of hers moves. The description is handed over
+ * without the stop it already carries, so the one the template writes is the only one rendered.
+ */
+function stripTrailingStop(description: string): string {
+  const trimmed = description.trimEnd();
+  return trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
+}
+
+/**
  * Her sentence, with the slots filled.
  *
  * The DESCRIPTION comes from `describePermission`, which is the same text the permission matrix
@@ -75,11 +79,41 @@ export function newPermissionSentence(
   t: (key: TranslationKey, vars?: Record<string, string>) => string,
   language: Language,
 ): string {
-  const name = OWNER_SUPPLIED_PERMISSION_NAMES[notice.code];
-  const description = describePermission(notice.code, language) ?? '';
+  /*
+   * ⛔ THE NAME SLOT IS FILLED IN ARABIC ONLY, and that is what English rendered already.
+   *
+   * Every ratified name is Arabic and no ruling says what an English reader should see, so
+   * putting `permissionNameAr` into the English template would drop an Arabic phrase into an
+   * English sentence. Measured on what shipped: 233 of the 234 codes had no name at all and so
+   * took the no-name template in BOTH languages — English keeps exactly that. The 234th,
+   * `retention.archive.retrieve`, did render its Arabic name inside the English sentence, and
+   * that was a defect rather than a behaviour worth preserving.
+   */
+  const name = language === 'AR' ? permissionNameAr(notice.code) : '';
+  const description = stripTrailingStop(
+    describePermission(notice.code, language) ?? '',
+  );
   const controls = controlsLabel(notice, t);
 
-  return name
-    ? t('notifNewPermissionSentence', { name, description, controls })
-    : t('notifNewPermissionSentenceNoName', { description, controls });
+  /*
+   * 🔴 OWNER DECISION 156 RULING 2 — THE SENTENCE DOES NOT SAY THE SAME WORDS TWICE.
+   *
+   * Her sentence has a NAME slot and a DESCRIPTION slot, and 158 of the 196 names are sliced
+   * out of the very description that follows them. So the bell read:
+   *
+   *   «صلاحية جديدة في النظام: يُقرّ بأن ترخيص المكتب قيد التجديد. يُقرّ بأن ترخيص المكتب قيد
+   *    التجديد، وأنه لم يصله…»
+   *
+   * ⟶ Where the description CONTAINS the name, the already-ratified no-name template is the
+   *   right one — the same template that served every unnamed code before the names existed.
+   *   ⛔ Neither template's words change; which of the two is chosen is all that moved.
+   *
+   * MEASURED against the shipping Arabic rather than assumed, and it reproduces her own table:
+   * 158 contained · 17 owner-worded singles · 59 family names, which are «اسم العائلة · الفعل»
+   * and so are never in a description. A name that is not in its description still gets the
+   * name, which is why `retention.archive.retrieve` still reads name-then-description.
+   */
+  return name === '' || description.includes(name)
+    ? t('notifNewPermissionSentenceNoName', { description, controls })
+    : t('notifNewPermissionSentence', { name, description, controls });
 }

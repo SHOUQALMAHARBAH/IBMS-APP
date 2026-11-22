@@ -24,6 +24,7 @@ import { hasPermission } from '../../../../lib/auth/permissions';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { PermissionMatrix } from '../../../../components/admin/PermissionMatrix';
+import { permissionDisplayName } from '../../../../lib/admin/permission-names';
 import {
   createMatrixStyle,
   generatedNameStyle,
@@ -315,7 +316,6 @@ export default function RoleAdminPage() {
     })();
   }, [user, canRead, canReadCatalogue, load]);
 
-
   /**
    * OWNER DECISION 134 — clear the «جديدة» mark on a code this office will not grant.
    *
@@ -604,7 +604,6 @@ export default function RoleAdminPage() {
           defect: the thing a person just asked for was rendered last. Create, then the open
           editor, then the table — which is also the users screen's arrangement. */}
 
-
       {canCreate ? (
         <Card title={t('roleCreateHeading')}>
           <form onSubmit={onCreate} style={formStyle}>
@@ -727,7 +726,11 @@ export default function RoleAdminPage() {
                   >
                     <Td>{row.entityType}</Td>
                     <Td>
-                      <code>{row.checkerPermission}</code>
+                      {/* OWNER DECISION 127 — the approver's permission by its ratified name.
+                          English keeps the code: no decision rules an English name. */}
+                      <code>
+                        {permissionDisplayName(row.checkerPermission, language)}
+                      </code>
                     </Td>
                     <Td>{row.holderCount}</Td>
                     <Td>
@@ -792,9 +795,14 @@ export default function RoleAdminPage() {
               this says what it knows and leaves the judgement to the administrator. */}
           {unreachableGrants.length > 0 ? (
             <p style={warningStyle} role="status" data-unreachable-grants="">
+              {/* OWNER DECISION 127 — the wall of codes becomes a list of names. The template's
+                  own words do not change; only what fills its `{codes}` slot, which this page
+                  resolves because it is the only caller and it already holds the language. */}
               {t('roleUnreachableGrantsWarning', {
                 count: String(unreachableGrants.length),
-                codes: unreachableGrants.join(', '),
+                codes: unreachableGrants
+                  .map((code) => permissionDisplayName(code, language))
+                  .join(', '),
               })}
             </p>
           ) : null}
@@ -979,9 +987,7 @@ export default function RoleAdminPage() {
                 <Th>{t('roleTableHolders')}</Th>
                 <Th>{t('roleTablePermissions')}</Th>
                 <Th>{t('roleTableMfa')}</Th>
-                {canActOnRow ? (
-                  <Th>{t('roleTableActions')}</Th>
-                ) : null}
+                {canActOnRow ? <Th>{t('roleTableActions')}</Th> : null}
               </tr>
             </thead>
             <tbody>
