@@ -3886,3 +3886,85 @@ for (const [status, label] of [
     await expect(error).not.toContainText("an RFQ can only be issued");
   });
 }
+
+/**
+ * 🔴 THE ART. 15/d SECTION IS IN VIEW WHEN IT APPEARS — the owner's walk, §S3.
+ *
+ * «خالد يختار الشركة الثانية في طلب العرض. يظهر سؤال الإعفاء تحت، خارج ما يراه، فيظنّ أن شيئاً
+ * لم يحصل.» The section was rendered AFTER the follow-up threshold field, so on an ordinary
+ * window it appeared below the fold — triggered by a click the employee had just made somewhere
+ * else. Nothing scrolled to it and nothing pointed at it.
+ *
+ * ⟶ MOVED rather than scrolled to. This asserts the OUTCOME (in the viewport) rather than the
+ *   mechanism, so the test still holds if that choice is ever revisited.
+ *
+ * ⚠️ AND THE VIEWPORT IS SET SMALL ON PURPOSE. Playwright's default is 1280×720, which is tall
+ *   enough to have shown the section even where it was — so a test at the default size would
+ *   have passed against the defect and proved nothing. 720 is a real laptop's content height.
+ */
+test("the art. 15/d question is in view the moment the shortlist raises it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page, {});
+
+  await page.route(
+    "http://localhost:4000/rfqs/article-15-d/options**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          required: true,
+          minInsurers: 3,
+          premiumCeilingJod: "2000.000",
+          exemptions: [
+            {
+              exemption: "AT_CUSTOMER_REQUEST",
+              because: "the customer asked for this insurer",
+            },
+          ],
+          mayDeclare: true,
+          evidence: [],
+          window: {
+            title: "المادة ١٥/د",
+            text: "نص المستشار",
+            reasonHint: "السبب",
+            acknowledgement: "إقرار",
+            reasonMinLength: 20,
+          },
+        },
+      }),
+  );
+
+  await page.goto("/rfqs/new?opportunityId=opp-1");
+  await page
+    .getByLabel("فرع التأمين")
+    .selectOption({ value: "Property All Risks" });
+
+  const question = page.locator('[data-article-15-d="question"]');
+  // NON-VACUITY: it is NOT on the screen before the shortlist is short of the minimum, so what
+  // the assertion below observes is the appearance and not a section that was always there.
+  await expect(question).toHaveCount(0);
+
+  await page.getByLabel("وادي رم التعاونية · A-").check();
+
+  await expect(question).toBeVisible();
+  // ⛔ IN THE VIEWPORT, not merely in the DOM. `toBeVisible` passes on an element below the
+  // fold — it is exactly what the screen did before this change — so the box is compared with
+  // the window's own height.
+  const box = await question.boundingBox();
+  expect(box, "the art. 15/d section has no box").not.toBeNull();
+  const viewport = page.viewportSize();
+  expect(
+    box!.y,
+    `the art. 15/d section starts at y=${box!.y} on a ${viewport!.height}px window — ` +
+      "it appeared below the fold, which is the whole finding of walk §S3",
+  ).toBeLessThan(viewport!.height);
+
+  // AND IT IS ABOVE THE THRESHOLD FIELD, which is the arrangement that makes it reachable by
+  // pressing Tab once from the control that raised it.
+  const thresholdBox = await page.locator("#threshold").boundingBox();
+  expect(thresholdBox).not.toBeNull();
+  expect(box!.y).toBeLessThan(thresholdBox!.y);
+});

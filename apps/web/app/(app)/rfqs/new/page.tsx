@@ -326,6 +326,38 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         </div>
       </fieldset>
 
+      {/*
+        🔴 DIRECTLY UNDER THE INSURER LIST, which is what makes it visible at all.
+
+        The owner’s walk (§S3): «خالد يختار الشركة الثانية في طلب العرض. يظهر سؤال الإعفاء
+        تحت، خارج ما يراه، فيظنّ أن شيئاً لم يحصل.» This section is what art. 15/d asks when a
+        shortlist falls short of the minimum, and it was rendered AFTER the follow-up threshold
+        field — so on an ordinary window it appeared below the fold, triggered by a click the
+        employee had just made somewhere else entirely. Nothing scrolled to it and nothing
+        pointed at it.
+
+        ⟶ MOVED rather than scrolled to, deliberately. A scroll-on-appearance moves the page
+          under a mouse that has not been told to expect it, and for a KEYBOARD user it is worse:
+          focus stays on the insurer checkbox while the viewport jumps somewhere else, which is
+          the one thing a screen must not do to someone who cannot see where it went. Moving the
+          markup costs nothing at runtime and puts the question beside its own cause.
+
+        ⟶ For a keyboard user the tab order now runs: the last insurer checkbox, then the
+          exemption controls, then the threshold field, then submit. The question is reached by
+          pressing Tab once from the control that raised it — no scroll, no focus move, and
+          nothing is announced that the reader did not navigate to.
+
+        ⛔ NOT ONE WORD CHANGES. `Article15DWindow` is untouched.
+      */}
+      {a15d ? (
+        <Article15DWindow
+          options={a15d}
+          choice={choice}
+          onChange={setChoice}
+          disabled={submitting}
+        />
+      ) : null}
+
       <label
         htmlFor="threshold"
         style={{ display: 'block', fontWeight: 600, marginTop: '1.5rem' }}
@@ -342,15 +374,6 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         onChange={(e) => setThreshold(e.target.value)}
         style={{ width: '6rem', marginTop: '0.35rem' }}
       />
-
-      {a15d ? (
-        <Article15DWindow
-          options={a15d}
-          choice={choice}
-          onChange={setChoice}
-          disabled={submitting}
-        />
-      ) : null}
 
       <div style={{ marginTop: '1.5rem' }}>
         <button type="submit" disabled={!canSubmit} style={buttonStyle}>
