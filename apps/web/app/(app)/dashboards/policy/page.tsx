@@ -13,7 +13,11 @@ import {
   Tr,
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
-import { formatNumber } from '../../../../lib/i18n/format';
+import {
+  formatDate,
+  formatNumber,
+  formatPeriodLabel,
+} from '../../../../lib/i18n/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
@@ -26,7 +30,6 @@ import { FigurePeriod } from '../../../../components/ui';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
-
 
 export default function PolicyDashboardPage() {
   const { language, t, tPlural } = useLanguage();
@@ -58,7 +61,9 @@ export default function PolicyDashboardPage() {
           periodLabel: periodLabel.trim() || undefined,
           periodStart: periodStart.trim() || undefined,
           periodEnd: periodEnd.trim() || undefined,
-          renewalWindowDays: renewalWindowDays.trim() ? Number(renewalWindowDays.trim()) : undefined,
+          renewalWindowDays: renewalWindowDays.trim()
+            ? Number(renewalWindowDays.trim())
+            : undefined,
         }),
       );
       setLoadError(null);
@@ -72,7 +77,16 @@ export default function PolicyDashboardPage() {
             : t('dpolLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd, renewalWindowDays, t]);
+  }, [
+    branchId,
+    insuranceLine,
+    insurerId,
+    periodLabel,
+    periodStart,
+    periodEnd,
+    renewalWindowDays,
+    t,
+  ]);
 
   useEffect(() => {
     if (!user) return;
@@ -93,13 +107,17 @@ export default function PolicyDashboardPage() {
   return (
     <main style={pageStackStyle}>
       <h1>{t('dpolHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dpolIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dpolIntro')}</p>
 
       <form
         onSubmit={applyFilters}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'flex-end',
+          margin: '0.75rem 0',
+        }}
       >
         <EntitySearch
           kind="branch"
@@ -107,7 +125,9 @@ export default function PolicyDashboardPage() {
           onChange={setBranchId}
           label={t('dashBranchPlacingOfficerLabel')}
         />
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashInsuranceLineLabel')}
           <input
             dir="auto"
@@ -121,7 +141,9 @@ export default function PolicyDashboardPage() {
           onChange={setInsurerId}
           label={t('dashInsurerIdLabel')}
         />
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
@@ -130,7 +152,9 @@ export default function PolicyDashboardPage() {
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodStart')}
           <input
             aria-label={t('dashPeriodStart')}
@@ -139,7 +163,9 @@ export default function PolicyDashboardPage() {
             onChange={(e) => setPeriodStart(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodEnd')}
           <input
             aria-label={t('dashPeriodEnd')}
@@ -148,7 +174,9 @@ export default function PolicyDashboardPage() {
             onChange={(e) => setPeriodEnd(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dpolRenewalWindowLabel')}
           <input
             placeholder="90"
@@ -159,17 +187,15 @@ export default function PolicyDashboardPage() {
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
-      {loadError ? (
-        <ErrorState title={loadError} />
-      ) : null}
+      {loadError ? <ErrorState title={loadError} /> : null}
 
       {summary ? (
         <>
           <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             {t('dpolPeriodRange', {
-              label: summary.periodLabel,
-              from: summary.periodStart.slice(0, 10),
-              to: summary.periodEnd.slice(0, 10),
+              label: formatPeriodLabel(summary.periodLabel, language),
+              from: formatDate(summary.periodStart, language),
+              to: formatDate(summary.periodEnd, language),
             })}{' '}
             {tPlural('dpolRenewalWindowDays', summary.renewalWindowDays)}
           </p>
@@ -224,7 +250,10 @@ export default function PolicyDashboardPage() {
 
           <Card title={t('dpolCancelled')} padded={false}>
             {summary.cancelledPolicies.length === 0 ? (
-              <EmptyState title={t('dpolNoCancellations')} style={{ margin: 'var(--space-4)' }} />
+              <EmptyState
+                title={t('dpolNoCancellations')}
+                style={{ margin: 'var(--space-4)' }}
+              />
             ) : (
               <Table>
                 <thead>
@@ -240,18 +269,20 @@ export default function PolicyDashboardPage() {
                     <Tr key={c.policyId}>
                       <Td>
                         {/*
-                          * OWNER DECISION 50 — a policy with no number yet is named by its
-                          * CUSTOMER plus a state word, never by its internal id. This was the one
-                          * `?? <uuid>` fallback in the product whose condition is genuinely
-                          * REACHABLE: a policy has no number until issuance records one.
-                          *
-                          * THE EM DASH AND THE ORDER LIVE IN THE ARABIC, not here: the key takes
-                          * `{customer}` so the sentence reads correctly right-to-left instead of
-                          * the screen concatenating around a separator.
-                          */}
+                         * OWNER DECISION 50 — a policy with no number yet is named by its
+                         * CUSTOMER plus a state word, never by its internal id. This was the one
+                         * `?? <uuid>` fallback in the product whose condition is genuinely
+                         * REACHABLE: a policy has no number until issuance records one.
+                         *
+                         * THE EM DASH AND THE ORDER LIVE IN THE ARABIC, not here: the key takes
+                         * `{customer}` so the sentence reads correctly right-to-left instead of
+                         * the screen concatenating around a separator.
+                         */}
                         <bdi>
                           {c.policyNumber ??
-                            t('dpolBeforeIssuance', { customer: c.customerName })}
+                            t('dpolBeforeIssuance', {
+                              customer: c.customerName,
+                            })}
                         </bdi>
                       </Td>
                       <Td>
@@ -260,7 +291,7 @@ export default function PolicyDashboardPage() {
                       <Td>
                         <bdi>{c.reason}</bdi>
                       </Td>
-                      <Td>{c.cancelledAt.slice(0, 10)}</Td>
+                      <Td>{formatDate(c.cancelledAt, language)}</Td>
                     </Tr>
                   ))}
                 </tbody>

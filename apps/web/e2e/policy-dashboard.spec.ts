@@ -1,12 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expect, test, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { permissionsForRoles } from './fixtures/role-permissions';
 
 const ME_BASE = {
-  id: "user-1",
-  email: "manager@ibms.test",
-  fullName: "Branch Manager",
-  languagePreference: "EN",
+  id: 'user-1',
+  email: 'manager@ibms.test',
+  fullName: 'Branch Manager',
+  languagePreference: 'EN',
   mfaEnabled: false,
   mfaPolicySatisfied: true,
   accessValidUntil: null,
@@ -16,16 +16,25 @@ const ME_BASE = {
 };
 
 async function mockAuth(page: Page, roles: string[]) {
-  await page.route("**/auth/refresh", (route) =>
-    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
-  await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+  await page.route('**/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+    }),
   );
 }
 
 const SUMMARY = {
-  generatedAt: "2026-09-07T00:00:00.000Z",
+  /* MIDDAY rather than midnight UTC, deliberately. Owner decision 156 ruling 1 sends this
+     through `formatDate`, which renders in the BROWSER's zone — so a midnight-UTC instant
+     renders as the 6th west of Greenwich and the 7th east of it, and the assertion below would
+     pass or fail on where the runner happens to be. Midday is the same calendar day from UTC-11
+     to UTC+11. The zone behaviour itself is pinned in lib/i18n/decision-156-date-shape.test.ts,
+     where it belongs. */
+  generatedAt: '2026-09-07T12:00:00.000Z',
   /*
    * OWNER DECISION 58 — and THIS is the screen where the two clauses differ.
    *
@@ -35,45 +44,51 @@ const SUMMARY = {
    * claim about a figure that does not obey it.
    */
   metricScope: {
-    activePoliciesCount: "asOf",
-    expiringPoliciesCount: "asOf",
-    newPoliciesIssuedCount: "period",
-    cancelledPolicies: "period",
+    activePoliciesCount: 'asOf',
+    expiringPoliciesCount: 'asOf',
+    newPoliciesIssuedCount: 'period',
+    cancelledPolicies: 'period',
   },
-  periodLabel: "2026-08",
-  periodStart: "2026-08-01T00:00:00.000Z",
-  periodEnd: "2026-09-01T00:00:00.000Z",
+  periodLabel: '2026-08',
+  periodStart: '2026-08-01T00:00:00.000Z',
+  periodEnd: '2026-09-01T00:00:00.000Z',
   renewalWindowDays: 90,
   activePoliciesCount: 240,
   expiringPoliciesCount: 18,
   newPoliciesIssuedCount: 12,
   cancelledPolicies: [
     {
-      policyId: "pol-1",
-      policyNumber: "POL-2026-001",
+      policyId: 'pol-1',
+      policyNumber: 'POL-2026-001',
       // Owner decision 50 — the name a policy with NO number is shown by instead of its uuid.
-      customerName: "شركة اليرموك للتأمين",
-      insuranceLine: "motor",
-      reason: "Client sold the insured vehicle.",
-      cancelledAt: "2026-08-15T00:00:00.000Z",
+      customerName: 'شركة اليرموك للتأمين',
+      insuranceLine: 'motor',
+      reason: 'Client sold the insured vehicle.',
+      cancelledAt: '2026-08-15T00:00:00.000Z',
     },
   ],
 };
 
-test("renders every metric section with real figures", async ({ page }) => {
-  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
-  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+test('renders every metric section with real figures', async ({ page }) => {
+  await mockAuth(page, ['BRANCH_DEPARTMENT_MANAGER']);
+  await page.route('http://localhost:4000/dashboards/policy**', (route) =>
     route.fulfill({ status: 200, json: SUMMARY }),
   );
 
-  await page.goto("/dashboards/policy");
-  await expect(page.getByRole("heading", { name: "Policy Dashboard" })).toBeVisible();
-  await expect(page.getByText("240", { exact: true })).toBeVisible();
-  await expect(page.getByText("18", { exact: true })).toBeVisible();
-  await expect(page.getByText("12", { exact: true })).toBeVisible();
-  await expect(page.getByText("POL-2026-001")).toBeVisible();
-  await expect(page.getByText("Client sold the insured vehicle.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
+  await page.goto('/dashboards/policy');
+  await expect(
+    page.getByRole('heading', { name: 'Policy Dashboard' }),
+  ).toBeVisible();
+  await expect(page.getByText('240', { exact: true })).toBeVisible();
+  await expect(page.getByText('18', { exact: true })).toBeVisible();
+  await expect(page.getByText('12', { exact: true })).toBeVisible();
+  await expect(page.getByText('POL-2026-001')).toBeVisible();
+  await expect(
+    page.getByText('Client sold the insured vehicle.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Apply filters' }),
+  ).toBeVisible();
 
   /*
    * OWNER DECISION 50 — a policy with NO number yet is named by its CUSTOMER plus a state word,
@@ -84,7 +99,7 @@ test("renders every metric section with real figures", async ({ page }) => {
    * THE PAIR: the name present AND the uuid gone. A screen rendering both would pass a name-only
    * check, which is the realistic half-done state.
    */
-  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+  await page.route('http://localhost:4000/dashboards/policy**', (route) =>
     route.fulfill({
       status: 200,
       json: {
@@ -97,39 +112,45 @@ test("renders every metric section with real figures", async ({ page }) => {
   );
   await page.reload();
   await expect(
-    page.getByText("شركة اليرموك للتأمين — before issuance"),
+    page.getByText('شركة اليرموك للتأمين — before issuance'),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: /pol-1/ })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: /pol-1/ })).toHaveCount(0);
 });
 
-test("a user without the permission sees the underlying error message", async ({ page }) => {
-  await mockAuth(page, ["CLAIMS_OFFICER"]);
-  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+test('a user without the permission sees the underlying error message', async ({
+  page,
+}) => {
+  await mockAuth(page, ['CLAIMS_OFFICER']);
+  await page.route('http://localhost:4000/dashboards/policy**', (route) =>
     route.fulfill({
       status: 403,
-      json: { message: "You do not hold a permission required to perform this action" },
+      json: {
+        message: 'You do not hold a permission required to perform this action',
+      },
     }),
   );
 
-  await page.goto("/dashboards/policy");
+  await page.goto('/dashboards/policy');
   await expect(
-    page.getByText("(dashboard.policy.view)", { exact: false }),
+    page.getByText('(dashboard.policy.view)', { exact: false }),
   ).toBeVisible();
 });
 
-test("policy dashboard screen has no serious/critical accessibility violations @a11y", async ({
+test('policy dashboard screen has no serious/critical accessibility violations @a11y', async ({
   page,
 }) => {
-  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
-  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+  await mockAuth(page, ['BRANCH_DEPARTMENT_MANAGER']);
+  await page.route('http://localhost:4000/dashboards/policy**', (route) =>
     route.fulfill({ status: 200, json: SUMMARY }),
   );
 
-  await page.goto("/dashboards/policy");
-  await expect(page.getByText("POL-2026-001")).toBeVisible();
+  await page.goto('/dashboards/policy');
+  await expect(page.getByText('POL-2026-001')).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
-    results.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
+    results.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    ),
   ).toEqual([]);
 });
 
@@ -151,40 +172,42 @@ test("policy dashboard screen has no serious/critical accessibility violations @
  * ==========================================================================
  */
 
-test("a live snapshot says «as of», a period-scoped figure says «during» — on the same screen", async ({
+test('a live snapshot says «as of», a period-scoped figure says «during» — on the same screen', async ({
   page,
 }) => {
-  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
-  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+  await mockAuth(page, ['BRANCH_DEPARTMENT_MANAGER']);
+  await page.route('http://localhost:4000/dashboards/policy**', (route) =>
     route.fulfill({ status: 200, json: SUMMARY }),
   );
 
-  await page.goto("/dashboards/policy");
+  await page.goto('/dashboards/policy');
 
   // The anchor: the figures themselves, from the same render.
-  await expect(page.getByText("240", { exact: true })).toBeVisible();
+  await expect(page.getByText('240', { exact: true })).toBeVisible();
 
   // THE TWO SNAPSHOTS. They ignore the window, so they must NOT name the month —
   // and the absence is asserted beside the presence, because a cell that printed
   // nothing at all would satisfy `not.toContainText` on its own.
-  for (const id of ["dpol-active", "dpol-expiring"]) {
+  for (const id of ['dpol-active', 'dpol-expiring']) {
     const cell = page.getByTestId(id);
-    await expect(cell).toHaveAttribute("data-figure-scope", "asOf");
-    await expect(cell).toContainText("as of");
-    await expect(cell).toContainText("2026-09-07");
+    await expect(cell).toHaveAttribute('data-figure-scope', 'asOf');
+    await expect(cell).toContainText('as of');
+    // OWNER DECISION 156 ruling 1 — the one date shape. This read "2026-09-07", which was
+    // `generatedAt.slice(0, 10)`: a second shape AND the UTC day.
+    await expect(cell).toContainText('07/09/2026');
     await expect(
       cell,
-      "a live snapshot must not claim a period it does not obey",
-    ).not.toContainText("August");
+      'a live snapshot must not claim a period it does not obey',
+    ).not.toContainText('August');
   }
 
   // THE PERIOD-SCOPED ONE, on the same screen and the same render.
-  const issued = page.getByTestId("dpol-new-issued");
-  await expect(issued).toHaveAttribute("data-figure-scope", "period");
-  await expect(issued).toContainText("during");
-  await expect(issued).toContainText("August 2026");
+  const issued = page.getByTestId('dpol-new-issued');
+  await expect(issued).toHaveAttribute('data-figure-scope', 'period');
+  await expect(issued).toContainText('during');
+  await expect(issued).toContainText('August 2026');
   await expect(
     issued,
-    "a period-scoped figure must name its window, not the generation time",
-  ).not.toContainText("as of");
+    'a period-scoped figure must name its window, not the generation time',
+  ).not.toContainText('as of');
 });

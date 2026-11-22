@@ -44,6 +44,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
@@ -396,15 +397,10 @@ export default function RegulatoryCompliancePage() {
 
   return (
     <main style={pageStackStyle}>
-      <PageHeader
-        title={t('rcHeading')}
-        description={t('rcIntro')}
-      />
+      <PageHeader title={t('rcHeading')} description={t('rcIntro')} />
 
       <h2>{t('rcLicenseHeading')}</h2>
-      {licenseLoadError ? (
-        <ErrorState title={licenseLoadError} />
-      ) : null}
+      {licenseLoadError ? <ErrorState title={licenseLoadError} /> : null}
       {licenseLoaded && !license ? (
         <p role="alert" style={errorStyle}>
           {t('rcNoLicenseBlocksBusiness')}
@@ -455,17 +451,17 @@ export default function RegulatoryCompliancePage() {
               </Tr>
               <Tr>
                 <Td>{t('rcExpires')}</Td>
-                <Td>{license.expiresAt.slice(0, 10)}</Td>
+                <Td>{formatDate(license.expiresAt, language)}</Td>
               </Tr>
               <Tr>
                 <Td>{t('rcRenewalDueBy')}</Td>
-                <Td>{license.renewalDueBy.slice(0, 10)}</Td>
+                <Td>{formatDate(license.renewalDueBy, language)}</Td>
               </Tr>
               <Tr>
                 <Td>{t('rcColRenewalFiled')}</Td>
                 <Td>
                   {license.renewalRequestedAt
-                    ? license.renewalRequestedAt.slice(0, 10)
+                    ? formatDate(license.renewalRequestedAt, language)
                     : t('rcNotFiled')}
                 </Td>
               </Tr>
@@ -473,7 +469,10 @@ export default function RegulatoryCompliancePage() {
                 <Tr>
                   <Td>{t('rcExpectedThreeYearExpiry')}</Td>
                   <Td>
-                    {license.expectedExpiryForThreeYearTerm.slice(0, 10)}
+                    {formatDate(
+                      license.expectedExpiryForThreeYearTerm,
+                      language,
+                    )}
                   </Td>
                 </Tr>
               ) : null}
@@ -567,7 +566,10 @@ export default function RegulatoryCompliancePage() {
             office own screen behind the office own `license.manage`.
           */}
           {canManage ? (
-            <div style={{ marginTop: '0.75rem' }} data-regulatory-action-form="">
+            <div
+              style={{ marginTop: '0.75rem' }}
+              data-regulatory-action-form=""
+            >
               <h3 style={{ margin: '0 0 0.25rem' }}>{t('rcActionsHeading')}</h3>
               <p style={noteStyle}>{t('rcActionReplacesMarker')}</p>
               <label style={labelStyle}>
@@ -815,9 +817,11 @@ export default function RegulatoryCompliancePage() {
                           : ''}
                       </Td>
                       <Td>
-                        {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
+                        {term.issuedAt
+                          ? formatDate(term.issuedAt, language)
+                          : '—'}
                       </Td>
-                      <Td>{term.expiresAt.slice(0, 10)}</Td>
+                      <Td>{formatDate(term.expiresAt, language)}</Td>
                       {/*
                         A TERM HAS NO STATUS OF ITS OWN ANY MORE. The column it rendered is dropped,
                         and nothing is lost: `pickCurrentTerm` decides which term governs by LATEST
@@ -828,7 +832,7 @@ export default function RegulatoryCompliancePage() {
                       */}
                       <Td>
                         {term.renewalRequestedAt
-                          ? term.renewalRequestedAt.slice(0, 10)
+                          ? formatDate(term.renewalRequestedAt, language)
                           : t('rcNotFiled')}
                       </Td>
                     </Tr>
@@ -914,9 +918,7 @@ export default function RegulatoryCompliancePage() {
               <tbody>
                 {scope.branches.map((branch) => (
                   <Tr key={branch.id}>
-                    <Td>
-                      {language === 'AR' ? branch.nameAr : branch.nameEn}
-                    </Td>
+                    <Td>{language === 'AR' ? branch.nameAr : branch.nameEn}</Td>
                     <Td>
                       {t(ENUM_LABEL.InsuranceLineCategory[branch.category])}
                     </Td>
@@ -1017,12 +1019,16 @@ export default function RegulatoryCompliancePage() {
               <Tr>
                 <Td>{t('rcCapitalRequired')}</Td>
                 <Td data-required-capital="">
-                  {scope.capital.requiredCapital}
+                  {formatMoney(scope.capital.requiredCapital, language)}
                 </Td>
               </Tr>
               <Tr>
                 <Td>{t('rcCapitalPaidUp')}</Td>
-                <Td>{scope.capital.paidUpCapital ?? '—'}</Td>
+                <Td>
+                  {scope.capital.paidUpCapital === null
+                    ? '—'
+                    : formatMoney(scope.capital.paidUpCapital, language)}
+                </Td>
               </Tr>
             </tbody>
           </Table>
@@ -1122,12 +1128,12 @@ export default function RegulatoryCompliancePage() {
         that carries it and `compliance-calendar.manage` gates this section — MEASURED to be held by
         the same seeded set, so no routing table and no new code.
       */}
-      {notice != null && notice.stage !== 'NONE' && notice.stage in NOTICE_LABEL ? (
+      {notice != null &&
+      notice.stage !== 'NONE' &&
+      notice.stage in NOTICE_LABEL ? (
         <div style={warningStyle} role="status" data-renewal-notice="">
           <strong>{t('rcNoticeHeading')}</strong>
-          <p style={{ margin: '0.35rem 0' }}>
-            {t(NOTICE_LABEL[notice.stage])}
-          </p>
+          <p style={{ margin: '0.35rem 0' }}>{t(NOTICE_LABEL[notice.stage])}</p>
           <table>
             <tbody>
               {notice.daysToExpiry === null ? null : (
@@ -1145,14 +1151,16 @@ export default function RegulatoryCompliancePage() {
               <Tr>
                 <Td>{t('rcExpires')}</Td>
                 <Td>
-                  {notice.expiresAt ? notice.expiresAt.slice(0, 10) : '—'}
+                  {notice.expiresAt
+                    ? formatDate(notice.expiresAt, language)
+                    : '—'}
                 </Td>
               </Tr>
               <Tr>
                 <Td>{t('rcNoticeApplicationDueBy')}</Td>
                 <Td>
                   {notice.applicationDueBy
-                    ? notice.applicationDueBy.slice(0, 10)
+                    ? formatDate(notice.applicationDueBy, language)
                     : '—'}
                 </Td>
               </Tr>
@@ -1202,12 +1210,8 @@ export default function RegulatoryCompliancePage() {
         </form>
       ) : null}
 
-      {actionError ? (
-        <ErrorState title={actionError} />
-      ) : null}
-      {itemsLoadError ? (
-        <ErrorState title={itemsLoadError} />
-      ) : null}
+      {actionError ? <ErrorState title={actionError} /> : null}
+      {itemsLoadError ? <ErrorState title={itemsLoadError} /> : null}
 
       {items ? (
         items.length === 0 ? (
@@ -1230,7 +1234,7 @@ export default function RegulatoryCompliancePage() {
                 <Tr key={it.id}>
                   <Td>{it.obligationName}</Td>
                   <Td>
-                    {it.dueDate.slice(0, 10)}
+                    {formatDate(it.dueDate, language)}
                     {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
                   </Td>
                   <Td>
