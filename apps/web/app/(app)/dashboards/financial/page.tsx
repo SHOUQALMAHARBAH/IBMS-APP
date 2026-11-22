@@ -58,7 +58,11 @@ function ProfitabilityTable({
    *  carry renders AS STORED, which is owner decision 49's rule. */
   vocabulary?: Record<string, TranslationKey>;
 }) {
-  const { t } = useLanguage();
+  // 🔴 `language` ADDED — every amount on this screen goes through `formatMoney`, which is
+  // the ONE home for how money is written (owner decision 146 ruling 1-أ keeps the digits
+  // Western through `format.ts`'s bare `ar` locale). These four columns printed the API's
+  // raw decimal string: «120000.000» where every other figure on the page reads «JOD 120,000.000».
+  const { t, language } = useLanguage();
   return (
     <section style={sectionStyle}>
       <h3>{title}</h3>
@@ -95,14 +99,10 @@ function ProfitabilityTable({
                       : r.label}
                   </bdi>
                 </Td>
-                <Td>
-                  {r.premiumWritten}
-                </Td>
-                <Td>{r.claimsPaid}</Td>
-                <Td>
-                  {r.commissionEarned}
-                </Td>
-                <Td>{r.netPosition}</Td>
+                <Td>{formatMoney(r.premiumWritten, language)}</Td>
+                <Td>{formatMoney(r.claimsPaid, language)}</Td>
+                <Td>{formatMoney(r.commissionEarned, language)}</Td>
+                <Td>{formatMoney(r.netPosition, language)}</Td>
               </Tr>
             ))}
           </tbody>
@@ -239,7 +239,8 @@ export default function FinancialDashboardPage() {
             </div>
             <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
               <div>
-                {t('commonCurrentLabel')} {summary.receivables.totals.current}
+                {t('commonCurrentLabel')}{' '}
+                {formatMoney(summary.receivables.totals.current, language)}
               </div>
               {/*
                 🔴 OWNER DECISION 153 §M2 — the four buckets were hard-coded English.
@@ -251,16 +252,20 @@ export default function FinancialDashboardPage() {
                 a header claiming a range its column does not hold is worse than an English one.
               */}
               <div>
-                {t('frAgeing1To30')} {summary.receivables.totals.d1_30}
+                {t('frAgeing1To30')}{' '}
+                {formatMoney(summary.receivables.totals.d1_30, language)}
               </div>
               <div>
-                {t('frAgeing31To60')} {summary.receivables.totals.d31_60}
+                {t('frAgeing31To60')}{' '}
+                {formatMoney(summary.receivables.totals.d31_60, language)}
               </div>
               <div>
-                {t('frAgeing61To90')} {summary.receivables.totals.d61_90}
+                {t('frAgeing61To90')}{' '}
+                {formatMoney(summary.receivables.totals.d61_90, language)}
               </div>
               <div>
-                {t('frAgeing90Plus')} {summary.receivables.totals.d90_plus}
+                {t('frAgeing90Plus')}{' '}
+                {formatMoney(summary.receivables.totals.d90_plus, language)}
               </div>
             </div>
           </Card>

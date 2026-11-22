@@ -78,6 +78,35 @@ PREFIX = re.compile(
     r"^\s*(?:العمل(?:ية|يات)\s+[0-9٠-٩]|Process(?:es)?\s+[0-9])"
 )
 
+# 🔴 THE SECOND RULE OF THE SAME SHAPE — OWNER DECISION 151 RULING 2-أ, ADDED 2026-11-19.
+#
+# Seven shipped strings cited one of OUR OWN internal documents by clause: «(الجزء 5.1)»,
+# «(البند 10.6، يُسجَّل)», «(الجزء 8.2)», «وفق الجزء 4.2 —», «البند 5.1 — ». That is the same
+# defect this file already exists for, one document over: an internal index leaking into the
+# product, in the sentence meant to tell the reader what the screen is for. A customer cannot
+# look up «البند 10.6» — there is nowhere for them to look it up.
+#
+# ⚠️ SEARCHED ANYWHERE IN THE VALUE, not anchored like PREFIX. Five of the seven carried the
+# reference MID-SENTENCE and only two opened with it, so a `^` would have caught two of seven
+# and reported a clean tree over the other five.
+CLAUSE = re.compile(r"(?:البند|الجزء)\s+[0-9٠-٩]")
+
+# ⛔ THE ONE EXEMPTION, AND IT IS HERS, NOT A CONVENIENCE.
+#
+# Annex §٢ states it in terms: *«يبقى كما هو: `iassetIntro` «جرد الأصول وفق البند 8.1 من معيار
+# ISO 27001»، لأنه مرجع لمعيار خارجي»* — it stays because it cites an EXTERNAL standard. A
+# reader CAN look up ISO 27001 clause 8.1; that is the whole difference from «البند 10.6»,
+# which names a document only we hold.
+#
+# Declared as a (key, span) pair rather than inferred from «من معيار», deliberately: a rule
+# that exempts anything followed by those two words would let the next internal reference
+# through the moment somebody wrote them. And it is checked in BOTH directions — a declared
+# exemption whose span has gone is STALE and fails, so the day `iassetIntro` is reworded this
+# list cannot quietly keep an entry for a string that no longer exists.
+CLAUSE_EXEMPT = {
+    ("iassetIntro", "البند 8.1 من معيار ISO 27001"),
+}
+
 
 def _files(root: str) -> list[str]:
     """Tracked dictionaries, or a walk on a tree with no `.git` (the self-test's trees)."""
@@ -120,6 +149,8 @@ def _entry_text(lines: list[str], start: int) -> "str | None":
 def measure(root: str) -> tuple[list[str], list[str]]:
     findings: list[str] = []
     scanned = values = 0
+    clause_hits = 0
+    exempt_seen: set = set()
     for rel in _files(root):
         try:
             with open(os.path.join(root, rel), "rb") as fh:
@@ -152,10 +183,44 @@ def measure(root: str) -> tuple[list[str], list[str]]:
                     f"twenty-five English ones, and neither changes a word after it. The "
                     f"backlog's index means nothing to the person reading the screen"
                 )
+            # DECISION 151 RULING 2-أ — an internal clause reference, anywhere in the value.
+            if CLAUSE.search(text):
+                exemption = next(
+                    (e for e in CLAUSE_EXEMPT
+                     if e[0] == m.group(1) and e[1] in text),
+                    None,
+                )
+                if exemption is not None:
+                    exempt_seen.add(exemption)
+                else:
+                    clause_hits += 1
+                    findings.append(
+                        f"{rel}:{n}: `{m.group(1)}` cites one of OUR OWN documents by clause -- "
+                        f"{text[:40]}... Owner decision 151 ruling 2-أ deletes «البند N» and "
+                        f"«الجزء N» from the seven strings that carried them: the reader has "
+                        f"nowhere to look that clause up. The ONLY exemption is a reference to "
+                        f"an EXTERNAL standard, and it is declared by key and span in "
+                        f"CLAUSE_EXEMPT -- add one only with a ruling, never to pass a build"
+                    )
+
+    # A declared exemption whose span has gone is STALE. Reported as a finding so the list
+    # cannot outlive the string it describes -- the direction `hardcoded-ui-english.py`'s own
+    # declared set already checks, inherited here rather than rediscovered later.
+    for key, span in sorted(CLAUSE_EXEMPT - exempt_seen):
+        findings.append(
+            f"CLAUSE_EXEMPT declares `{key}` carries «{span}» and no shipped value does. "
+            f"Either the string was reworded -- in which case delete the row in the SAME "
+            f"commit -- or the file it lives in stopped being scanned, which is worse"
+        )
+
     lines = [
         f"  dictionary files scanned                     {scanned}",
         f"  first-line values examined                   {values}",
-        f"  process-number prefixes, AR + EN (budget 0)  {len(findings)}",
+        f"  process-number prefixes, AR + EN (budget 0)  "
+        f"{len([f for f in findings if 'backlog process' in f])}",
+        f"  internal clause references (budget 0)        {clause_hits}",
+        f"  external-standard exemptions matched         "
+        f"{len(exempt_seen)} of {len(CLAUSE_EXEMPT)} declared",
     ]
     return findings, lines
 
@@ -174,7 +239,10 @@ def run(root: str, check: bool) -> int:
         print()
         print(f"  {len(findings)} error(s)")
         return 1 if check else 0
-    print("  ok     no shipped string opens by numbering a backlog process")
+    print(
+        "  ok     no shipped string opens by numbering a backlog process, and none "
+        "cites one of our own documents by clause"
+    )
     return 0
 
 
@@ -187,6 +255,16 @@ def _self_test() -> int:
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "ok.ts"), "wb") as fh:
             fh.write("    goodIntro: 'إنشاء طلب عرض أسعار واحد وإرساله.',\n".encode("utf-8"))
+        # ⛔ THE DECLARED EXEMPTION LIVES IN EVERY SYNTHETIC TREE, and that is not a
+        # convenience: CLAUSE_EXEMPT is checked for STALENESS, so a tree without this string
+        # would report the declaration stale and every case below would fail for a reason that
+        # has nothing to do with what it tests. Putting it here also makes the exemption itself
+        # a permanent case — the "clean tree" run proves an ISO reference is NOT a finding.
+        with open(os.path.join(d, "exempt.ts"), "wb") as fh:
+            fh.write(
+                "    iassetIntro: 'جرد الأصول وفق البند 8.1 من معيار ISO 27001 — كل أصل.',\n"
+                .encode("utf-8")
+            )
 
     def plant(name, text):
         def go(tmp):
@@ -255,6 +333,35 @@ def _self_test() -> int:
         ("a parenthetical «(Process 17)» inside a description is NOT a finding",
          plant("n.ts", "    nIntro: 'Capture the decision (Process 17) on a recommendation.',\n"),
          None),
+        # 🔴 DECISION 151 RULING 2-أ — the internal clause reference, added 2026-11-19.
+        #
+        # ⚠️ Five of the seven real strings carried it MID-SENTENCE, so the first three cases
+        # here are the ones an anchored matcher would miss. Without them the rule could be
+        # written with `^` and report a clean tree over five of its own seven subjects.
+        ("«(البند 10.6، يُسجَّل)» mid-sentence IS a finding",
+         plant("o.ts", "    oLabel: 'مبرر كشف {field} (البند 10.6، يُسجَّل)',\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("«(الجزء 5.1)» mid-sentence IS a finding",
+         plant("p.ts", "    pIntro: 'العدسة القرائية فقط للمدقّق الخارجي (الجزء 5.1): السجلات.',\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("«البند 5.1 — » opening the value IS a finding",
+         plant("q.ts", "    qIntro: 'البند 5.1 — مراجعة دورية لمن يملك الصلاحيات.',\n"),
+         "cites one of OUR OWN documents by clause"),
+        ("a clause reference in a WRAPPED value IS a finding",
+         plant("r.ts", "    rIntro:\n      'سجلات الموظفين والتوعية الأمنية ' +\n      'والتدريب (الجزء 8.2).',\n"),
+         "cites one of OUR OWN documents by clause"),
+        # ⛔ «البند» as an ordinary word. `acrIntro` itself says «أكّد كل بند أدناه» — confirm
+        # each ITEM below — so a matcher on the word alone would fail the very string the
+        # ruling just cleaned.
+        ("«بند» as an ordinary word with no number is NOT a finding",
+         plant("s.ts", "    sIntro: 'أكّد كل بند أدناه أو ألغِه أو ضع عليه علامة.',\n"),
+         None),
+        # 🔴 THE STALE DIRECTION. `exempt.ts` is overwritten so the declared span is gone;
+        # without this case CLAUSE_EXEMPT could outlive the string it describes, and a
+        # declaration nobody can falsify is how an exemption quietly becomes an amnesty.
+        ("a DECLARED exemption whose span has gone is reported STALE",
+         plant("exempt.ts", "    iassetIntro: 'جرد الأصول مع مالكه وتصنيفه.',\n"),
+         "and no shipped value does"),
     ]
     passed = failed = 0
     for label, mutate, needle in plants:

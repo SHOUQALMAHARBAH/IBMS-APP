@@ -23,6 +23,7 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 import {
   loadIndependently,
   namedFailures,
@@ -42,7 +43,11 @@ function displayOrDash(value: string | number | null): string {
 }
 
 export default function InsurerEmployeePerformanceDashboardPage() {
-  const { t } = useLanguage();
+  // 🔴 `language` ADDED — the two money columns went through `displayOrDash`, which only
+  // turns null into an em dash and otherwise prints the API's raw decimal string. ⚠️ The
+  // OTHER columns keep `displayOrDash`: they are counts and scores, and routing a count
+  // through `formatMoney` would stamp «JOD» on a number of policies.
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -221,8 +226,8 @@ export default function InsurerEmployeePerformanceDashboardPage() {
                     {row.employeeName ? <bdi>{row.employeeName}</bdi> : t('commonNameNotResolved')}
                   </Td>
                   <Td>{displayOrDash(row.newClients)}</Td>
-                  <Td>{displayOrDash(row.premiumWrittenJod)}</Td>
-                  <Td>{displayOrDash(row.commissionEarnedJod)}</Td>
+                  <Td>{formatMoney(row.premiumWrittenJod, language)}</Td>
+                  <Td>{formatMoney(row.commissionEarnedJod, language)}</Td>
                   <Td>{row.renewalRatePercent === null ? '—' : `${row.renewalRatePercent}%`}</Td>
                   <Td>{row.crossSellRatePercent === null ? '—' : `${row.crossSellRatePercent}%`}</Td>
                 </Tr>

@@ -17,6 +17,7 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
@@ -40,7 +41,10 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 export default function ExecutiveDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  // 🔴 `language` ADDED — the four money tiles printed the API's raw decimal string beside
+  // counts and a percentage. Their own labels now read «(دينار أردني)» (owner decision 146
+  // §١٠), which made the unformatted figure beside them read worse, not better.
+  const { t, language } = useLanguage();
 
   const [summary, setSummary] = useState<ExecutiveDashboardSummary | null>(
     null,
@@ -169,7 +173,7 @@ export default function ExecutiveDashboardPage() {
                 label={t('execConversionRate')}
               />
               <Stat
-                value={h.commissionIncomeJod}
+                value={formatMoney(h.commissionIncomeJod, language)}
                 label={t('execCommissionIncomeJod')}
               />
             </div>
@@ -194,7 +198,7 @@ export default function ExecutiveDashboardPage() {
             <div style={gridStyle}>
               <Stat value={h.openClaimsCount} label={t('execOpenClaims')} />
               <Stat
-                value={h.outstandingClaimsValueJod}
+                value={formatMoney(h.outstandingClaimsValueJod, language)}
                 label={t('execOutstandingClaimsValueJod')}
               />
             </div>
@@ -204,11 +208,11 @@ export default function ExecutiveDashboardPage() {
             <h2>{t('execFinancial')}</h2>
             <div style={gridStyle}>
               <Stat
-                value={h.receivablesOutstandingJod}
+                value={formatMoney(h.receivablesOutstandingJod, language)}
                 label={t('execReceivablesOutstandingJod')}
               />
               <Stat
-                value={h.payablesOutstandingJod}
+                value={formatMoney(h.payablesOutstandingJod, language)}
                 label={t('execPayablesToInsurersJod')}
               />
             </div>

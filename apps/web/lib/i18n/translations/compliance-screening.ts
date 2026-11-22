@@ -15,7 +15,7 @@ export const COMPLIANCE_SCREENING = {
     smRecordingThatDecisionFailedTry: 'فشل تسجيل القرار — حاول مرة أخرى.',
     smSanctionsMatchReview: 'مطابقات العقوبات للمراجعة',
     smNamesAreCheckedAgainstThe:
-      'تُقارن الأسماء مع قوائم OFAC والأمم المتحدة المحدَّثة تلقائياً، مع مطابقة تقريبية تشمل اختلافات كتابة الاسم بالحروف اللاتينية والأسماء الرباعية. المطابقة هنا سؤال وليست حكماً — لا يوقف النظام أي عميل تلقائياً؛ القرار قرار مسؤول الامتثال.',
+      'تُقارن الأسماء مع قوائم OFAC والأمم المتحدة المحدَّثة تلقائياً، مع مطابقة تقريبية تشمل اختلافات كتابة الاسم بالحروف اللاتينية والأسماء الرباعية. المطابقة هنا سؤال وليست حكماً — لا يوقف النظام أي عميل تلقائياً؛ القرار قرار مسؤول الالتزام.',
     smTheLocalSanctionsListIs:
       'قائمة العقوبات المحلية فارغة — لم تُنفَّذ المزامنة بعد. لم يُفحص أي عميل فعلياً، والقائمة الفارغة هنا لا تعني عدم وجود تطابقات. شغّل POST /watchlist-sync/run.',
     smNothingAwaitingReview: 'لا توجد مطابقات بانتظار المراجعة.',
@@ -30,7 +30,7 @@ export const COMPLIANCE_SCREENING = {
     smEdd: 'عناية معززة',
     smViewCustomerRfqs: 'طلبات عروض الأسعار لهذا العميل',
     smNoLongerOnTheSource: 'رُفع من القائمة المصدر — القرار قائم',
-    smReasonForTheDecisionMin: 'سبب القرار (١٠ أحرف على الأقل)',
+    smReasonForTheDecisionMin: 'سبب القرار (10 أحرف على الأقل)',
     smClearFalsePositive: 'مطابقة خاطئة',
     smConfirmMatch: 'تأكيد المطابقة',
     smCaseColumn: 'حالة الملف',
@@ -46,7 +46,7 @@ export const COMPLIANCE_SCREENING = {
     smCaseReassign: 'إعادة الإسناد',
     smCaseStartReview: 'بدء المراجعة',
     smCaseEscalate: 'تصعيد',
-    smCaseEscalateReason: 'سبب التصعيد (١٠ أحرف على الأقل)',
+    smCaseEscalateReason: 'سبب التصعيد (10 أحرف على الأقل)',
     smCaseNotes: 'ملاحظات العمل',
     smCaseAddNote: 'إضافة ملاحظة',
     smCaseNotePlaceholder:
@@ -61,7 +61,7 @@ export const COMPLIANCE_SCREENING = {
     smCaseActionFailed: 'تعذّر تنفيذ الإجراء على الملف — حاول مرة أخرى.',
     smCaseNoReviewers:
       'لا يوجد مستخدم نشط يملك صلاحية sanctions-pep.screen غيرك، فلا أحد يمكن الإسناد إليه.',
-    smComplianceOfficerOnly: 'مسؤول الامتثال فقط',
+    smComplianceOfficerOnly: 'مسؤول الالتزام فقط',
     smReviewReasonAria: 'سبب المراجعة لـ {name}',
     slapRefusalAct: 'عرض سياسات مستويات الخدمة',
     slapCouldNotLoadSlaPolicies: 'تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى.',
@@ -96,8 +96,7 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayFixedMissing: 'العطل ثابتة التاريخ غير المُدخلة',
     slapHolidayAddFixed: 'أضِف العطل الثابتة لهذه السنة',
     slapHolidayFixedNote:
-      'أربع عطل تتكرر في التاريخ نفسه كل سنة: رأس السنة الميلادية (١ كانون الثاني)، ' +
-      'عيد العمال (١ أيار)، عيد الاستقلال (٢٥ أيار)، عيد الميلاد المجيد (٢٥ كانون الأول).',
+      'أربع عطل تتكرر في التاريخ نفسه كل سنة: رأس السنة الميلادية (1 كانون الثاني)، عيد العمال (1 أيار)، عيد الاستقلال (25 أيار)، عيد الميلاد المجيد (25 كانون الأول).',
     slapHolidayMovingHeading: 'المناسبات الإسلامية — تُدخل حسب الإعلان الرسمي',
     slapHolidayMovingNote:
       'تواريخ هذه المناسبات تُحدَّد بإعلان رسمي في الأردن وقد تختلف بيوم عن أي تحويل ' +
@@ -201,7 +200,7 @@ export const COMPLIANCE_SCREENING = {
     shRefusalAct: 'عرض تقرير سلامة الفحص',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
     shListHealth: 'حالة مزوّد الفحص',
-    shListOverview: 'إحصاءات الفحص لآخر ٣٠ يوماً',
+    shListOverview: 'إحصاءات الفحص لآخر 30 يوماً',
     /*
      * OWNER ANSWER 2 — the two capability words, hers verbatim.
      *

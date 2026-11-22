@@ -4,6 +4,7 @@ import {
   escapeHtml,
   formatDocumentDate,
   formatDocumentMoney,
+  preferLanguage,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
 
@@ -48,7 +49,13 @@ export interface InvoiceDocumentData {
    * every invoice created by #31 today always has one). */
   policyNumber: string | null;
   insuranceLine: string | null;
+  /** The line's Arabic name from the policy's catalogue join, or null where none is known
+   *  (and always null where the invoice carries no policy). */
+  insuranceLineAr: string | null;
   insurerName: string | null;
+  /** The insurer's Arabic name, read from the SAME source as `insurerName` by
+   *  `resolveInsurerNamePair` — never coalesced field by field. */
+  insurerNameAr: string | null;
   invoiceDate: Date;
   dueDate: Date;
   premiumAmount: { toString(): string };
@@ -104,14 +111,32 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
       ? 'مستحقة'
       : 'Outstanding';
 
+  /*
+   * THE INSURER AND THE LINE IN THE READER'S LANGUAGE — decision 153 §U2.
+   *
+   * ⚠️ Both halves are NULLABLE here, unlike the certificate: an invoice's policy link is
+   * schema-nullable, so there may be no insurer and no line at all. `preferLanguage` is
+   * therefore applied only where a Latin name exists, and the em dash the row already
+   * printed for an absent value is unchanged.
+   */
+  const insurer =
+    data.insurerName === null
+      ? null
+      : preferLanguage(data.insurerName, data.insurerNameAr, lang);
+  const line =
+    data.insuranceLine === null
+      ? null
+      : preferLanguage(data.insuranceLine, data.insuranceLineAr, lang);
+
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
           ['رقم المرجع', escapeHtml(data.invoiceId)],
           ['العميل', escapeHtml(data.customerLegalName)],
           ['رقم الوثيقة', escapeHtml(data.policyNumber ?? '—')],
-          ['خط التأمين', escapeHtml(data.insuranceLine ?? '—')],
-          ['شركة التأمين', escapeHtml(data.insurerName ?? '—')],
+          // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
+          ['فرع التأمين', escapeHtml(line ?? '—')],
+          ['شركة التأمين', escapeHtml(insurer ?? '—')],
           ['تاريخ الفاتورة', formatDocumentDate(data.invoiceDate, 'ar')],
           ['تاريخ الاستحقاق', formatDocumentDate(data.dueDate, 'ar')],
           ['الحالة', clientStatus],
@@ -120,8 +145,8 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
           ['Reference', escapeHtml(data.invoiceId)],
           ['Customer', escapeHtml(data.customerLegalName)],
           ['Policy Number', escapeHtml(data.policyNumber ?? '—')],
-          ['Insurance Line', escapeHtml(data.insuranceLine ?? '—')],
-          ['Insurer', escapeHtml(data.insurerName ?? '—')],
+          ['Insurance Line', escapeHtml(line ?? '—')],
+          ['Insurer', escapeHtml(insurer ?? '—')],
           ['Invoice Date', formatDocumentDate(data.invoiceDate, 'en')],
           ['Due Date', formatDocumentDate(data.dueDate, 'en')],
           ['Status', clientStatus],

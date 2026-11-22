@@ -1,0 +1,26 @@
+{
+  "clause-reference-back-on-a-shipped-string": {
+    "file": "apps/web/lib/i18n/translations/customers.ts",
+    "from": "    customerRevealJustificationLabel: 'مبرر كشف {field} (يُسجَّل)',",
+    "to": "    customerRevealJustificationLabel: 'مبرر كشف {field} (البند 10.6، يُسجَّل)',",
+    "why": "Owner decision 151 ruling 2-أ deletes «البند N» / «الجزء N» from the seven strings that cited one of OUR OWN documents: the reader has nowhere to look that clause up. `check:process-prefix` carries the rule at budget zero and must name this file and line. ⚠️ The span is MID-SENTENCE, which is the shape an anchored matcher would miss — five of the seven were like this."
+  },
+  "eastern-digits-back-on-a-shipped-string": {
+    "file": "apps/web/lib/i18n/translations/compliance-risk.ts",
+    "from": "    wsRestoreReason: 'سبب استعادة قائمة أقدم (10 أحرف على الأقل)',",
+    "to": "    wsRestoreReason: 'سبب استعادة قائمة أقدم (١٠ أحرف على الأقل)',",
+    "why": "Owner decision 146 ruling 1-أ: «كل رقم مكتوب في نصوص النظام غربي». Row 4 of annex §٣. `check:eastern-digits` is budget zero and must name this file and line."
+  },
+  "one-word-changed-in-her-ratified-arabic": {
+    "file": "apps/web/lib/i18n/translations/nav.ts",
+    "from": "    navComplianceDashboard: 'لوحة الالتزام',",
+    "to": "    navComplianceDashboard: 'شاشة الالتزام',",
+    "why": "Decision 151 §٤ row 2 ratifies «لوحة الالتزام». `decision-151.strings.test.ts` re-slices annex §٧ at test time and compares byte for byte, so changing ONE word must kill it by name — and must NOT be caught by the two gates above, which are about clause references and digits."
+  },
+  "paid-declaration-left-behind-as-stale": {
+    "file": "scripts/measurements/hardcoded-ui-english.py",
+    "from": "    'apps/web/components/policy/EndorsementSection.tsx|commission reversal',",
+    "to": "    'apps/web/components/policy/EndorsementSection.tsx|Premium adjustment',\n    'apps/web/components/policy/EndorsementSection.tsx|commission reversal',",
+    "why": "Decision 146 ruling 6-a paid this debt, so the declaration row was deleted in the same commit. Putting it back must fail the gate's STALE direction — a declared string that no longer occurs. Without that direction a paid debt could sit on the list for ever and nobody would know the word had arrived."
+  }
+}

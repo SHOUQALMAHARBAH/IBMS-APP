@@ -174,7 +174,7 @@ export const RFQ = {
     rfqLogExchangeError: 'تعذر تسجيل المراسلة — حاول مرة أخرى.',
     rfqDirectionLabel: 'الاتجاه',
     rfqChannelLabel: 'القناة',
-    rfqNegotiationNotesPlaceholder: 'مثال: طُلب خصم ٥٪ وشطب استثناء الفيضان',
+    rfqNegotiationNotesPlaceholder: 'مثال: طُلب خصم 5٪ وشطب استثناء الفيضان',
     rfqCommInsurerLabel: 'المؤمِّن (اختياري)',
     rfqCommInsurerWholePanel: 'كل القائمة',
     rfqCommSubjectLabel: 'الموضوع (اختياري)',

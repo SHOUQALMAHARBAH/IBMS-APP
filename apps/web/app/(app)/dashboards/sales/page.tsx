@@ -263,7 +263,9 @@ export default function SalesDashboardPage() {
             <h2>{t('dsalPremiumWritten')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
-                <div style={statStyle}>{summary.premiumWritten.newJod}</div>
+                <div style={statStyle}>
+                  {formatMoney(summary.premiumWritten.newJod, language)}
+                </div>
                 <div>{t('dsalNewBusiness')}</div>
                 <FigurePeriod
                   scope={summary.metricScope.premiumWritten}
@@ -273,7 +275,9 @@ export default function SalesDashboardPage() {
                 />
               </div>
               <div>
-                <div style={statStyle}>{summary.premiumWritten.renewalJod}</div>
+                <div style={statStyle}>
+                  {formatMoney(summary.premiumWritten.renewalJod, language)}
+                </div>
                 <div>{t('dsalRenewal')}</div>
                 <FigurePeriod
                   scope={summary.metricScope.premiumWritten}
@@ -283,7 +287,9 @@ export default function SalesDashboardPage() {
                 />
               </div>
               <div>
-                <div style={statStyle}>{summary.premiumWritten.totalJod}</div>
+                <div style={statStyle}>
+                  {formatMoney(summary.premiumWritten.totalJod, language)}
+                </div>
                 <div>{t('dsalTotal')}</div>
                 <FigurePeriod
                   scope={summary.metricScope.premiumWritten}

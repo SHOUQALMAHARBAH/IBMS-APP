@@ -5,7 +5,7 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildRecommendationReportHtml } from './recommendation-report.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { insurerName } from '../../repositories/insurer-identity';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
 
 const RECOMMENDATION_REPORT_TEMPLATE_TYPE = 'recommendation_report';
 
@@ -63,13 +63,20 @@ export class RecommendationReportDocumentService {
     // through `view`'s own `formatMoney()`/`.toFixed(2)` output
     // (`@code-reviewer` MINOR, this slice's own first pass).
     const q = recommendation.recommendedQuotation;
+    const insurerPair = resolveInsurerNamePair(q.insurer);
     const html = buildRecommendationReportHtml(
       {
         recommendationId: view.id,
         customerLegalName: customer.legalName,
         insuranceLine: q.rfq.insuranceLine,
         createdAt: view.createdAt,
-        insurerName: insurerName(q.insurer),
+        /*
+         * BOTH NAMES FROM ONE SOURCE — decision 153 §U2. `RECOMMENDATION_INCLUDE` already
+         * selects `INSURER_IDENTITY_SELECT`, which carries every source the pair resolver
+         * consults, so ⛔ no query changed here.
+         */
+        insurerName: insurerPair.name,
+        insurerNameAr: insurerPair.nameAr,
         premium: q.premium,
         currency: q.currency,
         deductible: q.deductible,

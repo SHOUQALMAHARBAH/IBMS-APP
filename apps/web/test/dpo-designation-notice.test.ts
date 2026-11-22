@@ -27,8 +27,26 @@ import { COMMON } from '../lib/i18n/translations/common';
  *
  * If this fails: do NOT edit the hash. Her text is the authority; a changed hash means somebody
  * reworded a legal notice she wrote.
+ *
+ * ## 🔴 THE HASH MOVED ONCE, 2026-11-19, AND SHE IS WHY — OWNER DECISION 146 RULING 1-أ
+ *
+ * «كل رقم مكتوب في نصوص النظام غربي», and annex §٣ names `dpoAssignNotice` as ROW 3 of the
+ * fifty-three, listing the figures it changes: «٢٤ · ٢٠٢٣ · ١١ · ٢١ · ٢٢ ⟶ 24 · 2023 · 11 · 21
+ * · 22». So the notice now writes its article numbers in Western digits.
+ *
+ * ⟶ AND THE PIN GOT STRONGER RATHER THAN WEAKER, because swapping one hash for another proves
+ *   only that somebody computed a hash. `PRE_146_SHA256` is the ORIGINAL, kept, and the second
+ *   assertion below maps the shipping text's Western digits BACK to Eastern ones and requires
+ *   that it reproduces it. That is the ruling's own statement — *«الرقم وحده يتبدّل، حرفاً
+ *   بحرف. لا تتغيّر كلمة»* — made checkable: if one word of her notice were reworded while the
+ *   digits were changed, the inverse would NOT hash to the original and this file would say so.
  */
 const OWNER_TEXT_SHA256 =
+  'e26a57114f8322aac91105e8516ad4f7ece396fd4fe9370759a313b945cc9ad1';
+
+/** Her text as supplied, before decision 146's digit rule. ⛔ Never delete this: it is what
+ *  makes "only the digits moved" an assertion instead of a claim. */
+const PRE_146_SHA256 =
   'eecf5f3bdb189c049b7f4cb570f043860ba5bf26cac7101fda1645fcd8e04755';
 
 /**
@@ -47,6 +65,24 @@ describe('the combined-assignment notice is the owner’s own text', () => {
     expect(createHash('sha256').update(text, 'utf8').digest('hex')).toBe(
       OWNER_TEXT_SHA256,
     );
+  });
+
+  it('🔴 decision 146 changed the DIGITS and nothing else — proven by inverting them', () => {
+    /*
+     * Map every Western digit back to its Eastern counterpart and require her ORIGINAL hash.
+     * A reword smuggled in alongside the digit change cannot survive this: the inverse would
+     * hash to something else, and no amount of re-running would make it match.
+     */
+    const backToEastern = assembled('AR').replace(/[0-9]/g, (d) =>
+      String.fromCharCode(d.charCodeAt(0) - 0x30 + 0x0660),
+    );
+    expect(
+      createHash('sha256').update(backToEastern, 'utf8').digest('hex'),
+      'The notice no longer differs from the owner’s supplied text by digits ALONE. Decision ' +
+        '146 ruling 1-أ permits exactly one change to it — «الرقم وحده يتبدّل، حرفاً بحرف. لا ' +
+        'تتغيّر كلمة» — so a failure here means a word of a legal notice she wrote was changed ' +
+        'as well. ⛔ Do not update either hash: restore her wording.',
+    ).toBe(PRE_146_SHA256);
   });
 
   /**
@@ -69,10 +105,13 @@ describe('the combined-assignment notice is the owner’s own text', () => {
     const ar = assembled('AR');
     // The article. A notice that states an exposure without naming the provision it comes from is
     // this product making a legal claim with no source.
-    expect(ar).toContain('١١/أ');
+    //
+    // 🔴 WESTERN DIGITS SINCE 2026-11-19 — owner decision 146 ruling 1-أ, annex §٣ row 3. The
+    // CLAUSE each of these names is unchanged; only how its number is written moved.
+    expect(ar).toContain('11/أ');
     // The exposure, by article. Both are named in her text and both matter: 21 and 22.
-    expect(ar).toContain('٢١');
-    expect(ar).toContain('٢٢');
+    expect(ar).toContain('21');
+    expect(ar).toContain('22');
     // AND THAT IT IS PERMITTED. This is the half the struck hard block would have contradicted, and
     // the half an office of one person needs: the system records it and does not prevent it.
     expect(ar).toContain('يسجّله ولا يمنعه');

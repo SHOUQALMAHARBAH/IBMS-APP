@@ -70,6 +70,10 @@ export class QuotationComparisonDocumentService {
           // through `insurerIdentity()` now, so the name is already resolved here
           // and re-resolving it would need the raw join this no longer receives.
           insurerName: r.quotation.insurer.name,
+          // Decision 153 §U2 — the Arabic half, from the SAME flatten. `insurerIdentity()`
+          // picks one source and reads both names from it, so reading `.nameAr` off the row
+          // here cannot disagree with the `.name` directly above it.
+          insurerNameAr: r.quotation.insurer.nameAr,
           isCurrentVersion: r.quotation.isCurrentVersion,
           premium: r.quotation.premium,
           currency: r.quotation.currency,
