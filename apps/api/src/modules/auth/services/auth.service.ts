@@ -835,6 +835,19 @@ export class AuthService {
       fullName: resolveDisplayName(user),
       languagePreference: user.languagePreference,
       roles,
+      /*
+       * DECISION 157 («ما لا يحتاج قراراً») -- the home page prints a role by NAME.
+       *
+       * `roles` above is the MACHINE name and stays exactly as it is: `AppNav` orders the
+       * navigation by it and `navOrderFor` would stop recognising anything if it moved. This is
+       * a SIBLING field, so a screen that wants to show a person their role has something to
+       * show, and a screen that wants to branch still cannot do it by name.
+       *
+       * Both spellings rather than one resolved string, for the reason `accessValidUntil`
+       * already gives below: the caller knows which language it is rendering and the server
+       * does not.
+       */
+      roleNames: roleRefs.map((r) => ({ ar: r.nameAr, en: r.nameEn })),
       permissions,
       mfaEnabled: user.mfaEnabled,
       mfaPolicySatisfied: this.mfaPolicySatisfied(

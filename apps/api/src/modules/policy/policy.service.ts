@@ -58,6 +58,7 @@ import { assertWithinRoleScope } from '../../common/role-scope';
 import { insurerIdentity } from '../../repositories/insurer-identity';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
+import { UserRepository } from '../../repositories/user.repository';
 
 interface PolicyScheduleView {
   id: string;
@@ -89,6 +90,21 @@ interface PolicyDocumentView {
 interface PolicyCheckingView {
   placedByUserId: string;
   checkedByUserId: string | null;
+  /**
+   * The checker's DISPLAY name, resolved through `displayNameForUserId` — never `User.fullName`
+   * (OWNER DECISION 48: a register resolves through the HR record when one is linked).
+   *
+   * OWNER DECISION 153 §٢ ROW ٧, as amended by DECISION 157 table أ: the policy's checking line
+   * reads «دقّقها: {name} في {date}». It printed `checkedByUserId` — a 36-character internal id,
+   * on a line a placement officer reads — and 153 §٦ criterion 4 says the internal number is not
+   * displayed. A screen cannot resolve a name the wire does not carry, so the name travels WITH
+   * the record rather than being fetched by a second call, which would need a permission this
+   * reader may not hold.
+   *
+   * `null` while nobody has checked, and `null` too if the account is gone; the screen renders
+   * this line only when `checkedAt` is set.
+   */
+  checkedByName: string | null;
   checkedAt: Date | null;
   discrepancyFound: boolean;
   discrepancyDetail: string | null;
@@ -298,6 +314,10 @@ export class PolicyService {
     // decision needs and this module has no other way to know.
     private readonly lines: InsuranceLineRepository,
     private readonly licenseGate: LicenseGateService,
+    // The checker's display name for the policy's checking line (DECISION 153 §٢ row ٧).
+    // AuthModule already exports this repository and PolicyModule already imports AuthModule,
+    // so this is one more constructor argument rather than a new module wire.
+    private readonly users: UserRepository,
   ) {}
 
   /** Placement / Manager / Executive work the whole book; a Policy Checking
@@ -430,7 +450,38 @@ export class PolicyService {
     return { policy, customer };
   }
 
-  private toView(policy: PolicyWithContext): PolicyView {
+  /**
+   * One name read for a whole page, never one per row.
+   *
+   * `toView` stays SYNCHRONOUS and takes the map it needs. Making it `async` instead would have
+   * turned `rows.map((r) => this.toView(r))` into an N+1 — a name query per policy on every list
+   * — which is the shape `displayNamesForUserIds` exists to make unnecessary.
+   */
+  private async checkerNames(
+    rows: PolicyWithContext[],
+  ): Promise<Map<string, string>> {
+    const ids = rows
+      .map((r) => r.checking?.checkedByUserId)
+      .filter((id): id is string => Boolean(id));
+    if (ids.length === 0) return new Map();
+    return this.users.displayNamesForUserIds([...new Set(ids)]);
+  }
+
+  /** One row, presented with its checker's name resolved. */
+  private async present(policy: PolicyWithContext): Promise<PolicyView> {
+    return this.toView(policy, await this.checkerNames([policy]));
+  }
+
+  /** Many rows, with ONE name read for all of them. */
+  private async presentMany(rows: PolicyWithContext[]): Promise<PolicyView[]> {
+    const names = await this.checkerNames(rows);
+    return rows.map((r) => this.toView(r, names));
+  }
+
+  private toView(
+    policy: PolicyWithContext,
+    checkerNames: Map<string, string>,
+  ): PolicyView {
     return {
       id: policy.id,
       discard: discardView(policy),
@@ -485,6 +536,9 @@ export class PolicyService {
         ? {
             placedByUserId: policy.checking.placedByUserId,
             checkedByUserId: policy.checking.checkedByUserId,
+            checkedByName: policy.checking.checkedByUserId
+              ? (checkerNames.get(policy.checking.checkedByUserId) ?? null)
+              : null,
             checkedAt: policy.checking.checkedAt,
             discrepancyFound: policy.checking.discrepancyFound,
             discrepancyDetail: policy.checking.discrepancyDetail,
@@ -671,7 +725,7 @@ export class PolicyService {
       afterValue: policyPlacementAuditSnapshot(created),
     });
 
-    return this.toView(await this.loadVisible(created.id, actor));
+    return this.present(await this.loadVisible(created.id, actor));
   }
 
   async recordIssuance(
@@ -851,7 +905,7 @@ export class PolicyService {
       });
     }
 
-    return this.toView(await this.loadVisible(id, actor));
+    return this.present(await this.loadVisible(id, actor));
   }
 
   async attachDocuments(
@@ -880,7 +934,7 @@ export class PolicyService {
       });
     }
 
-    return this.toView(await this.loadVisible(id, actor));
+    return this.present(await this.loadVisible(id, actor));
   }
 
   async list(
@@ -918,7 +972,7 @@ export class PolicyService {
         this.policies.countForActor(filter),
       ]);
       return {
-        items: rows.map((r) => this.toView(r)),
+        items: await this.presentMany(rows),
         total,
         page: window.page,
         pageSize: window.pageSize,
@@ -933,18 +987,18 @@ export class PolicyService {
       // bounded by construction — at most one policy per opportunity, and one
       // customer's own policies — so they report everything they have and the
       // page control hides itself.
-      return wholeSet(row ? [this.toView(row)] : []);
+      return wholeSet(row ? await this.presentMany([row]) : []);
     }
 
     await this.assertCustomerVisible(query.customerId as string, actor);
     const rows = await this.policies.findManyByCustomerId(
       query.customerId as string,
     );
-    return wholeSet(rows.map((r) => this.toView(r)));
+    return wholeSet(await this.presentMany(rows));
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<PolicyView> {
-    return this.toView(await this.loadVisible(id, actor));
+    return this.present(await this.loadVisible(id, actor));
   }
   /**
    * DISCARD — this policy was raised in error and never took effect.
@@ -987,6 +1041,6 @@ export class PolicyService {
       afterValue: { discardedReason: dto.reason.trim() },
     });
 
-    return this.toView(await this.loadVisible(id, actor));
+    return this.present(await this.loadVisible(id, actor));
   }
 }

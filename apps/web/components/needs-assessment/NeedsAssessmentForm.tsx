@@ -158,8 +158,8 @@ export function NeedsAssessmentForm({
           {isSubmitting
             ? t('usrSaving')
             : mode === 'create'
-              ? 'Save draft & see recommended cover'
-              : 'Save questionnaire'}
+              ? /* DECISION 157 table ج row ٩-ب. */ t('naFormSaveDraftButton')
+              : /* row ٩-ج. */ t('naFormSaveQuestionnaireButton')}
         </button>
         {error ? (
           <p role="alert" style={errorStyle}>

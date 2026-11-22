@@ -28,6 +28,19 @@ export class ApiError extends Error {
      * deliberately NOT part of `message` for a screen to render — see `isFieldValidationError`.
      */
     public readonly fieldMessages?: readonly string[],
+    /**
+     * The refusal body as the server sent it.
+     *
+     * A domain refusal may carry facts beside its `code` — DECISION 157 ruling 1 sends the
+     * opportunity's status with `OPPORTUNITY_NOT_OPEN_FOR_RFQ`, so a screen can name the stage
+     * in Arabic rather than parsing the server's English sentence. The whole body is carried
+     * rather than a named field per refusal: this client knows nothing about any one domain,
+     * and the alternative is a new parameter every time a refusal learns to say more.
+     *
+     * ⛔ A screen reads a FIELD of this, never the `message`. Matching on prose makes a
+     * sentence a wire format.
+     */
+    public readonly details?: Readonly<Record<string, unknown>>,
   ) {
     super(message);
   }
@@ -114,9 +127,14 @@ async function tryRefresh(): Promise<boolean> {
   }
 }
 
-async function parseErrorBody(res: Response): Promise<{ message?: string; code?: string }> {
+async function parseErrorBody(
+  res: Response,
+): Promise<{ message?: string; code?: string } & Record<string, unknown>> {
   try {
-    return (await res.json()) as { message?: string; code?: string };
+    return (await res.json()) as { message?: string; code?: string } & Record<
+      string,
+      unknown
+    >;
   } catch {
     return {};
   }
@@ -147,7 +165,7 @@ async function fetchWithRetry(
       ? body.message.filter((m): m is string => typeof m === 'string')
       : undefined;
     const message = fieldMessages ? fieldMessages.join(', ') : (body.message ?? res.statusText);
-    throw new ApiError(message, res.status, body.code, fieldMessages);
+    throw new ApiError(message, res.status, body.code, fieldMessages, body);
   }
   return res;
 }

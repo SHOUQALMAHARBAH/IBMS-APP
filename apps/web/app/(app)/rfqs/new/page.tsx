@@ -13,7 +13,12 @@ import {
   type Article15DChoice,
   type Article15DOptions,
   type SelectableInsurer,
+  OPPORTUNITY_NOT_OPEN_FOR_RFQ,
 } from '../../../../lib/rfq/rfq-api';
+import {
+  OPPORTUNITY_STATUS_LABEL_KEY,
+} from '../../../../lib/opportunity/opportunity-status';
+import type { OpportunityStatus } from '../../../../lib/opportunity/opportunity-api';
 import { Article15DWindow } from '../../../../components/rfq/Article15DWindow';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
@@ -197,11 +202,36 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       });
       router.push(`/rfqs/${rfq.id}`);
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError ? err.message : t('rfqNewCreateError'),
-      );
+      setSubmitError(refusalText(err));
       setSubmitting(false);
     }
+  }
+
+  /**
+   * OWNER DECISION 157 ruling 1 — her sentence, with the opportunity's stage NAMED.
+   *
+   * Decision 153 §٢ row ١٦ ratified «…لأنها في مرحلة التنسيب», and the server refuses in every
+   * status but `NEEDS_CONFIRMED` and `RFQ_ISSUED` — so six of the eight stages the sentence can
+   * be shown for made it untrue. 157 keeps the sentence and lets the stage name itself.
+   *
+   * ⛔ Read off the refusal's stable CODE and its `opportunityStatus` field, never its prose.
+   * This screen holds only `?opportunityId=` and never fetches the record, so the refusal is the
+   * only thing that can tell it the stage. An unknown stage falls back to the server's own
+   * message rather than printing a raw enum token at a reader.
+   */
+  function refusalText(err: unknown): string {
+    if (!(err instanceof ApiError)) return t('rfqNewCreateError');
+    if (err.code === OPPORTUNITY_NOT_OPEN_FOR_RFQ) {
+      const status = err.details?.opportunityStatus;
+      const key =
+        typeof status === 'string'
+          ? OPPORTUNITY_STATUS_LABEL_KEY[status as OpportunityStatus]
+          : undefined;
+      if (key) {
+        return t('rfqOpportunityStatusRefusal', { status: t(key) });
+      }
+    }
+    return err.message;
   }
 
   if (loadError) {

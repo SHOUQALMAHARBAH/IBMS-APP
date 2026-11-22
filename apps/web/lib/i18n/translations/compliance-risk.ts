@@ -208,6 +208,7 @@ export const COMPLIANCE_RISK = {
      * zero in `declared-vocabulary.test.ts`.
      */
     rcScopeBranchLabel: 'فرع التأمين',
+    rcLineChoosePlaceholder: 'اختر فرع تأمين…',
     rcScopeRemove: 'إزالة',
     rcScopeColBranch: 'فرع التأمين',
     rcScopeColType: 'النوع',
@@ -859,6 +860,7 @@ export const COMPLIANCE_RISK = {
       'No branches recorded yet. An insurance type is only ever determined by its branches.',
     rcScopeAddBranch: 'Add branch',
     rcScopeBranchLabel: 'Branch',
+    rcLineChoosePlaceholder: '— choose an insurance line —',
     rcScopeRemove: 'Remove',
     rcScopeColBranch: 'Branch',
     rcScopeColType: 'Type',

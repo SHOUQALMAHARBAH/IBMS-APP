@@ -70,6 +70,15 @@ APP = os.path.join('apps', 'web', 'app', '(app)')
 # of them, with no new pattern at all — which is the measurement that matters most
 # here: the shapes were fine and the SURFACE was half missing.
 COMPONENTS = os.path.join('apps', 'web', 'components')
+# A THIRD ROOT, 2026-11-22 — and it closes the blind spot mode 18 is about.
+#
+# `lib/endorsement/endorsement-api.ts` carried `label: 'Pro-rata'` and `label: 'Short-period'`
+# on an options array that `EndorsementSection` renders straight into an `<option>`. Neither of
+# the two roots above opens a file under `lib/`, so those two English words sat on an Arabic
+# screen's cancellation-basis chooser and every run of this script reported the screen clean.
+# ⚠️ READ ONLY BY MODES 15-19, which are reported rather than failed: a sweep of `lib/` for the
+# twelve older modes would be a different measurement and is not made here.
+LIB = os.path.join('apps', 'web', 'lib')
 
 # A translated call, so its ARGUMENT (a key) is never mistaken for prose. Removed rather than used to
 # skip the line — failure mode 2 was skipping any line that contained one.
@@ -310,6 +319,83 @@ TERNARY_LITERAL_2 = re.compile(r"'([A-Za-z]{2,}[A-Za-z ]{0,40})'")
 # Measured across 176 tsx files: the broad form (any ALL-CAPS token) finds exactly
 # THREE, all three real, so the shape test costs nothing today and is forward
 # insurance against the first `>VAT<` somebody writes.
+# ----------------------------------------------------------------------------------------------
+# FAILURE MODES 15-19 — the five shapes MEASURED blind on 2026-11-19
+# (`IBMS-DOC/demo/measure-english-left-on-demo-screens.md` §٦).
+#
+# That measurement read 56 English sites on the demo path and ran THIS SCRIPT against the same
+# commit: it saw NINE of them and reported «zero undeclared». The other forty-seven were invisible
+# — not declared away, not argued about, simply never matched. Five shapes account for all of them.
+#
+# ⚠️ THEIR FINDINGS ARE REPORTED, NOT FAILED. Every real case on the demo path was translated by
+# message 51 §1 (owner decisions 153 §٢ and 157); what these still find is OFF the demo path —
+# cross-sell, up-sell, the consent widget, data-sharing approvals, sales performance — and no
+# ruling covers those screens. Failing them would be enforcing a decision the owner has not made,
+# over screens she has not walked. The count is printed on every run so the debt stays visible,
+# which is the line `check:date-formatting` already draws for its 73 out-of-scope slice sites.
+
+# 15 — ONE CAPITALISED WORD before a brace: `Requested {amount}` · `Expiry {date}`.
+#      Too short for PROSE (which needs >6 characters of running text) and not a parenthetical.
+WORD_BEFORE_BRACE = re.compile(r'(?:^|>|\s)([A-Z][a-z]{2,})\s+\{')
+# ⚠️ AND ITS FIRST RUN CRIED WOLF, which this script's own header calls as bad as under-counting.
+# `export interface Rfq {` is a capitalised word before a brace, and so is every `type X = {`,
+# `enum X {` and `class X {`. Measured: 11 of the first 56 findings were declarations in
+# `lib/*-api.ts`, none of them copy. A DECLARATION is not a render.
+DECLARATION_LINE = re.compile(
+    r'\b(?:interface|type|enum|class|namespace|extends|implements|satisfies)\b')
+
+# 16 — A QUOTED LITERAL THAT OPENS WITH A SEPARATOR: `' · settled'` · `' – ongoing'`.
+#      The separator is why it was invisible: the text begins with punctuation and a space, so
+#      every matcher anchored on a leading letter skipped it.
+SEPARATOR_LITERAL = re.compile(r"'\s*[·–—-]\s+([A-Za-z][^']{2,})'")
+
+# 17 — AN ALL-LOWERCASE QUOTED LITERAL inside a brace expression: `'set at quotation'`.
+#      Lowercase is the whole reason it was missed — the label matcher requires a capital.
+LOWERCASE_RENDERED = re.compile(r"\?\?\s*'([a-z][a-z ]{6,})'")
+
+# 18 — A `label:` IN A NON-SCREEN FILE. `lib/endorsement/endorsement-api.ts` carried
+#      `label: 'Pro-rata'`, rendered straight into an `<option>`. This script's two roots are
+#      `app/(app)` and `components/`, so a file under `lib/` was never opened at all.
+LIB_LABEL = re.compile(r"\blabel:\s*'([A-Z][^']{2,})'")
+
+# 19 — A STORED VALUE RENDERED AS TEXT: `{i.docType}` · `{row.entityType}`. Not English at all,
+#      which is why an English matcher could never see it; it renders a database token at a
+#      reader, which is decision 49's subject.
+# ⚠️ THE SUFFIX IS PART OF THE PATTERN, and its first run proved why: a prefix rule alone
+#      matched `{e.entityCount}` on /sla-dashboard, which is a NUMBER. A stored vocabulary ends
+#      in Type / Category / Kind / Status; a count does not.
+STORED_VALUE_TEXT = re.compile(
+    r'>\s*\{\s*[a-z][A-Za-z0-9]*\.((?:doc|entity|record)(?:Type|Category|Kind|Status))\s*\}\s*<')
+
+
+def widened(src):
+    """[(line_no, shape, text)] for the five shapes above. Comments masked, as everywhere."""
+    out = []
+    for i, line_src in enumerate(mask_comments(src).split('\n'), 1):
+        raw = mask_attributes(line_src)
+        s = raw.strip()
+        if s.startswith(CODE_PREFIX) or MACHINE.search(s):
+            continue
+        stripped = T_CALL.sub('', raw)
+        for shape, pat, subject in (
+            ('15 word-before-brace',
+             None if DECLARATION_LINE.search(s) else WORD_BEFORE_BRACE, stripped),
+            ('16 separator-literal', SEPARATOR_LITERAL, stripped),
+            ('17 lowercase-rendered', LOWERCASE_RENDERED, stripped),
+            ('18 lib-label', LIB_LABEL, raw),
+            ('19 stored-value', STORED_VALUE_TEXT, raw),
+        ):
+            if pat is None:
+                continue
+            for m in pat.finditer(subject):
+                text = m.group(1).strip()
+                if ALLOW.match(text) or text.split()[0].lower() in NOT_BARE_COPY:
+                    continue
+                if (i, shape, text) not in out:
+                    out.append((i, shape, text[:60]))
+    return out
+
+
 BARE_ENUM_TEXT = re.compile(r">\s*([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)\s*<")
 TERNARY_LITERAL = re.compile(r"'([A-Za-z]{3,}[A-Za-z ]{0,40})'")
 
@@ -370,18 +456,19 @@ DECLARED_PARENTHETICALS = {
     #      already translated — so one half of that pair reads in Arabic and the other does
     #      not, on one line.
     #
+    # ✅ NINE OF THE ELEVEN PAID 2026-11-22 by OWNER DECISIONS 153 §٢ and 157 (message 51 §1):
+    #    rows 1, 2, 3, 5, 6, 7, 9, 10 and 11 above. Their declarations are deleted here, in the
+    #    commit that translated them, which is what the STALE direction exists to force. The
+    #    notes stay so the debt and its payment are both legible.
+    #    ⚠️ AND THIS GATE WAS NEVER BLIND TO ANY OF THEM: all nine were REPORTED on every run
+    #    for weeks, and these declarations are what kept it green. The debt was the Arabic
+    #    word, not the detector — the same correction row 8 already records.
+    #    ⛔ ROW 4 (`Previously withdrawn`) STAYS: `ConsentCaptureWidget` is suspended whole by
+    #    OWNER DECISION 154 and nobody touches it before module 11.
+    #
     # DELETING a row is how a translation gets recorded, and the gate fails on a STALE row
     # too. Adding a TWELFTH is not the ordinary fix: derive it, or it is hers.
-    'apps/web/components/access-recertification/StartCyclePanel.tsx|Start cycle',
-    'apps/web/components/access-recertification/StartCyclePanel.tsx|your review queue below now reflects it',
-    'apps/web/components/needs-assessment/NeedsAssessmentReviewPanel.tsx|Mark reviewed',
     'apps/web/components/pdpl/ConsentCaptureWidget.tsx|Previously withdrawn',
-    'apps/web/components/policy/CommissionSection.tsx|(pending approval)',
-    'apps/web/components/policy/CommissionSection.tsx|(approved)',
-    'apps/web/components/policy/CommissionSection.tsx|Insurer statement amount (must equal',
-    'apps/web/components/policy/EndorsementSection.tsx|commission reversal',
-    'apps/web/components/policy/PolicySection.tsx|Checked by',
-    'apps/web/components/policy/PolicySection.tsx|receipt acknowledged',
     # ------------------------------------------------------------------------------------------
     # THE TWELFTH WAS DECLARED HERE AND IS NOW DERIVED — the row is gone, and the
     # correction is recorded because it ran the wrong way for one commit.
@@ -839,7 +926,91 @@ def self_test():
             False,
         ),
     ]
+    # ------------------------------------------------------------------------------------------
+    # FAILURE MODES 15-19, EACH WITH ITS REAL CASE. ⛔ Not one is invented: every line below was
+    # on the demo path at `2cb95423` and is named in the measurement, with its file and line.
+    widened_cases = [
+        (
+            'mode 15 — one capitalised word before a brace (PolicySection.tsx:409)',
+            "            Requested {formatMoney(policy.requestedPremium, language)}\n",
+            True,
+        ),
+        (
+            'mode 16 — a literal opening with a separator (ClaimCard.tsx:658)',
+            "          {s.settled ? ' · settled' : ''}\n",
+            True,
+        ),
+        (
+            'mode 16 — the en-dash form too (PolicySection.tsx:522)',
+            "                    : ' – ongoing'}\n",
+            True,
+        ),
+        (
+            'mode 17 — an all-lowercase rendered literal (insurance-programs/[id]:267)',
+            "                      {line.sumInsuredBasis ?? 'set at quotation'}\n",
+            True,
+        ),
+        (
+            'mode 18 — a label in lib/ (endorsement-api.ts:36)',
+            "  { value: 'pro_rata', label: 'Pro-rata' },\n",
+            True,
+        ),
+        (
+            'mode 19 — a stored value rendered as text (ClaimCard.tsx:252)',
+            "              <span>{i.docType}</span>\n",
+            True,
+        ),
+        (
+            'mode 19 — and the roles table\'s own (settings/roles:728)',
+            "                    <td>{row.entityType}</td>\n",
+            True,
+        ),
+        # ⛔ NON-FINDINGS. Without these the five shapes would be matchers that fire on anything,
+        # and a gate that cries wolf is as useless as one that under-counts — this script's own
+        # header says so.
+        (
+            'a translated call before a brace is not a finding',
+            "            {t('policySectionRequestedPremium', { amount: x })}\n",
+            False,
+        ),
+        (
+            'a capitalised word with no brace after it is not mode 15',
+            "            <strong>{t('policyStatusLabel')}</strong>\n",
+            False,
+        ),
+        (
+            'a value prop is not a rendered label (mode 18 is about `label:`)',
+            "  { value: 'pro_rata', labelKey: 'endorsementBasisProRata' },\n",
+            False,
+        ),
+        (
+            'a stored value that is NOT a doc/entity/record token is not mode 19',
+            "              <span>{row.holderCount}</span>\n",
+            False,
+        ),
+        # ⛔ THE TWO THAT CRIED WOLF ON THE FIRST RUN, kept as cases so the tightening cannot be
+        # undone by someone who only reads the pattern. Measured: the untightened pair reported
+        # 56 strings in 32 files; tightened, 30 in 12. Every one of the 26 removed was one of
+        # these two shapes, read by hand.
+        (
+            'a TYPE DECLARATION is not a render, however capitalised (rfq-api.ts:45)',
+            'export interface Rfq {\n',
+            False,
+        ),
+        (
+            'and a COUNT is not a stored vocabulary (sla-dashboard:348)',
+            '                    <Td>{e.entityCount}</Td>\n',
+            False,
+        ),
+    ]
     failures = 0
+    for name, src, expected in widened_cases:
+        found = len(widened(src)) > 0
+        ok = found == expected
+        print('  %s%s' % ('ok   ' if ok else '*** FAIL *** ', name))
+        if not ok:
+            failures += 1
+            print('      expected %s, got %s  %r' % (expected, found, widened(src)))
     for name, src, expected in cases:
         found = len(findings(src)) > 0
         ok = found == expected
@@ -850,7 +1021,7 @@ def self_test():
     if failures:
         print('\nSELF-TEST FAILED — %d case(s). The detector would under-count.' % failures)
         return 1
-    print('\nSELF-TEST PASSED — all three real misses are caught.')
+    print('\nSELF-TEST PASSED — every real miss is caught, modes 1-19.')
     return 0
 
 
@@ -906,6 +1077,43 @@ def main():
     print('\nfiles scanned (pages + components)  %4d' % len(screens))
     print('files with hardcoded English        %4d' % dirty)
     print('strings                             %4d' % total)
+
+    # ------------------------------------------------------------------------------------------
+    # MODES 15-19 — REPORTED, NEVER FAILED.
+    #
+    # The measurement of 2026-11-19 read 56 English sites on the demo path and ran this script
+    # against the same commit: it saw NINE and reported «zero undeclared». These five shapes are
+    # the other forty-seven. Every real case ON THE DEMO PATH was translated by message 51 §1
+    # (owner decisions 153 §٢ and 157); what remains is off that path, and no ruling covers those
+    # screens. Failing them would be enforcing a decision she has not made, over screens she has
+    # not walked — the line `check:date-formatting` already draws for its 73 slice sites.
+    #
+    # ⚠️ THE COUNT IS PRINTED ON EVERY RUN so the debt stays visible rather than becoming a
+    # silent exemption. A later batch promotes it to the failing set WITH a ruling, not without.
+    #
+    # Mode 18 needs a THIRD root: `lib/` was never opened by this script, which is exactly why
+    # `label: 'Pro-rata'` reached an `<option>` on an Arabic screen for months.
+    lib_files = []
+    for root, _, files in os.walk(LIB):
+        for name in sorted(files):
+            if name.endswith('.ts') and not name.endswith('.test.ts'):
+                lib_files.append(
+                    (os.path.join(root, name).replace(os.sep, '/'),
+                     os.path.join(root, name)))
+    widened_total = 0
+    widened_files = 0
+    for rel, path in sorted(screens + lib_files):
+        hits = widened(io.open(path, encoding='utf-8').read())
+        if not hits:
+            continue
+        widened_files += 1
+        widened_total += len(hits)
+        print('      REPORTED %-44s %d' % (rel, len(hits)))
+        for line, shape, text in hits:
+            print('          L%-5s [%s] %r' % (line, shape, text))
+    print('files scanned for modes 15-19       %4d' % (len(screens) + len(lib_files)))
+    print('modes 15-19: files                  %4d' % widened_files)
+    print('modes 15-19: strings (REPORTED)     %4d' % widened_total)
 
     # THE DECLARATION, IN BOTH DIRECTIONS. `strings` stays the TOTAL and stays printed, so
     # the real figure is never hidden behind a declaration; what the gate reads is

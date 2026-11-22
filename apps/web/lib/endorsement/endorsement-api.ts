@@ -32,9 +32,17 @@ export const ENDORSEMENT_CHANGE_TYPE_OPTIONS = [
 export type EndorsementChangeType =
   (typeof ENDORSEMENT_CHANGE_TYPE_OPTIONS)[number];
 
+/**
+ * OWNER DECISION 153 §٢ rows ١٤-أ and ١٤-ب — «تناسبي» · «المدة القصيرة».
+ *
+ * ⚠️ A `label` HERE was the whole defect: this file is under `lib/`, so the screens' English
+ * sweep never looked at it, and the two words reached a `<option>` on an Arabic screen as
+ * written. The option carries a KEY now and the screen translates it, so the one place a
+ * reader can change the word is the dictionary.
+ */
 export const CANCELLATION_BASIS_OPTIONS = [
-  { value: 'pro_rata', label: 'Pro-rata' },
-  { value: 'short_period', label: 'Short-period' },
+  { value: 'pro_rata', labelKey: 'endorsementBasisProRata' },
+  { value: 'short_period', labelKey: 'endorsementBasisShortPeriod' },
 ] as const;
 export type CancellationBasis =
   (typeof CANCELLATION_BASIS_OPTIONS)[number]['value'];

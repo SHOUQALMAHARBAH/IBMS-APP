@@ -207,8 +207,18 @@ describe('every screen speaks both languages (rule 6)', () => {
  * 18 -> 16 on 2026-10-23 (batch eight). The floor still cannot be 0: six rows are
  * DEFERRED-BY-DECISION to module 7 (decision 46), and `/audit-trail`'s polymorphic `entityId`
  * counts BY DECISION 49 — it is labelled with its type's Arabic word now, and the id stays.
+ *
+ * 11 -> 10 on 2026-11-22 (message 51 §1). OWNER DECISION 157 table ج row ٨ renames the control
+ * on `/insurance-programs/[id]` that opens the needs assessment: it printed the first eight
+ * characters of the assessment's internal id and now reads «تقييم الاحتياجات ({الحالة})».
+ * Decision 153 §٦ criterion 4 — «لا رقم داخلي في عنوان صفحة برنامج التأمين ولا في سطر تدقيق
+ * الوثيقة» — and this is the first half of it; the second (the policy checking line) was never
+ * counted here because it renders a FIELD rather than a slice.
+ *
+ * ⚠️ The ratchet DEMANDED this, by name, on the commit that earned it: a budget left above the
+ * real count stops being a ratchet and silently re-admits what it just paid for.
  */
-const RENDERED_IDENTIFIER_BUDGET = 11;
+const RENDERED_IDENTIFIER_BUDGET = 10;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

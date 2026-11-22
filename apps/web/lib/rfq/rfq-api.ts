@@ -359,3 +359,18 @@ export function logRfqCommunication(
 ): Promise<RfqCommunication> {
   return apiPost(`/rfqs/${rfqId}/communications`, input);
 }
+
+/**
+ * The stable code the api puts on the 422 raised when an RFQ is asked for on an opportunity that
+ * is not open for one, beside an `opportunityStatus` field naming the stage.
+ *
+ * OWNER DECISION 157 ruling 1. Restated here rather than imported — the web and the api are
+ * separate builds and nothing crosses between them — which is the same shape
+ * `isMfaEnrolmentError` already uses for `MFA_ENROLLMENT_REQUIRED`.
+ *
+ * ⚠️ A restated string is a second home, so it is PINNED: `rfq-refusal-code.test.ts` reads
+ * `apps/api/src/modules/rfq/rfq.config.ts` and fails if the two ever stop agreeing. Without
+ * that, a rename on the server would make this screen quietly fall back to printing the
+ * server's English sentence on an Arabic page — the failure would be invisible.
+ */
+export const OPPORTUNITY_NOT_OPEN_FOR_RFQ = 'OPPORTUNITY_NOT_OPEN_FOR_RFQ';

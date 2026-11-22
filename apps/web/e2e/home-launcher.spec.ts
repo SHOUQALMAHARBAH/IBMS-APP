@@ -38,7 +38,13 @@ async function mockAuth(page: Page, roles: string[], permissions?: string[]) {
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, permissions: permissions ?? permissionsForRoles(roles) },
+      json: {
+        ...ME_BASE,
+        roles,
+        // DECISION 157 — see home.spec.ts. Without it the launcher cannot render at all.
+        roleNames: roles.map((r) => ({ ar: `عربي ${r}`, en: `Name of ${r}` })),
+        permissions: permissions ?? permissionsForRoles(roles),
+      },
     }),
   );
 }
@@ -134,4 +140,30 @@ test("offers a role with no grants only Security, not an administration card", a
   // anchor — without it the absence below is satisfied by a launcher that rendered nothing.
   await expect(page.locator('[data-home-card="/settings/security"]')).toBeVisible();
   await expect(page.locator('[data-home-card="/settings/roles"]')).toHaveCount(0);
+});
+
+/**
+ * 🔴 DECISION 157 («ما لا يحتاج قراراً») — A ROLE IS NAMED, NEVER CODED.
+ *
+ * The launcher greeted the one administrator every office has with `OFFICE_ADMINISTRATOR`.
+ * `ENUM_LABEL.RoleName` holds ELEVEN roles and has no key for that one, nor for any role an
+ * office defines for itself, so the fallback printed the machine name — which the owner's own
+ * walk reported (§T6).
+ *
+ * Both halves are asserted: the NAME is present AND the code is absent. The second is what
+ * catches a render that shows both.
+ */
+test("greets the administrator by their role's name, not its code", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.goto("/");
+
+  const greeting = page.getByText("Signed in as", { exact: false });
+  await expect(greeting).toBeVisible();
+  await expect(greeting).toContainText("Name of OFFICE_ADMINISTRATOR");
+  // ⛔ The bare code must not survive beside the name. The fixture's display name deliberately
+  // CONTAINS the code, so this asserts the code does not stand on its own — which is the only
+  // honest form of the check when the two overlap.
+  await expect(greeting).not.toHaveText(/\bas OFFICE_ADMINISTRATOR\b/);
 });

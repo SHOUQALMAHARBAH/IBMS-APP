@@ -32,7 +32,7 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
-import { isFollowUpDue } from './rfq.config';
+import { isFollowUpDue, OPPORTUNITY_NOT_OPEN_FOR_RFQ } from './rfq.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateRfqDto } from './dto/create-rfq.dto';
 import type { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
@@ -717,9 +717,18 @@ export class RfqService {
       opportunity.status !== 'NEEDS_CONFIRMED' &&
       opportunity.status !== 'RFQ_ISSUED'
     ) {
-      throw new UnprocessableEntityException(
-        `Opportunity ${opportunity.id} is ${opportunity.status}; an RFQ can only be issued while it is NEEDS_CONFIRMED or RFQ_ISSUED.`,
-      );
+      /*
+       * OWNER DECISION 157 ruling 1 — the refusal carries a STABLE CODE and the status that
+       * caused it, so the screen can render her ratified sentence naming the stage by name.
+       *
+       * ⛔ The English sentence is unchanged: 157's English section says the server's own
+       * English may stay as the English text, and it is what a developer reads in a log.
+       */
+      throw new UnprocessableEntityException({
+        code: OPPORTUNITY_NOT_OPEN_FOR_RFQ,
+        message: `Opportunity ${opportunity.id} is ${opportunity.status}; an RFQ can only be issued while it is NEEDS_CONFIRMED or RFQ_ISSUED.`,
+        opportunityStatus: opportunity.status,
+      });
     }
 
     const inheritedLine = await this.assertLineInProgramme(

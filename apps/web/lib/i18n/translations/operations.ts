@@ -314,6 +314,8 @@ export const OPERATIONS = {
     acrAdminLoadFailed:
       'تعذر تحميل سجل مراجعة حسابات المسؤولين — حاول مرة أخرى.',
     acrStartCycleError: 'تعذّر بدء الدورة — حاول مرة أخرى.',
+    acrCycleStartedMessage: 'بدأت الدورة «{name}»، وهي الآن في قائمة المراجعة أدناه.',
+    naListUpdatedLabel: 'آخر تحديث: {date}',
     acrCycleDueDate: 'تاريخ الاستحقاق (اختياري — الافتراضي 15 يوماً)',
     acrCycleLabel: 'وسم الدورة',
     acrStartCycleHeading: 'بدء دورة إعادة اعتماد جديدة',
@@ -498,9 +500,9 @@ export const OPERATIONS = {
     usrPasswordMin12CharsWith:
       'كلمة المرور (12 محرفاً على الأقل، مع حرف كبير وصغير ورقم ورمز)',
     usrDepartment: 'القسم',
-    usrSelect: '— اختر —',
+    usrSelect: 'اختر…',
     usrBranch: 'فرع المكتب',
-    usrSelect2: '— اختر —',
+    usrSelect2: 'اختر…',
     usrRoles: 'الأدوار',
     usrSaving: 'جارٍ الحفظ…',
     usrProvisionUser: 'إنشاء المستخدم',
@@ -700,8 +702,7 @@ export const OPERATIONS = {
     roleNoRoles: 'لا توجد أدوار بعد.',
     dutySegHeading: 'عمليات تحتاج شخصين مختلفين',
     dutySegIntro:
-      'خمس عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
-    dutySegColOperation: 'العملية',
+      'ستّ عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
     dutySegColPermission: 'صلاحية المعتمِد',
     dutySegColHolders: 'عدد من يملكها',
     dutySegColStatus: 'الحالة',
@@ -1028,6 +1029,8 @@ export const OPERATIONS = {
     acrAdminLoadFailed:
       'Could not load the administrator access review record — try again.',
     acrStartCycleError: 'Could not start the cycle — try again.',
+    acrCycleStartedMessage: 'Cycle "{name}" started — your review queue below now reflects it.',
+    naListUpdatedLabel: 'Updated {date}',
     acrCycleDueDate: 'Due date (optional — defaults to 15 days)',
     acrCycleLabel: 'Cycle label',
     acrStartCycleHeading: 'Start a new recertification cycle',
@@ -1388,7 +1391,6 @@ export const OPERATIONS = {
     dutySegHeading: 'Operations that need two different people',
     dutySegIntro:
       'Fifteen operations in this system cannot be done by one person: whoever records the action cannot be the one who approves it. This is the list, with whether your office has a second person for each of them today.',
-    dutySegColOperation: 'Operation',
     dutySegColPermission: "Approver's permission",
     dutySegColHolders: 'People who hold it',
     dutySegColStatus: 'Status',

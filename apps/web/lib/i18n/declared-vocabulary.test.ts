@@ -94,6 +94,16 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
        * gains `CERTIFICATE_OF_INSURANCE`, and OWNER DECISION 148 gives it its word. The
        * floor follows the schema; the totality assertion below is what proves coverage. */
       ['DocumentCategory', 17],
+      /*
+       * 🔴 ADDED 2026-11-22 WITH MESSAGE 51 §1, AND IT IS NOT A PRECAUTION.
+       *
+       * `insurance-programs/[id]` printed `ctx.needsAssessmentStatus` AS STORED -- `APPROVED`
+       * at an Arabic reader -- and DECISION 157 table ج row ٨ renders it through
+       * `ENUM_LABEL.NeedsAssessmentStatus` instead. A raw token is ugly; a MISSING label is
+       * worse, because `translate()` returns undefined and React renders NOTHING, so the
+       * control would read «تقييم الاحتياجات ()». Measured before adding: 5 keys for 5 members.
+       */
+      ['NeedsAssessmentStatus', 5],
     ] as const) {
       const members = schemaEnumMembers(name);
       expect(members.length, `${name} parsed ${members.length} member(s)`).toBe(
@@ -109,6 +119,7 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     ['SlaSourceType', 'SlaSourceType'],
     ['InteractionChannel', 'InteractionChannel'],
     ['DocumentCategory', 'DocumentCategory'],
+    ['NeedsAssessmentStatus', 'NeedsAssessmentStatus'],
   ])(
     'ENUM_LABEL.%s is total over the database enum, and every key resolves in both languages',
     (mapName, enumName) => {
@@ -144,6 +155,40 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     const members = [...found![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
     expect(members.length, 'parsed no members out of the DTO').toBe(3);
     expect(Object.keys(ENUM_LABEL.ScreeningMatchStatus).sort()).toEqual(members);
+  });
+
+  /*
+   * 🔴 `ClaimDocType` IS NOT A PRISMA ENUM -- the column is a `String` and the vocabulary is the
+   * api's own `CLAIM_DOC_TYPES` const. Same argument as `ScreeningMatchStatus` above: the
+   * declaring source is parsed, never restated.
+   *
+   * ADDED 2026-11-22 WITH MESSAGE 51 §1. `ClaimCard` printed `i.docType` AS STORED
+   * (`claim_form`) on the claim's document checklist; OWNER DECISION 153 §٢ row ١٣ renders it
+   * through this map. Until now a missing key cost nothing, because nothing read the map for
+   * this list; from here a missing key renders a BLANK document name beside a «(إلزامي)» mark,
+   * which is strictly worse than the code it replaced. Measured before adding: 8 keys for 8
+   * types.
+   */
+  it('ENUM_LABEL.ClaimDocType is total over the api const that declares the vocabulary', () => {
+    const config = readFileSync(
+      join(API, 'modules/claim/claim.config.ts'),
+      'utf8',
+    );
+    const found = /export const CLAIM_DOC_TYPES = \[([^\]]*)\]/.exec(config);
+    expect(found, 'CLAIM_DOC_TYPES was not found in claim.config.ts').toBeTruthy();
+    const members = [...found![1].matchAll(/'([a-z_]+)'/g)]
+      .map((m) => m[1])
+      .sort();
+    expect(members.length, 'parsed no members out of claim.config.ts').toBe(8);
+    expect(Object.keys(ENUM_LABEL.ClaimDocType).sort()).toEqual(members);
+    for (const key of Object.values(ENUM_LABEL.ClaimDocType)) {
+      for (const language of LANGUAGES) {
+        expect(
+          lookupOptional(language, key),
+          `${key} has no ${language} value`,
+        ).toBeTruthy();
+      }
+    }
   });
 
   describe("decision 59's word has ONE home and ONE consumer", () => {

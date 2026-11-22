@@ -272,8 +272,9 @@ export function EndorsementSection({
               <p style={{ margin: '0.4rem 0' }}>
                 {t('endorsementPremiumAdjustmentLabel')}{' '}
                 {formatMoney(e.premiumAdjustment, language)}
+                {/* OWNER DECISION 153 §٢ row ٩-ب. The « · » separator stays. */}
                 {e.commissionReversal
-                  ? ` · commission reversal ${formatMoney(e.commissionReversal.amount, language)}`
+                  ? ` · ${t('endorsementCommissionReversalLabel')} ${formatMoney(e.commissionReversal.amount, language)}`
                   : ''}
               </p>
               {e.cancellation ? (
@@ -467,7 +468,7 @@ export function EndorsementSection({
               >
                 {CANCELLATION_BASIS_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
-                    {o.label}
+                    {t(o.labelKey)}
                   </option>
                 ))}
               </select>

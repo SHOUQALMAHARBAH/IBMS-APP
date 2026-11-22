@@ -115,8 +115,11 @@ export default function NeedsAssessmentsPage() {
                     assessment.recommendedCoverageLines.length,
                   )}
                 </div>
+                {/* OWNER DECISION 153 §٢ row ١٥. */}
                 <div style={cardMetaStyle}>
-                  Updated {formatDate(assessment.updatedAt, language)}
+                  {t('naListUpdatedLabel', {
+                    date: formatDate(assessment.updatedAt, language),
+                  })}
                 </div>
               </button>
             ))}

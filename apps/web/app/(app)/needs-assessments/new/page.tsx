@@ -149,7 +149,8 @@ function NewNeedsAssessmentFlow() {
               onChange={(e) => setSelectedProfileId(e.target.value)}
               style={inputStyle}
             >
-              <option value="">— select —</option>
+              {/* DECISION 157 table ب row ٢-١٠, which points at DECISION 153 §٢ row ٢٠-أ. */}
+              <option value="">{t('naNewProfileSelectPlaceholder')}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {/* `siteLabel` is required as of migration 20261104100000 — no fallback exists. */}

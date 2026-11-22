@@ -245,11 +245,17 @@ function ClaimDocumentation({
           : `· ${t('claimDocumentationMissing', { docs: claim.missingMandatoryDocuments.join(', ') })}`}
       </strong>
       <ul style={{ margin: '0.35rem 0', paddingInlineStart: '1.1rem', fontSize: '0.85rem' }}>
+        {/* OWNER DECISION 153 §٢ row ١٣ — «(إلزامي)», and the document's name from the
+            shipping vocabulary rather than its stored code (`claim_form`). The ✓ / ☐ / ·
+            marks are symbols, not words, and stay. `ENUM_LABEL.ClaimDocType` is proven total
+            over `CLAIM_DOC_TYPES` by `declared-vocabulary.test.ts` — without that, a ninth
+            type would render a BLANK name here, strictly worse than the code it replaces. */}
         {claim.documentChecklist
           .filter((i) => i.required || i.present)
           .map((i) => (
             <li key={i.docType} style={{ opacity: i.present ? 1 : 0.6 }}>
-              {i.present ? '✓' : i.required ? '☐ (required)' : '·'} {i.docType}
+              {i.present ? '✓' : i.required ? `☐ ${t('claimDocRequiredMark')}` : '·'}{' '}
+              {t(ENUM_LABEL.ClaimDocType[i.docType])}
             </li>
           ))}
       </ul>
@@ -649,13 +655,14 @@ function ClaimSettlement({
           {formatMoney(s.approvedAmount, language)} · {t('claimDeductibleShort')}{' '}
           {formatMoney(s.deductible, language)} · {t('claimNetSettlementShort')}{' '}
           {formatMoney(s.netSettlement, language)}
-          {s.brokerProcessedPayment ? ' · broker-processed' : ''}
+          {/* DECISION 157 table ج rows ٥-أ, ٥-ب, ٥-ج and table ب row ٢-٧. Separators stay. */}
+          {s.brokerProcessedPayment ? ` · ${t('claimCardBrokerProcessed')}` : ''}
           {s.secondApproverRequired
             ? s.secondApproverUserId
-              ? ' · second-approved'
-              : ' · awaiting a second approver'
+              ? ` · ${t('claimCardSecondApproved')}`
+              : ` · ${t('claimCardAwaitingSecondApprover')}`
             : ''}
-          {s.settled ? ' · settled' : ''}
+          {s.settled ? ` · ${t('claimCardSettledMark')}` : ''}
         </p>
       ) : null}
 

@@ -107,7 +107,8 @@ export function NeedsAssessmentReviewPanel({
               )
             }
           >
-            {busy === 'review' ? t('nadRecording') : 'Mark reviewed'}
+            {/* DECISION 157 table ب row ٢-١١. */}
+            {busy === 'review' ? t('nadRecording') : t('naReviewMarkReviewedButton')}
           </button>
         ) : null}
         {assessment.status === 'REVIEWED' ? (
@@ -151,7 +152,8 @@ export function NeedsAssessmentReviewPanel({
             )
           }
         >
-          {busy === 'return' ? t('nadReturning') : 'Return for changes'}
+          {/* DECISION 157 table ج row ٩-أ. */}
+          {busy === 'return' ? t('nadReturning') : t('naReviewReturnForChangesButton')}
         </button>
         <button
           type="button"

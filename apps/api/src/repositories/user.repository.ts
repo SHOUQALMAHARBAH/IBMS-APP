@@ -17,6 +17,16 @@ import { resolveDisplayName } from '../common/display-name.util';
 export interface RoleRef {
   id: string;
   name: string;
+  /**
+   * The role's DISPLAY names. `name` is the machine name -- the legacy eleven still carry
+   * `OFFICE_ADMINISTRATOR` and the like -- and a screen that prints it prints a code.
+   *
+   * DECISION 157 («ما لا يحتاج قراراً»): the home page renders a role's ARABIC name,
+   * never its code, and that must hold for a role an office defined as well as for the seeded
+   * eleven. Both columns are NOT NULL on `Role`, so there is nothing to fall back to.
+   */
+  nameAr: string;
+  nameEn: string;
   /** Part II §4.4 — this role never skips the MFA prompt. A column on `Role`,
    *  strict by default, because the list of role NAMES it replaced matched no
    *  custom role and therefore failed OPEN. See `roleSecurityAttributes`. */
@@ -263,6 +273,8 @@ export class UserRepository {
           select: {
             id: true,
             name: true,
+            nameAr: true,
+            nameEn: true,
             requiresMfaAlways: true,
             requiresHardwareToken: true,
           },

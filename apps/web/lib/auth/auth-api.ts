@@ -51,6 +51,18 @@ export interface MeResponse {
   fullName: string;
   languagePreference: 'AR' | 'EN';
   roles: string[];
+  /**
+   * The same roles by their DISPLAY names, in both spellings, in the same order as `roles`.
+   *
+   * DECISION 157 («ما لا يحتاج قراراً»): the home page renders a role's Arabic name, never its
+   * code. `roles` above carries the MACHINE name — the seeded eleven still answer
+   * `OFFICE_ADMINISTRATOR` — so a screen that prints it prints a code, and `ENUM_LABEL.RoleName`
+   * cannot help: it holds eleven keys and has none for that role, nor for any role an office
+   * defines for itself.
+   *
+   * ⛔ Nothing branches on either field. Authorization reads `permissions`.
+   */
+  roleNames: { ar: string; en: string }[];
   /** Part IV §10.4 — the caller's RESOLVED permission codes, sorted, straight
    * from the same grid the API enforces with. Every conditional render in the
    * app reads this (via `hasPermission`); nothing branches on `roles`, which

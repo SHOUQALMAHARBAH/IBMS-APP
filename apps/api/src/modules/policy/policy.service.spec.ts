@@ -23,6 +23,7 @@ import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import type { UserRepository } from '../../repositories/user.repository';
 import { instrumentLegalValues } from '../compliance-risk/legal-figures.double';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
@@ -427,6 +428,12 @@ function makeDeps(opts: Opts = {}) {
         findCategory: vi.fn().mockResolvedValue('GENERAL'),
       } as unknown as InsuranceLineRepository,
       licenseGate,
+      // DECISION 153 §٢ row ٧ — the checker's display name. An EMPTY map rather than
+      // `undefined`: a mock that threw would make an unchecked policy look like a broken
+      // feature, and every policy in this file is presented before anyone has checked it.
+      {
+        displayNamesForUserIds: vi.fn().mockResolvedValue(new Map()),
+      } as unknown as UserRepository,
     ),
     state,
     mocks: {
