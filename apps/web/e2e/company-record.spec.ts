@@ -61,6 +61,10 @@ async function mockAuth(
       json: {
         ...ME_BASE,
         roles: ['INSURANCE_COMPANY_ADMINISTRATOR'],
+        // DECISION 157 - the home page greets a person by their role's NAME, so
+        // /auth/me carries the display names. Required of every spec that can reach `/`;
+        // `home-shell-fixtures.test.ts` is the guard.
+        roleNames: [{ ar: 'مدير شركة التأمين', en: 'Insurance Company Administrator' }],
         permissions,
         organizationType,
       },

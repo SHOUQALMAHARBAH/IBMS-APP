@@ -40,6 +40,11 @@ const ME = {
   fullName: "New Employee",
   languagePreference: "EN",
   roles: ["SALES_RELATIONSHIP_OFFICER"],
+  // DECISION 157 - the home page greets a person with their role's NAME, so
+  // /auth/me carries the display names beside the machine names. A fixture that
+  // omits this makes `user.roleNames.length` throw and the shell render
+  // "This page couldn't load" - a broken SCREEN rather than a stale mock.
+  roleNames: [{ ar: "موظف علاقات العملاء", en: "Sales Relationship Officer" }],
   permissions: permissionsForRoles(["SALES_RELATIONSHIP_OFFICER"]),
   mfaEnabled: true,
   mfaPolicySatisfied: true,
