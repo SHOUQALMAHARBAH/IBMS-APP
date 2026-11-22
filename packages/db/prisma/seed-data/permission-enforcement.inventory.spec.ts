@@ -48,6 +48,30 @@ const UNENFORCED: Record<string, string> = {
     "Created in the same transaction as the refund above, under the same `endorsement.apply` gate, for the same reason: the two figures cannot be raised independently.",
 };
 
+/**
+ * Files that MENTION every code by name and enforce none of them.
+ *
+ * A display map keyed by permission code quotes all of its codes as object keys, so a grep for
+ * `'<code>'` finds every one and the whole catalogue looks enforced. That is the opposite of what
+ * this guard measures, and it would hide exactly the defect it exists to catch.
+ *
+ *   `permission-descriptions.ts`  the lookup for the line UNDER each checkbox.
+ *   `permission-names.ts`         🔴 OWNER DECISION 127, message 50 — the 196 ratified Arabic
+ *                                 NAMES, keyed by code. It is a dictionary of what to RENDER in
+ *                                 place of the code; nothing in it decides what anybody may do.
+ *                                 Without this entry, `refund.raise` and
+ *                                 `commission-reversal.create` read as enforced the moment the
+ *                                 names shipped — which is how CI found it.
+ *
+ * ⛔ This list is for files that are definitionally about DISPLAY. A service that reads a code to
+ * decide something belongs in the walk however inconvenient, and adding a file here to make a
+ * build pass would turn the guard off for every code that file happens to name.
+ */
+const DISPLAY_ONLY_FILES: Record<string, string> = {
+  "permission-descriptions.ts": "apps/web/lib/admin/permission-descriptions.ts",
+  "permission-names.ts": "apps/web/lib/admin/permission-names.ts",
+};
+
 /** Every code the application actually reads, from the source rather than from a second list. */
 function enforcedCodes(): Set<string> {
   const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
@@ -85,7 +109,7 @@ function walk(dir: string, out: string[]): void {
     // generated MIRROR of this very catalogue, so counting it would make every code look enforced.
     if (/\.(spec|test)\.tsx?$/.test(entry.name)) continue;
     if (full.includes(`${path.sep}fixtures${path.sep}`)) continue;
-    if (entry.name === "permission-descriptions.ts") continue;
+    if (entry.name in DISPLAY_ONLY_FILES) continue;
     out.push(full);
   }
 }
@@ -106,6 +130,26 @@ describe("permission catalogue — every code the screen offers is a code someth
     // Role matrix still telling the administrator it does nothing.
     const nowEnforced = Object.keys(UNENFORCED).filter((code) => enforced.has(code)).sort();
     expect(nowEnforced).toEqual([]);
+  });
+
+  /*
+   * THE DIRECTION THE EXCLUSION LIST ROTS IN, added with `permission-names.ts` in message 50.
+   *
+   * `walk` skips by BASENAME, so an entry here silences that name anywhere under the four roots —
+   * and if the file is renamed or deleted the entry survives, silently ready to skip some future
+   * file that happens to take the name. Each one must therefore still exist where it says it does.
+   */
+  it("excludes only display files that still exist, at the path each entry names", () => {
+    const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
+    for (const [basename, relative] of Object.entries(DISPLAY_ONLY_FILES)) {
+      const abs = path.join(repoRoot, relative);
+      expect(
+        fs.existsSync(abs),
+        `DISPLAY_ONLY_FILES names ${relative} and it is not there — delete the entry in the SAME ` +
+          `commit, or this guard stays switched off for every code that file used to mention`,
+      ).toBe(true);
+      expect(path.basename(relative), `${relative} does not end in ${basename}`).toBe(basename);
+    }
   });
 
   it("declares nothing as unenforced that is not in the catalogue at all", () => {
