@@ -197,9 +197,9 @@ npm run seed:demo -w api
 هذا الأمر يبني بيانات كاملة عبر واجهة النظام نفسها (وليس بكتابة مباشرة في قاعدة البيانات)،
 فيأخذ عدة دقائق. ما ينشئه:
 
-- **مكتبان** (مؤسستان منفصلتان): `Default Brokerage Office` و
-  `Rawabi Insurance Brokerage (demo)`. المكتبان ضروريان — دليل شركات التأمين لا يُظهر شيئًا
-  ذا معنى بمكتب واحد.
+- **مكتبان** (مؤسستان منفصلتان): «مكتب ناصر للتأمينات» و«مكتب الحياة للتأمينات»
+  (`Nasser Insurance Office` و`Al-Hayat Insurance Office`). المكتبان ضروريان — دليل شركات
+  التأمين لا يُظهر شيئًا ذا معنى بمكتب واحد.
 - **١٠ موظفين و٢٥٠ عميلًا لكل مكتب في كل تشغيل**، مع عروض وطلبات تسعير ووثائق ومطالبات
   وفواتير وشكاوى. **والتشغيل يضيف ولا يستبدل**: تشغيلان يعطيان ضعف العدد. إن أردتِ الرقم
   الذي سجّلتِه — ٢٠ موظفًا و٥٠٠ عميل — في تشغيل واحد، اضبطي المتغيرين قبل الأمر:
@@ -227,6 +227,57 @@ npm run seed:demo -w api
 المنتصف (Ctrl+C أو إغلاق النافذة) تبقى الحسابات الستة عشر مربوطة بتطبيق مصادقة لا يملك أحد
 سرّه — وهذه بالضبط حالة «الرمز صحيح ويقول خطأ». العلاج سطر واحد:
 `npm run demo:release -w api`.
+
+### البدء من قاعدة بيانات فارغة
+
+**التشغيل يضيف ولا يحذف.** فإن كانت قاعدة البيانات تحمل بيانات تشغيل سابق بالنصوص
+الإنجليزية، فالتشغيل الجديد **يضع العربي بجانبها ولا يستبدلها**: تبقى الصفوف القديمة كما هي،
+وتُرى معها على الشاشات. هذا مقصود — **لا شيء هنا يحذف بيانات**.
+
+⛔ **وإفراغ قاعدة البيانات قرارُك ويدُك.** لا يوجد في هذا الملف ولا في أي أمر هنا شيء يفعله
+نيابةً عنك. إن أردتِ تشغيلاً نظيفاً، الطريق الموثَّق هو:
+
+```powershell
+# ١ — أوقفي النظام إن كان شغّالاً (Ctrl+C في نافذة `npm run dev`).
+
+# ٢ — أوقفي حاوية قاعدة البيانات واحذفي حجمها. هذا يمحو بيانات التطوير كلّها.
+docker compose down -v
+
+# ٣ — شغّليها من جديد، فارغة.
+docker compose up -d db
+
+# ٤ — ابني الجداول. يطبع في آخره: "All migrations have been successfully applied."
+npm run db:migrate:dev
+
+# ٥ — ازرعي الأدوار وكتالوج الصلاحيات. بلا هذه الخطوة لا يدخل أحد.
+npm run db:seed
+
+# ٦ — شغّلي النظام في نافذة، وابني بيانات العرض في نافذة ثانية.
+npm run dev
+$env:DEMO_PASSWORD = (Read-Host "اختاري كلمة مرور العرض")
+npm run seed:demo -w api
+```
+
+**ما يطبعه كلُّ أمرٍ حين ينجح:**
+
+| الأمر | السطر الذي يؤكّد نجاحه |
+|---|---|
+| `docker compose up -d db` | اسم الحاوية ومعه `Started` أو `Running` |
+| `npm run db:migrate:dev` | `All migrations have been successfully applied.` |
+| `npm run db:seed` | سطر يذكر عدد الصلاحيات والأدوار المزروعة |
+| `npm run seed:demo -w api` | `All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.` |
+
+⚠️ **والخطوة ٢ تمحو كلَّ شيء**، لا بيانات العرض وحدها: أي حساب أنشأتِه بيدك، وأي دور عرّفتِه،
+وأي تجربة كتبتِها. اقرئيها مرّتين قبل تنفيذها.
+### ثلاثة أشياء يعرفها من يعرض
+
+- **بناء نسخة الإنتاج يتوقّف مرّة أحياناً** على تنبيه أمني من Next.js، بعد أن يُكمل كلَّ
+  مراحله. **أعيدي الأمر نفسه فينجح.** ⛔ ولا تُرقّى Next.js قبل العرض: الترقية بعد تثبيت
+  نسخة العرض وقبل أيّ مكتب حقيقي.
+- **الوضع الفاتح للعرض**، و**حساب واحد في المتصفّح في كلّ مرّة**. المتصفّح يحمل دخولاً واحداً،
+  وتبديل الحساب أثناء المشي يُظهر رفضاً ليس حقيقياً (حدث في المشية الأخيرة).
+- **قائمة «اعرف عميلك» خارج العرض.** جملُ التعليق فيها لم تُكتَب بعد (القرار ١٥٧ الحكم ١٢،
+  مديول ١٥ بعد العرض)، فالشاشة ليست في السيناريو.
 
 ## ٥. الخطوة الرابعة: العنوان والحساب
 
@@ -724,8 +775,9 @@ npm run seed:demo -w api
 It drives the real API rather than writing to the database directly, so it takes several
 minutes. It creates:
 
-- **Two offices** — `Default Brokerage Office` and `Rawabi Insurance Brokerage (demo)`. Two
-  are necessary: the cross-office insurer directory shows nothing meaningful with one.
+- **Two offices** — «مكتب ناصر للتأمينات» (`Nasser Insurance Office`) and «مكتب الحياة
+  للتأمينات» (`Al-Hayat Insurance Office`). Two are necessary: the cross-office insurer
+  directory shows nothing meaningful with one.
 - **10 employees and 250 customers per office, per run**, with opportunities, RFQs, policies,
   claims, invoices and complaints. **A run ADDS rather than replaces**, so two runs give twice
   as much. To get the figures you recorded — 20 employees and 500 customers — in a single run,
@@ -756,6 +808,61 @@ it at all.
 half-way — Ctrl+C, or closing the window — and every account stays paired to an
 authenticator whose secret nobody holds, which is exactly the "correct code is rejected" state.
 One line fixes it: `npm run demo:release -w api`.
+
+### Starting from an empty development database
+
+**A run ADDS and never deletes.** If the database already holds a previous run's rows with the
+English texts, this run puts the Arabic ones **beside** them rather than replacing them: the old
+rows stay exactly as they are and appear on the screens next to the new ones. That is
+deliberate — **nothing here deletes data.**
+
+⛔ **Emptying the database is your decision and your hand.** Nothing in this file and no command
+here does it for you. If you want a clean run, the documented route is:
+
+```powershell
+# 1 — Stop the system if it is running (Ctrl+C in the `npm run dev` window).
+
+# 2 — Stop the database container and delete its volume. THIS ERASES ALL DEVELOPMENT DATA.
+docker compose down -v
+
+# 3 — Start it again, empty.
+docker compose up -d db
+
+# 4 — Build the tables. It ends with "All migrations have been successfully applied."
+npm run db:migrate:dev
+
+# 5 — Seed the roles and the permission catalogue. Without this nobody can sign in.
+npm run db:seed
+
+# 6 — Run the system in one window and build the demo data in a second.
+npm run dev
+$env:DEMO_PASSWORD = (Read-Host "Choose a demo password")
+npm run seed:demo -w api
+```
+
+**What each command prints when it worked:**
+
+| Command | The line that confirms it |
+|---|---|
+| `docker compose up -d db` | the container name followed by `Started` or `Running` |
+| `npm run db:migrate:dev` | `All migrations have been successfully applied.` |
+| `npm run db:seed` | a line naming how many permissions and roles were seeded |
+| `npm run seed:demo -w api` | `All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.` |
+
+⚠️ **Step 2 erases everything**, not only the demo data: every account you made by hand, every
+role you defined, every experiment you wrote. Read it twice before you run it.
+### Three things the presenter knows
+
+- **The production build stops once in a while** on a Next.js security advisory, AFTER it has
+  completed every phase. **Run the same command again and it succeeds.** ⛔ Next.js is not
+  upgraded before the demo: the upgrade comes after this build is tagged and before any real
+  office.
+- **The light theme for the demo**, and **one account per browser at a time.** A browser holds
+  one sign-in, and switching accounts mid-walk shows a refusal that is not real — which is
+  exactly what happened on the final walk.
+- **The «اعرف عميلك» queue is out of the demo.** Its hold sentences have not been written yet
+  (decision 157 ruling 12 carries them to module 15, after the demo), so that screen is not in
+  the scenario.
 
 ## 5. Step four: the address and the account
 

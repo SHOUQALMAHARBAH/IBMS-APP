@@ -438,16 +438,16 @@ const COMPANY_SUFFIXES = [
   'للاستثمار العقاري',
 ];
 const SECTORS = [
-  'Manufacturing',
-  'Retail Trade',
-  'Construction',
-  'Healthcare',
-  'Logistics & Transport',
-  'Information Technology',
-  'Food & Beverage',
-  'Real Estate',
-  'Professional Services',
-  'Hospitality',
+  'التصنيع',
+  'تجارة التجزئة',
+  'المقاولات',
+  'الرعاية الصحية',
+  'النقل والخدمات اللوجستية',
+  'تقنية المعلومات',
+  'الأغذية والمشروبات',
+  'العقارات',
+  'الخدمات المهنية',
+  'الضيافة والفنادق',
 ];
 const CITIES = [
   'عمّان، الأردن',
@@ -574,6 +574,65 @@ const brokenPromises: string[] = [];
 function recordBrokenPromise(detail: string): void {
   brokenPromises.push(detail);
   console.log(`  !!! walkthrough promise NOT confirmed: ${detail}`);
+}
+
+/**
+ * 🔴 OWNER DECISION 158 §٤ — THE WALKTHROUGH NAMES THE OFFICES THIS RUN ACTUALLY CREATES.
+ *
+ * `docs/first-run.md` listed `Default Brokerage Office` and `Rawabi Insurance Brokerage (demo)`
+ * long after decision 150 ruling 6 gave the two offices the owner's own names. A presenter
+ * reading that paragraph and then looking at the screen sees two offices neither of which is
+ * named in the guide, and has no way to tell a stale document from a failed seed.
+ *
+ * ⛔ IT COMPARES, IT DOES NOT WRITE. The guide is the thing that was wrong and the names in
+ * `demo-chain-plan.ts` are the owner's; this reads both and reports a disagreement the way
+ * every other walkthrough promise here is reported — collected, never thrown, because a check
+ * on the DOCS must not be able to cost the DATA.
+ *
+ * It looks for the ARABIC name, which is the one she ratified; the English beside it in the
+ * guide is this repository's transliteration and is not pinned.
+ */
+function verifyWalkthroughNamesTheOffices(): void {
+  const guidePath = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'docs',
+    'first-run.md',
+  );
+  let guide: string;
+  try {
+    guide = fs.readFileSync(guidePath, 'utf8');
+  } catch (err) {
+    recordBrokenPromise(
+      `docs/first-run.md could not be read at ${guidePath}: ${(err as Error).message}. ` +
+        'The walkthrough is what a presenter follows, so a missing one is a broken promise ' +
+        'rather than a missing nicety.',
+    );
+    return;
+  }
+  for (const slug of ['office-a', 'office-b'] as const) {
+    const { ar, en } = DEMO_OFFICE_NAMES[slug];
+    if (!guide.includes(ar)) {
+      recordBrokenPromise(
+        `docs/first-run.md does not name ${slug} as ${JSON.stringify(ar)} (${en}), which is ` +
+          'what this run creates. Either the guide is stale or the name moved; correct the ' +
+          'guide before this seed is used for a demo.',
+      );
+    }
+  }
+  for (const stale of [
+    'Default Brokerage Office',
+    'Rawabi Insurance Brokerage (demo)',
+  ]) {
+    if (guide.includes(stale)) {
+      recordBrokenPromise(
+        `docs/first-run.md still names ${JSON.stringify(stale)}, which no demo office has ` +
+          'been called since decision 150 ruling 6.',
+      );
+    }
+  }
 }
 
 const DUPLICATE_SPELLING_DEMO = {
@@ -1478,6 +1537,31 @@ async function proveDuplicateSpellingIsRefused(
  * a certificate named so it cannot be read as a real filing. Three calendar years ending 31 December
  * (art. 10/b), derived from the current year so a later run cannot seed an already-expired term.
  */
+/**
+ * 🔴 OWNER DECISION 158 TABLE ك — THE DEMO OFFICES' LICENCE NUMBER SAYS IT IS A DEMO.
+ *
+ * Item 12 was left to this session's judgement («اختار الاحسن برأيك»), and the paper records
+ * the reasoning: the number is PRINTED ON THE CERTIFICATE under the office name (decision 153
+ * ruling 2), and the presenter may open that certificate in front of the brokers. A number
+ * that says «تجريبي» is safer than one that looks like a real CBJ licence.
+ *
+ * ⛔ `packages/db/prisma/seed.ts` IS NOT TOUCHED. `CBJ-SEED-<subdomain>` is what a REAL
+ * install's placeholder term carries, and changing it would put a demo word into every office
+ * anybody ever creates. The demo seeder puts demo values on its own two offices, which is the
+ * whole division her «ما لا يتغيّر» section draws.
+ *
+ * ⚠️ A SLUG NOT IN THIS MAP KEEPS THE OLD GENERATED NUMBER rather than taking a demo one by
+ * default: the two demo offices are named, and a third office added later is not silently
+ * stamped «تجريبي».
+ */
+const DEMO_LICENCE_NUMBER: Record<string, string> = {
+  [ORG_A_SLUG]: 'تجريبي/001',
+  [ORG_B_SLUG]: 'تجريبي/002',
+};
+
+/** Table ك's third row — the scope text, on both demo offices. */
+const DEMO_LICENCE_SCOPE = 'وساطة تأمين عامّة (بيانات تجريبية)';
+
 async function ensureBrokerLicenseTermForOffice(
   app: INestApplication<App>,
   orgSlug: string,
@@ -1497,7 +1581,10 @@ async function ensureBrokerLicenseTermForOffice(
   const year = new Date().getUTCFullYear();
   try {
     await postAs(app, complianceToken, '/broker-license', {
-      licenseNumber: `CBJ-DEMO-${orgSlug.toUpperCase()}-${year}`,
+      licenseNumber:
+        DEMO_LICENCE_NUMBER[orgSlug] ??
+        `CBJ-DEMO-${orgSlug.toUpperCase()}-${year}`,
+      scopeOfAuthorization: DEMO_LICENCE_SCOPE,
       issuedAt: new Date(Date.UTC(year, 0, 1)).toISOString(),
       expiresAt: new Date(Date.UTC(year + 2, 11, 31)).toISOString(),
       certificateFileName: `not-a-real-cbj-document--demo-seed-${orgSlug}.pdf`,
@@ -1725,7 +1812,7 @@ async function ensureInsurersForOrg(
           rfqContactName: 'قسم الاكتتاب',
           rfqContactEmail: `underwriting@${master.id.slice(0, 8)}.demo.test`,
           claimsContactEmail: `claims@${master.id.slice(0, 8)}.demo.test`,
-          underwriterContact: 'Underwriting Desk',
+          underwriterContact: 'قسم الاكتتاب',
           creditTermsDays: pick([30, 45, 60]),
         },
       });
@@ -1954,12 +2041,12 @@ async function seedEmployees(
         familyName: name.family,
         nationalId: jordanianNationalId(),
         position: pick([
-          'Account Executive',
-          'Underwriting Assistant',
-          'Claims Handler',
-          'Compliance Analyst',
-          'Office Administrator',
-          'Branch Manager',
+          'مسؤول حسابات العملاء',
+          'مساعد اكتتاب',
+          'موظف مطالبات',
+          'محلّل التزام',
+          'إداري مكتب',
+          'مدير فرع',
         ]),
         hireDate: isoDateDaysAgo(randomInt(60, 2000)),
         /*
@@ -1971,9 +2058,9 @@ async function seedEmployees(
         licensedRole:
           Math.random() < 0.4
             ? pick([
-                'Chartered Insurance Institute, Dip CII',
-                'ACII',
-                'Jordan Insurance Federation certificate',
+                'دبلوم مهني في التأمين',
+                'شهادة مهنية متقدّمة في التأمين',
+                'شهادة مهنية في التأمين',
               ])
             : undefined,
         userId: linkUser?.id,
@@ -2162,7 +2249,7 @@ async function seedLeadFunnel(
       sector: pick(SECTORS),
       activity: pick(SECTORS),
       employeeCount: randomInt(3, 250),
-      businessSize: pick(['Small', 'Medium', 'Large']),
+      businessSize: pick(['صغيرة', 'متوسطة', 'كبيرة']),
       location: pick(CITIES),
       contactPerson: `${pick(GIVEN_NAMES_M)} ${pick(FAMILY_NAMES)}`,
       productsOfInterest: pickN(
@@ -2230,10 +2317,27 @@ function buildCoverageFigures(): {
   limits: Record<string, string>;
   sumsInsured: Record<string, string>;
 } {
-  const total = randomInt(50_000, 750_000);
+  const amount = randomInt(50_000, 750_000);
+  /*
+   * 🔴 OWNER DECISION 158 TABLE ي — THE THREE KEYS ARE ARABIC IN DEMO DATA.
+   *
+   * These are FREE-FORM JSON KEYS an employee types, which message 51 §3 pinned in the
+   * NOT-MAPPED direction: there is no vocabulary to map them to and a value with no label
+   * renders AS STORED (decision 49). So the English a broker read on the schedule summary was
+   * never a missing translation — it was THIS SEED's own word, and her table settles it.
+   *
+   * ⛔ The renderers are untouched: they still print whatever key the data carries, which is
+   * what makes an office's own key work the day one is typed.
+   *
+   * ⚠️ The local was called `total` too, which would have shadowed nothing but read as though
+   * the key and the amount were one thing; it is `amount` now.
+   */
   return {
-    limits: { perOccurrence: money(total), aggregate: money(total * 2) },
-    sumsInsured: { total: money(total) },
+    limits: {
+      'لكل حادث': money(amount),
+      'الإجمالي السنوي': money(amount * 2),
+    },
+    sumsInsured: { الإجمالي: money(amount) },
   };
 }
 
@@ -2259,9 +2363,8 @@ async function runFullPipeline(
   const riskProfile = await attempt(tally, 'riskProfile', () =>
     postAs<{ id: string }>(app, actors.sales.token, '/risk-profiles', {
       customerId,
-      siteLabel: 'Head Office',
-      priorClaimsHistorySummary:
-        'No prior claims reported in the past 3 years.',
+      siteLabel: 'المقرّ الرئيسي',
+      priorClaimsHistorySummary: 'لا مطالبات سابقة في السنوات الثلاث الماضية.',
     }),
   );
   if (!riskProfile) return undefined;
@@ -2495,10 +2598,8 @@ async function runFullPipeline(
       postAs(app, actors.placement.token, `/rfqs/${rfq.id}/communications`, {
         direction: 'INBOUND',
         channel: 'EMAIL',
-        subject: 'Request to approach a specific insurer',
-        body:
-          'The customer wrote asking that this line be placed with one named company. ' +
-          'Attach this message to the art. 15/d/5 exemption to clear the «بلا إثبات» mark.',
+        subject: 'طلب التوجّه إلى شركة تأمين بعينها',
+        body: 'كتب العميل يطلب أن يُوضَع هذا الفرع لدى شركة واحدة سمّاها.',
         // ⚠️ `occurredAt`, NOT `sentAt`. The first version sent `sentAt` — the COLUMN's name on
         // `CommunicationLog` — and the DTO forbids unknown properties, so all four of these
         // answered `400 property sentAt should not exist`: every halted RFQ shipped with nothing
@@ -2584,18 +2685,15 @@ async function runFullPipeline(
       opportunityId: opportunity.id,
       recommendedQuotationId: quotationId,
       rationale:
-        'Best overall balance of coverage breadth, competitive pricing and insurer standing for this risk profile.',
+        'أفضل توازن بين اتّساع التغطية والسعر ومكانة شركة التأمين لهذا الخطر.',
       rationaleFactors: {
-        coverage:
-          'Coverage matches every line the needs assessment recommended.',
-        price: 'Most competitive premium among the insurers approached.',
-        financialStrength:
-          'The insurer carries a strong regional financial-strength rating.',
-        claimsService:
-          'Established, responsive local claims-handling track record.',
-        deductible:
-          'Deductible level is appropriate for the client size and risk appetite.',
-        policyConditions: 'Standard market wording with no unusual exclusions.',
+        coverage: 'التغطية تطابق كل فرع أوصى به تقييم الاحتياجات.',
+        price: 'أقلّ قسط بين الشركات التي طُلب منها عرض.',
+        financialStrength: 'للشركة تصنيف قوّة مالية جيّد.',
+        claimsService: 'سجلّها في تسوية المطالبات محلياً جيّد وسريع.',
+        deductible: 'مبلغ التحمّل مناسب لحجم العميل.',
+        policyConditions:
+          'نصّ الوثيقة معتاد في السوق وبلا استثناءات غير مألوفة.',
       },
     }),
   );
@@ -2765,11 +2863,11 @@ async function maybeClaimPolicy(
       // Strictly inside cover: after inception, and never in the future.
       lossDate: isoDateDaysAgo(randomInt(1, Math.max(1, inceptionDaysAgo - 1))),
       causeOfLoss: pick([
-        'Storm damage to the warehouse roof.',
-        'Vehicle collision during a delivery run.',
-        'Water damage from a burst pipe.',
-        'Theft of stock from a storage facility.',
-        'Fire damage to office equipment.',
+        'ضرر في سقف المستودع بسبب عاصفة.',
+        'تصادم مركبة أثناء التوصيل.',
+        'ضرر مياه بسبب انفجار ماسورة.',
+        'سرقة بضاعة من المخزن.',
+        'ضرر حريق في معدّات المكتب.',
       ]),
       lossLocation: pick(CITIES),
       estimatedLoss: money(estimatedLoss),
@@ -2781,7 +2879,7 @@ async function maybeClaimPolicy(
       insurerClaimReference: `INS-REF-${Date.now()}-${nextSeq()}`,
       adjuster: {
         name: `${pick(GIVEN_NAMES_M)} ${pick(FAMILY_NAMES)}`,
-        firm: 'Regional Loss Adjusters LLC',
+        firm: 'المكتب الإقليمي لتسوية الخسائر',
       },
     }),
   );
@@ -2954,10 +3052,10 @@ async function seedComplaints(
       postAs(app, actors.compliance.token, '/complaints', {
         customerId: pick(customerIds),
         issue: pick([
-          'The settlement offered was well below the assessed repair cost.',
-          'The policy documents were delivered over three weeks late.',
-          'The renewal premium increased with no explanation given.',
-          'No response was received after multiple follow-up calls about an open claim.',
+          'مبلغ التسوية المعروض أقلّ بكثير من كلفة الإصلاح المقدَّرة.',
+          'تأخّر تسليم مستندات الوثيقة أكثر من ثلاثة أسابيع.',
+          'زاد قسط التجديد بلا توضيح.',
+          'لم يصل ردّ بعد اتصالات متابعة متكرّرة عن مطالبة مفتوحة.',
         ]),
         category: pick(categories),
       }),
@@ -2974,29 +3072,28 @@ async function seedIncidents(
   const severities = ['low', 'medium', 'high', 'critical'];
   const samples = [
     {
-      title: 'Phishing email targeting a claims workstation',
+      title: 'بريد احتيالي استهدف جهاز موظف مطالبات',
       description:
-        'A claims officer reported a suspicious email requesting login credentials; the link was not clicked.',
+        'أبلغ موظف مطالبات عن بريد مشبوه يطلب بيانات الدخول، ولم يُفتَح الرابط.',
     },
     {
-      title: 'Laptop left unattended in a client meeting room',
+      title: 'حاسوب محمول تُرك بلا رقابة في غرفة اجتماع عميل',
       description:
-        "A placement officer's laptop was briefly unattended; the screen was locked and no data was accessed.",
+        'تُرك حاسوب موظف تنسيب بلا رقابة لوقت قصير، والشاشة مقفلة ولم يُطّلَع على بيانات.',
     },
     {
-      title: 'Misdirected email containing a customer document',
+      title: 'بريد أُرسل لغير صاحبه وفيه مستند عميل',
       description:
-        'A policy schedule was emailed to an incorrect recipient inside the same office and was recalled promptly.',
+        'أُرسل جدول وثيقة إلى مستلم خطأ داخل المكتب نفسه، واستُرجع فوراً.',
     },
     {
-      title: 'Unusual login pattern flagged for a Finance account',
-      description:
-        'Multiple failed login attempts were recorded outside normal business hours.',
+      title: 'نمط دخول غير معتاد على حساب في المالية',
+      description: 'سُجّلت محاولات دخول فاشلة متكرّرة خارج ساعات العمل.',
     },
     {
-      title: 'Vendor access review overdue',
+      title: 'مراجعة صلاحيات مورّد متأخّرة',
       description:
-        "A third-party vendor's access review was flagged as overdue during a routine compliance check.",
+        'تبيّن في فحص التزام دوري أن مراجعة صلاحيات مورّد خارجي تأخّرت عن موعدها.',
     },
   ];
   for (let i = 0; i < count; i += 1) {
@@ -3026,12 +3123,12 @@ async function seedVendors(
     'other',
   ];
   const names = [
-    'Regional Loss Adjusters LLC',
-    'CloudSecure Hosting Services',
-    'Al-Nokhba Printing & Archiving',
-    'Horizon Marketing & Call Centre',
-    'Jordan Reinsurance Facility',
-    'Apex Office Supplies',
+    'المكتب الإقليمي لتسوية الخسائر',
+    'السحابة الآمنة لخدمات الاستضافة',
+    'النخبة للطباعة والأرشفة',
+    'الأفق للتسويق ومركز الاتصال',
+    'مجمّع إعادة التأمين الأردني',
+    'القمّة للوازم المكتبية',
   ];
   for (let i = 0; i < count; i += 1) {
     await attempt(tally, 'vendor', () =>
@@ -3399,6 +3496,7 @@ it(
           data: { legalName, legalNameAr },
         });
       }
+      verifyWalkthroughNamesTheOffices();
       const orgAName = ORG_A_LEGAL_NAME;
 
       // Each Organization is seeded independently — a hard failure in Office A
