@@ -150,6 +150,43 @@ export function formatDate(value: string | Date, language: Language): string {
   return d.toLocaleDateString(LOCALE_BY_LANGUAGE[language]);
 }
 
+/**
+ * 🔴 THE FINAL WALK §ب-١٠ — THE LAST DAY *INSIDE* A HALF-OPEN PERIOD.
+ *
+ * «من 1/11/2026 إلى 1/12/2026» for November: every period in this product is `[start, end)` —
+ * `currentUtcMonthRange` and `previousUtcMonthRange` both return the first instant of the NEXT
+ * month, and every repository query depends on that being exclusive. So the bound is right and
+ * printing it beside «إلى» is what is wrong: a reader is told the month ran to the 1st of the
+ * following one.
+ *
+ * ⛔ THE api IS NOT CHANGED. The exclusive bound is read by every `gte`/`lt` pair behind these
+ * figures, and making it inclusive to tidy a label would move what the numbers count.
+ *
+ * ⟶ One day back, in UTC, because the bound is a UTC calendar instant (`Date.UTC(y, m + 1, 1)`)
+ *   and so is the day being named. Then through `formatDate` like every other date on a screen
+ *   (decision 156 ruling 1), so the shape is the one shape.
+ */
+export function periodEndInclusive(value: string | Date): Date {
+  const exclusive = typeof value === 'string' ? new Date(value) : value;
+  const inclusive = new Date(exclusive.getTime());
+  inclusive.setUTCDate(inclusive.getUTCDate() - 1);
+  return inclusive;
+}
+
+/**
+ * The same day, formatted — for a screen that prints it itself.
+ *
+ * Two exports rather than one because `ReportProvenance` takes an ISO STRING and formats it, so
+ * the sales dashboard needs the Date and the policy dashboard needs the words. ⛔ One home for
+ * the arithmetic either way: the subtraction happens in exactly one function.
+ */
+export function formatPeriodEndInclusive(
+  value: string | Date,
+  language: Language,
+): string {
+  return formatDate(periodEndInclusive(value), language);
+}
+
 /** Locale-aware `Date.prototype.toLocaleString()` replacement (date + time). */
 export function formatDateTime(value: string | Date, language: Language): string {
   const d = typeof value === 'string' ? new Date(value) : value;

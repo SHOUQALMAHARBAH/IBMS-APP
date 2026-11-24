@@ -197,6 +197,18 @@ export const POLICY = {
     claimsQueueNoneMatch: 'لا توجد مطالبة تطابق هذا البحث. جرّب مرجعاً أو حالة أخرى.',
     claimsQueueCountLabel: '{count} مطالبة',
     claimsQueueRefusalAct: 'عرض المطالبات',
+    /*
+     * 🔴 THE FINAL WALK §ب-٢ — THE CLAIMS SECTION'S OWN REFUSAL ACT.
+     *
+     * `ClaimSection` rendered the SERVER'S English sentence — «You do not hold a permission
+     * required to perform this action» — under «المطالبات» on the opportunity page, which is the
+     * last section of the one screen the whole demo path runs through.
+     *
+     * ⛔ ITS OWN KEY WITH THE SAME TEXT (decision 157 ruling 2), never a second render of
+     * `claimsQueueRefusalAct`: that one belongs to the claims QUEUE, and a later reword of the
+     * queue's act would otherwise move a sentence on the opportunity page.
+     */
+    claimSectionRefusalAct: 'عرض المطالبات',
     claimsQueueLoadError: 'تعذر تحميل المطالبات — حاول مرة أخرى.',
     claimsQueueViewAria: 'فتح المطالبة {name}',
     claimsQueueNoNumberYet: 'لم يُسجَّل رقم مطالبة بعد',
@@ -540,6 +552,8 @@ export const POLICY = {
     claimsQueueNoneMatch: 'No claim matches this search. Try another reference or status.',
     claimsQueueCountLabel: '{count} claims',
     claimsQueueRefusalAct: 'view claims',
+    // The final walk §ب-٢ — the claims section's own act, same text, its own key.
+    claimSectionRefusalAct: 'view claims',
     claimsQueueLoadError: 'Could not load claims — try again.',
     claimsQueueViewAria: 'Open claim {name}',
     claimsQueueNoNumberYet: 'No claim number yet',

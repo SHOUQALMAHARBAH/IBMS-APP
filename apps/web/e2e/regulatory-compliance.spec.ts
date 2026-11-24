@@ -489,6 +489,20 @@ test('an expired term with a timely application says it is still valid, and does
         mayPractise: true,
         standingActDecisionRef: null,
         deemedCancelledUnderArticle14C: false,
+        /*
+         * 🔴 OWNER DECISION 159 RULING 1-ب ADDED THIS, AND THE FIXTURE WAS WRONG WITHOUT IT.
+         *
+         * This test's whole subject is a sentence that says the licence is treated as still
+         * valid. Her ruling is that it renders only once the DECLARATION is on record — so the
+         * state that makes the sentence true is `UNDER_STUDY`, and a fixture carrying no
+         * `renewalUnderStudy` at all describes an office the screen is now silent for. It was
+         * written before decision 128 existed; what it asserts is unchanged.
+         */
+        renewalUnderStudy: {
+          state: 'UNDER_STUDY',
+          declaredByName: 'مراد سالم الخطيب',
+          declaredAt: '2026-12-20T00:00:00.000Z',
+        },
       },
       // AND THE SERIES IS STILL RUNNING even though the application is filed, which is the
       // brief's own instruction: a filing is not a decision, so `renewalFiled` is reported BESIDE
@@ -870,7 +884,13 @@ const STANDING_UNDER_STUDY = {
   mayPractise: true,
   standingActDecisionRef: null,
   deemedCancelledUnderArticle14C: false,
-  renewalUnderStudy: { state: 'UNDER_STUDY' },
+  /* 🔴 OWNER DECISION 159 RULING 3 — the two facts the state carries, and only this state
+     has them: the name AS STORED on the day, and the instant. */
+  renewalUnderStudy: {
+    state: 'UNDER_STUDY',
+    declaredByName: 'مراد سالم الخطيب',
+    declaredAt: '2026-12-20T00:00:00.000Z',
+  },
 };
 
 /** Everything in order EXCEPT the declaration — decision 136(ب)'s sentence belongs here. */
@@ -930,4 +950,142 @@ test('OWNER DECISION 136(ب) — the office awaiting a declaration is told what 
   await expect(note).not.toContainText('منتهٍ');
   // And criterion 8 holds here too: this office is past its printed expiry.
   await expect(page.getByTestId('rc-standing')).not.toContainText('ساري');
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * 🔴 DECISIONS 159 AND 160 — THE LICENCE SCREEN AFTER THE DECLARATION.
+ *
+ * The final walk recorded office B's screen after the presenter's live declaration: state
+ * «قيدَ التجديد», the block lifted, issuing open — and the renewal notice still saying «وهذا لا
+ * يَرفعُ المنعَ». That answers decision 159's own open question, and decision 160 ruling 1 is
+ * the answer: a CONDITION, and not one word of hers.
+ *
+ * ⚠️ RENDERED IN ARABIC on purpose. Both rulings are about Arabic sentences and the English
+ * halves are unruled, so an English render would assert the presence and absence of words
+ * nobody has ruled on — the vacuous shape this file already records paying for once.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** `UNDER_STUDY` with a running notice: past the expiry, filed, proven and declared. */
+const UNDER_STUDY_WITH_NOTICE = {
+  ...LICENSE_SERIES,
+  current: {
+    ...LICENSE,
+    expiresAt: '2026-12-31T00:00:00.000Z',
+    expiryIsEndOfCalendarYear: true,
+    renewalRequestedAt: '2026-11-16T00:00:00.000Z',
+    renewalFiledOnTime: true,
+    validPendingRenewalDecision: true,
+  },
+  standing: STANDING_UNDER_STUDY,
+  renewalNotice: {
+    stage: 'EXPIRED',
+    daysToExpiry: -3,
+    expiresAt: '2026-12-31T00:00:00.000Z',
+    applicationDueBy: '2026-11-16T00:00:00.000Z',
+    // FILED — which is what makes `rcNoticeFiled` the sentence at issue.
+    renewalFiled: true,
+  },
+};
+
+test('OWNER DECISION 159 ruling 1-ب — «ما زال ساريًا» names the proof AND the declaration', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, { licenseSeries: UNDER_STUDY_WITH_NOTICE });
+  await page.goto('/regulatory-compliance');
+
+  const note = page.locator('[data-valid-pending-renewal-decision]');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('بإثباته وسُجِّل الإقرار');
+  // ⛔ And the pre-159 reason is gone. A presence check alone passes against a sentence
+  // carrying both halves.
+  await expect(note).not.toContainText('قُدّم في موعده، إلى حين');
+});
+
+test('OWNER DECISION 159 ruling 1-ب — and it is SILENT before the declaration', async ({
+  page,
+}) => {
+  /*
+   * THE OTHER DIRECTION, and it is the ruling. `validPendingRenewalDecision` is TRUE here — the
+   * date-only rule is satisfied — and the office still may not practise, because nobody has
+   * declared. Before this ruling the screen said «ما زال ساريًا» while the gate refused all six
+   * issuance acts.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      ...UNDER_STUDY_WITH_NOTICE,
+      standing: STANDING_AWAITING_DECLARATION,
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  // POSITIVE FIRST, from the SAME render — an unhydrated page satisfies any absence.
+  await expect(page.locator('[data-renewal-awaiting-declaration]')).toBeVisible();
+  await expect(page.locator('[data-valid-pending-renewal-decision]')).toHaveCount(0);
+});
+
+test('OWNER DECISION 159 ruling 3 — who declared, and when, under the standing', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, { licenseSeries: UNDER_STUDY_WITH_NOTICE });
+  await page.goto('/regulatory-compliance');
+
+  const line = page.locator('[data-renewal-declared-by]');
+  await expect(line).toBeVisible();
+  // The NAME AS STORED on the day of the declaration, not the account's name today.
+  await expect(line).toContainText('مراد سالم الخطيب');
+  /*
+   * Through `formatDate` (decision 156 ruling 1) — ⛔ never the ISO string or a slice of it.
+   *
+   * ⚠️ A REGEX, BECAUSE THE ARABIC RENDER CARRIES BIDI MARKS. `ar-JO-u-nu-latn` produces
+   * «20‏/12‏/2026» — a RIGHT-TO-LEFT MARK (U+200F) before each solidus — so a plain
+   * `toContainText('20/12/2026')` fails against a date that is perfectly correct. Measured on
+   * this run rather than guessed at.
+   */
+  await expect(line).toContainText(/20.?\/12.?\/2026/);
+  await expect(line).not.toContainText('2026-12-20');
+});
+
+test('OWNER DECISION 160 ruling 1 — the filing notice goes once the block is lifted', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, { licenseSeries: UNDER_STUDY_WITH_NOTICE });
+  await page.goto('/regulatory-compliance');
+
+  // POSITIVE FIRST: the notice panel itself IS on the screen, so the absence below is about
+  // one paragraph inside it and not about a panel that failed to render.
+  const notice = page.locator('[data-renewal-notice]');
+  await expect(notice).toBeVisible();
+  // ⛔ AND THE FILING PARAGRAPH IS NOT THERE AT ALL — not replaced by the not-filed sentence,
+  // which would be a second false statement: the filing IS on record.
+  await expect(page.locator('[data-renewal-notice-filing]')).toHaveCount(0);
+  await expect(notice).not.toContainText('لا يَرفعُ المنعَ');
+  await expect(notice).not.toContainText('لا يوجدُ طلبُ تجديدٍ');
+});
+
+test('OWNER DECISION 160 ruling 1 — and it still says so in every other state', async ({
+  page,
+}) => {
+  /*
+   * NON-VACUITY. Without this the implementation could satisfy the test above by never
+   * rendering the paragraph, which would delete a sentence of hers rather than condition it —
+   * and `rcNoticeFiled` is the sentence an office that applied on time and heard nothing most
+   * needs to keep being told.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      ...UNDER_STUDY_WITH_NOTICE,
+      standing: STANDING_AWAITING_DECLARATION,
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  const filing = page.locator('[data-renewal-notice-filing]');
+  await expect(filing).toBeVisible();
+  // OWNER DECISION 159 ruling 2-أ — and the declaration is now one of the two things it names.
+  await expect(filing).toContainText('هو تسجيلُ الإقرار، أو تدوينُ');
 });

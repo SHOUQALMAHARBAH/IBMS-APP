@@ -201,7 +201,7 @@ function ClaimDocumentation({
   canDocument: boolean;
   onDone: () => Promise<void>;
 }) {
-  const { t, tPlural } = useLanguage();
+  const { t, tPlural, language } = useLanguage();
   const [docType, setDocType] = useState<ClaimDocType>('claim_form');
   const [classification, setClassification] =
     useState<ClaimDocClassification>('CONFIDENTIAL');
@@ -242,7 +242,24 @@ function ClaimDocumentation({
         {t('claimDocumentationHeading')}{' '}
         {claim.documentationComplete
           ? `· ${t('claimDocumentationComplete')}`
-          : `· ${t('claimDocumentationMissing', { docs: claim.missingMandatoryDocuments.join(', ') })}`}
+          : /* 🔴 THE FINAL WALK §ب-٦ — THE HEADER PRINTED THE STORED CODES.
+               «التوثيق · ناقص claim_form, medical_report, invoice», directly above a list
+               whose every row already read the shipping Arabic name. Decision 153 §٢ row ١٣
+               fixed the list and this line was missed, so the card said the same thing twice
+               and the first time in English.
+
+               `ENUM_LABEL.ClaimDocType` is the SAME map the list below uses, proven total over
+               the api's own `CLAIM_DOC_TYPES` by `declared-vocabulary.test.ts` — so a ninth
+               document type fails by name rather than rendering a blank here.
+
+               The separator is «، », the Arabic comma this dictionary already uses to join a
+               list (`permissionRefusalAnyOf`) — ⛔ not a new word, and not the Latin «, »
+               that would reintroduce half the defect. */
+            `· ${t('claimDocumentationMissing', {
+              docs: claim.missingMandatoryDocuments
+                .map((d) => t(ENUM_LABEL.ClaimDocType[d]))
+                .join(language === 'AR' ? '، ' : ', '),
+            })}`}
       </strong>
       <ul style={{ margin: '0.35rem 0', paddingInlineStart: '1.1rem', fontSize: '0.85rem' }}>
         {/* OWNER DECISION 153 §٢ row ١٣ — «(إلزامي)», and the document's name from the

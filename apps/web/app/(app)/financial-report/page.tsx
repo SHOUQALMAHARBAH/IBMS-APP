@@ -23,6 +23,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatMoney } from '../../../lib/i18n/format';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
@@ -201,7 +202,31 @@ export default function FinancialReportPage() {
             </p>
             <ProfitTable rows={data.profitability.byLine} />
             <h2 style={{ marginTop: '1.25rem' }}>{t('frBookResultBySegment')}</h2>
-            <ProfitTable rows={data.profitability.bySegment} />
+            {/* 🔴 THE FINAL WALK §ب-٨ — THE SEGMENT COLUMN PRINTED «CORPORATE» / «INDIVIDUAL».
+                The row's `label` is the stored `CustomerType` member, and this table renders it
+                as text. `ENUM_LABEL.CustomerType` already ships both words — the onboarding
+                wizard has rendered them since it was built — so this cost no Arabic.
+
+                ⛔ `byLine` ABOVE IS NOT GIVEN A MAP, and that is measured rather than skipped:
+                its label is the stored ENGLISH line name and this payload sends no
+                `insuranceLineAr`, so a map would have nothing to map. That is the `LINE_DECLARED`
+                api debt (message 47 §3), and it is reported, not papered over. */}
+            <ProfitTable
+              rows={data.profitability.bySegment}
+              labelOf={(key) =>
+                key in ENUM_LABEL.CustomerType
+                  ? t(
+                      ENUM_LABEL.CustomerType[
+                        key as keyof typeof ENUM_LABEL.CustomerType
+                      ],
+                    )
+                  : /* OWNER DECISION 49 — a value with no label renders AS STORED, never
+                       blank. `CustomerType` has exactly two members and the compiler proves
+                       the map covers both, so this branch is unreachable today; it stays
+                       because the alternative when a third member lands is an empty cell. */
+                    key
+              }
+            />
           </Card>
         </>
       )}
@@ -211,8 +236,12 @@ export default function FinancialReportPage() {
 
 function ProfitTable({
   rows,
+  /** How a row's `key` becomes the word in the first column. Omitted means «render the label
+   *  the api sent», which is what the by-line table needs until its payload carries Arabic. */
+  labelOf,
 }: {
   rows: FinancialReportSummary['profitability']['byLine'];
+  labelOf?: (key: string) => string;
 }) {
   const { language, t } = useLanguage();
   if (rows.length === 0)
@@ -233,7 +262,7 @@ function ProfitTable({
         {rows.map((r) => (
           <Tr key={r.key}>
             <Td>
-              <bdi>{r.label}</bdi>
+              <bdi>{labelOf ? labelOf(r.key) : r.label}</bdi>
             </Td>
             <Td>{formatMoney(r.premiumWritten, language)}</Td>
             <Td>{formatMoney(r.claimsPaid, language)}</Td>

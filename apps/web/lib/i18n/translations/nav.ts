@@ -133,9 +133,31 @@ export const NAV = {
     notifNewPermission: 'صلاحية جديدة في النظام',
     notifNewPermissionSentence:
       'صلاحية جديدة في النظام: {name}. {description}. تتحكّم في: {controls}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
+    /*
+     * 🔴 OWNER DECISION 160 RULING 2 — HER SENTENCE WITHOUT THE «تتحكّم في:» CLAUSE.
+     *
+     * «الجملة العربية لا تحمل عنوان خادم ولا رمزاً ولا كلمة لاتينية. حين لا شاشة تُسمّى
+     * بالعربية، لا تُعرَض عبارة «تتحكّم في:».» The bell printed an api route into that slot —
+     * «تتحكّم في: POST /rfqs (the art. 15/d declaration branch)» — because a permission that
+     * opens no screen has only its routes to name, and `controlsLabel` handed them over
+     * verbatim as the honest answer. On the screen the presenter opens when he grants the
+     * declaration permission live, that is an English route in the middle of an Arabic
+     * sentence.
+     *
+     * ⛔ NOT ONE OTHER WORD CHANGES, and that is CHECKABLE rather than asserted:
+     * `new-permission-sentence.test.ts` derives this value by deleting exactly the clause from
+     * the key above and requires the two to agree, so a reword smuggled in beside the deletion
+     * cannot survive. ⛔ Her own template above is untouched.
+     */
+    notifNewPermissionSentenceNoScreen:
+      'صلاحية جديدة في النظام: {name}. {description}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
     // The same sentence with her NAME slot removed -- see the key's note in the EN block.
     notifNewPermissionSentenceNoName:
       'صلاحية جديدة في النظام: {description}. تتحكّم في: {controls}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
+    // OWNER DECISION 160 ruling 2 applied to the no-name template — same deletion, derived and
+    // checked the same way.
+    notifNewPermissionSentenceNoNameNoScreen:
+      'صلاحية جديدة في النظام: {description}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
   },
   EN: {
     language: 'Language',
@@ -277,7 +299,15 @@ export const NAV = {
     notifNewPermission: 'A new permission in the system',
     notifNewPermissionSentence:
       'A new permission in the system: {name}. {description}. It controls: {controls}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
+    // OWNER DECISION 160 ruling 2. Decision 160's «ما لا يتغيّر» keeps the English WORDS as
+    // they are and says the display condition follows the Arabic, so the English clause goes
+    // with it: same deletion, same derivation test.
+    notifNewPermissionSentenceNoScreen:
+      'A new permission in the system: {name}. {description}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
     notifNewPermissionSentenceNoName:
       'A new permission in the system: {description}. It controls: {controls}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
+    // The same, on the no-name template.
+    notifNewPermissionSentenceNoNameNoScreen:
+      'A new permission in the system: {description}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
   },
 } as const;

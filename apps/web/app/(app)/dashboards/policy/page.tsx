@@ -16,6 +16,7 @@ import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   formatDate,
   formatNumber,
+  formatPeriodEndInclusive,
   formatPeriodLabel,
 } from '../../../../lib/i18n/format';
 import { useCallback, useEffect, useState } from 'react';
@@ -195,7 +196,10 @@ export default function PolicyDashboardPage() {
             {t('dpolPeriodRange', {
               label: formatPeriodLabel(summary.periodLabel, language),
               from: formatDate(summary.periodStart, language),
-              to: formatDate(summary.periodEnd, language),
+              /* THE FINAL WALK §ب-١٠ — the last day INSIDE the period. `periodEnd` is the
+                 exclusive bound every query behind these figures uses; printing it beside
+                 «إلى» told a reader November ran to 1 December. */
+              to: formatPeriodEndInclusive(summary.periodEnd, language),
             })}{' '}
             {tPlural('dpolRenewalWindowDays', summary.renewalWindowDays)}
           </p>

@@ -188,14 +188,18 @@ export class LicenseGateService {
       this.legalValues.licenceFigures(now),
     ]);
     /*
-     * 🔴 OWNER DECISION 128 — THE RELATION BECOMES A BOOLEAN HERE, at the one boundary between the
+     * 🔴 OWNER DECISION 128 — THE RELATION CROSSES HERE, at the one boundary between the
      * database's row and the pure derivation, exactly as the scope lines become branch keys below.
      *
-     * ⚠️ IT MUST BE MAPPED EXPLICITLY. `LicenseTermRow.hasRenewalDeclaration` is OPTIONAL so that
+     * ⚠️ IT MUST BE MAPPED EXPLICITLY. `LicenseTermRow.renewalDeclaration` is OPTIONAL so that
      * every existing fixture compiles, which means forgetting this line would leave it `undefined`
      * — read as «nobody declared» — and an office that HAD declared would be refused for ever,
      * silently and with the wrong sentence. Optional-reads-as-absent is the safe direction for a
      * fixture and the dangerous one for the real path, so the real path states it.
+     *
+     * 🔴 OWNER DECISION 159 RULING 3 — AND IT IS THE ROW NOW, NOT `!== null`. The derivation
+     * reads its presence as the boolean and its two columns as the facts the screen prints, so
+     * «did anyone declare» and «who, and when» cannot disagree.
      */
     const current = pickCurrentTerm(terms);
     const standing = deriveLicenseStanding(
@@ -203,7 +207,7 @@ export class LicenseGateService {
         ? null
         : {
             ...current,
-            hasRenewalDeclaration: current.renewalDeclaration !== null,
+            renewalDeclaration: current.renewalDeclaration,
           },
       /*
        * Art. 21/b/5 — the scope lines become `insuranceBranchKey`s HERE, at the one boundary

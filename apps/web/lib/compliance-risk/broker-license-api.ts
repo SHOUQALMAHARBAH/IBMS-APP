@@ -115,7 +115,16 @@ export interface BrokerLicenseSeries {
       | { state: 'NO_PROOF' }
       | { state: 'ENDED_BY_ACT'; kind: 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL' }
       | { state: 'AWAITING_DECLARATION' }
-      | { state: 'UNDER_STUDY' };
+      /**
+       * 🔴 OWNER DECISION 159 RULING 3 — who declared, and when, on the one state that has an
+       * answer. `declaredByName` is the name AS IT STOOD on the day; `declaredAt` is an ISO
+       * instant and goes through `formatDate` (decision 156), never a slice.
+       */
+      | {
+          state: 'UNDER_STUDY';
+          declaredByName: string;
+          declaredAt: string;
+        };
   };
 }
 

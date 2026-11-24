@@ -17,7 +17,10 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { formatMoney } from '../../../../lib/i18n/format';
+import {
+  formatMoney,
+  periodEndInclusive,
+} from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
@@ -214,7 +217,11 @@ export default function SalesDashboardPage() {
             kind="period"
             periodLabel={summary.periodLabel}
             from={summary.periodStart}
-            to={summary.periodEnd}
+            /* THE FINAL WALK §ب-١٠ — `ReportProvenance` renders what it is handed, and the
+               api's `periodEnd` is the EXCLUSIVE bound; the inclusive last day is resolved
+               here rather than inside the component, which serves thirteen screens and must
+               not start assuming every date it is given is a half-open bound. */
+            to={periodEndInclusive(summary.periodEnd).toISOString()}
           />
 
           <section style={sectionStyle}>

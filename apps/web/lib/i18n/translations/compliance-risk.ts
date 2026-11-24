@@ -232,7 +232,7 @@ export const COMPLIANCE_RISK = {
     rcExpiryNotThreeYearTermWarning:
       'تاريخ الانتهاء المُدخل لا يطابق مدة الثلاث سنوات التي تقتضيها المادة 10/ب: المدة ثلاث سنوات ميلادية تنتهي في 31 كانون الأول، ويُعتبر جزء السنة الميلادية لهذه الغاية سنة — فسنة الإصدار تُحتسب سنة كاملة. تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
     rcValidPendingRenewalDecision:
-      'انتهى تاريخ هذه المدة المطبوع، ويُعامَل الترخيص على أنه ما زال ساريًا لأن طلب التجديد قُدّم في موعده، إلى حين صدور قرار البنك المركزي. هذا قرار داخلي للمكتب ولا يستند إلى نص في تعليمات رقم (9) لسنة 2026.',
+      'انتهى تاريخ هذه المدة المطبوع، ويُعامَل الترخيص على أنه ما زال ساريًا لأن طلب التجديد قُدّم في موعده بإثباته وسُجِّل الإقرار، إلى حين صدور قرار البنك المركزي. هذا قرار داخلي للمكتب ولا يستند إلى نص في تعليمات رقم (9) لسنة 2026.',
     rcRenewalFiledLate:
       'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
     rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
@@ -332,6 +332,22 @@ export const COMPLIANCE_RISK = {
       'موقوف',
     rcStandingCancelled:
       'ملغى',
+    /*
+     * 🔴 OWNER DECISION 159 RULING 3 — WHO DECLARED, AND WHEN, UNDER THE STANDING.
+     *
+     * «موافقة على الجملة الشغّالة» — her ruling approves the sentence ALREADY SHIPPING,
+     * `dpoAssignAcknowledgedOn`, and this value is SLICED from it byte for byte by
+     * `license-renewal.strings.test.ts`.
+     *
+     * ⛔ ITS OWN KEY, NOT A SECOND RENDER OF THAT ONE (decision 157 ruling 2). The DPO
+     * assignment card and the licence standing are two screens; a later reword of one would
+     * otherwise move the other, on a screen nobody was looking at.
+     *
+     * The NAME is `actorNameShown` — the name as it stood on the day of the declaration,
+     * never the account's name today (decision 159 §٣).
+     */
+    rcRenewalDeclaredBy:
+      'أقرّ به {who} في {when}',
     rcStandingDerived:
       'هذه الحالةُ مُستنبَطةٌ من مدَدِ الترخيصِ المسجّلةِ ومن قراراتِ الجهةِ الرقابيةِ المدوَّنة. وهي نفسُ الحالةِ التي يَمنعُ النظامُ على أساسِها الأعمالَ الجديدة.',
     rcStandingMayNotPractise:
@@ -383,7 +399,7 @@ export const COMPLIANCE_RISK = {
     rcNoticeApplicationDueBy:
       'آخرُ موعدٍ لتقديمِ طلبِ التجديد (المادة 11)',
     rcNoticeFiled:
-      'طلبُ التجديدِ مدوَّنٌ لدينا. وهذا لا يَرفعُ المنعَ ولا يُوقِفُ التنبيه: تقديمُ الطلبِ ليس قرارًا، والذي يَرفعُ المنعَ هو تدوينُ مدّةِ الترخيصِ الجديدةِ مع شهادتِها.',
+      'طلبُ التجديدِ مدوَّنٌ لدينا. وهذا لا يَرفعُ المنعَ ولا يُوقِفُ التنبيه: تقديمُ الطلبِ ليس قرارًا، والذي يَرفعُ المنعَ هو تسجيلُ الإقرار، أو تدوينُ مدّةِ الترخيصِ الجديدةِ مع شهادتِها.',
     rcNoticeNotFiled:
       'لا يوجدُ طلبُ تجديدٍ مدوَّنٌ لدينا.',
     rcNoticeNoSource:
@@ -938,6 +954,10 @@ export const COMPLIANCE_RISK = {
       'Suspended',
     rcStandingCancelled:
       'Cancelled',
+    // OWNER DECISION 159 ruling 3. The English half is NOT ruled, so it takes the shipping
+    // English of the same sentence, byte for byte, by the same slice.
+    rcRenewalDeclaredBy:
+      'Acknowledged by {who} on {when}',
     rcStandingDerived:
       'This standing is derived from the recorded licence terms and any recorded regulator decision, not stored as a field. It is the same answer the system blocks new business on.',
     rcStandingMayNotPractise:

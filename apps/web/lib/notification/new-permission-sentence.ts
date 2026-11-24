@@ -28,29 +28,39 @@ import type { NewPermissionNotice } from './notification-api';
  */
 
 /**
- * What the code controls, for the «تتحكّم في» slot.
+ * What the code controls, for the «تتحكّم في» slot — OR `null`, which is her ruling.
  *
  * A SCREEN where the nav map names the code — rendered as that screen's own already-shipping
- * title, so no Arabic is invented and both languages are served. Otherwise the ROUTES, verbatim.
+ * title, so no Arabic is invented and both languages are served.
  *
- * ⟶ A route is weaker than a screen name and it is the honest answer when no screen exists:
- *   naming a screen that is not built would be a guess, in the one sentence an administrator
- *   reads before deciding who may do something.
+ * 🔴 OWNER DECISION 160 RULING 2 — AND OTHERWISE THERE IS NOTHING TO SAY, SO NOTHING IS SAID.
+ *
+ * This used to return `notice.routes.join(…)`, on the reasoning that «a route is weaker than a
+ * screen name and it is the honest answer when no screen exists». The final walk measured what
+ * that produces on the screen the presenter opens: «تتحكّم في: POST /rfqs (the art. 15/d
+ * declaration branch)» — an English api route, with a parenthetical about a code branch, inside
+ * an Arabic sentence, read by an office administrator deciding who may swear to a licence
+ * renewal. Her ruling: «الجملة العربية لا تحمل عنوان خادم ولا رمزاً ولا كلمة لاتينية.»
+ *
+ * ⟶ `null` means «this sentence has no «تتحكّم في:» clause», and `newPermissionSentence` picks
+ *   a template that does not carry one. ⛔ Not an empty string into the old template, which
+ *   would render «تتحكّم في: .» — a clause with nothing in it is worse than no clause.
+ *
+ * ⚠️ AND THE href FALLBACK IS GONE FOR THE SAME REASON. A screen the api named and the nav map
+ * does not have has no Arabic title either, so printing its path would be the same defect by a
+ * different route. The api-side spec still fails on that state, which is where it is fixed.
  */
 export function controlsLabel(
   notice: NewPermissionNotice,
   t: (key: TranslationKey, vars?: Record<string, string>) => string,
-): string {
+): string | null {
   if (notice.screen) {
     const destination = DESTINATION_GROUPS.flatMap((g) => g.items).find(
       (d) => d.href === notice.screen,
     );
     if (destination) return t(destination.labelKey);
-    // A screen the api named and the nav map does not have. Fall through to the href rather
-    // than inventing a title for it — and the api-side spec fails on exactly this state.
-    return notice.screen;
   }
-  return notice.routes.join('  ·  ');
+  return null;
 }
 
 /**
@@ -113,7 +123,25 @@ export function newPermissionSentence(
    * and so are never in a description. A name that is not in its description still gets the
    * name, which is why `retention.archive.retrieve` still reads name-then-description.
    */
-  return name === '' || description.includes(name)
+  /*
+   * 🔴 OWNER DECISION 160 RULING 2 — FOUR TEMPLATES NOW, AND THE CHOICE IS TWO INDEPENDENT
+   * QUESTIONS.
+   *
+   * Does the description already say the name (decision 156 ruling 2)? And is there a screen
+   * this permission opens that already has an Arabic title (decision 160 ruling 2)? The two are
+   * unrelated — `license-renewal.declare` answers «yes» to the first and «no» to the second —
+   * so collapsing them into one three-way choice would have left one combination unreachable.
+   *
+   * ⛔ NO TEMPLATE'S WORDS CHANGE. The two new ones are the two old ones with exactly her ruled
+   * clause deleted, which `new-permission-sentence.test.ts` derives and checks.
+   */
+  const noName = name === '' || description.includes(name);
+  if (controls === null) {
+    return noName
+      ? t('notifNewPermissionSentenceNoNameNoScreen', { description })
+      : t('notifNewPermissionSentenceNoScreen', { name, description });
+  }
+  return noName
     ? t('notifNewPermissionSentenceNoName', { description, controls })
     : t('notifNewPermissionSentence', { name, description, controls });
 }

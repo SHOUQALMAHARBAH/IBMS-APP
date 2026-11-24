@@ -372,8 +372,21 @@ export type RenewalUnderStudy =
   | { state: 'ENDED_BY_ACT'; kind: 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL' }
   /** Conditions 1, 2 and 4 hold; nobody has declared yet. Decision 136(ب)'s sentence. */
   | { state: 'AWAITING_DECLARATION' }
-  /** All four hold. The office issues, and every record is stamped. */
-  | { state: 'UNDER_STUDY' };
+  /**
+   * All four hold. The office issues, and every record is stamped.
+   *
+   * 🔴 OWNER DECISION 159 RULING 3 — AND IT CARRIES WHO DECLARED AND WHEN.
+   *
+   * The two facts are ON THE STATE rather than beside it, because they exist only in this one
+   * state: `AWAITING_DECLARATION` has nobody to name, and the four failing states have nothing
+   * to say about a declaration that was never reached. A pair of nullable fields on the standing
+   * would be two columns that are null in five of six states and a screen free to read them in
+   * any of them.
+   *
+   * `declaredByName` is `actorNameShown` — the name AS IT STOOD on the day (decision 48's
+   * resolution, frozen at the act), never the account's name today.
+   */
+  | { state: 'UNDER_STUDY'; declaredByName: string; declaredAt: Date };
 
 export function deriveRenewalUnderStudy(
   license: {
@@ -381,7 +394,19 @@ export function deriveRenewalUnderStudy(
     renewalRequestedAt: Date | null;
     renewalProofDocumentId: string | null;
     renewalReferenceNumber: string | null;
-    hasRenewalDeclaration: boolean;
+    /**
+     * 🔴 OWNER DECISION 128's condition 3, AND DECISION 159 RULING 3's two facts, from ONE
+     * source.
+     *
+     * It used to be `hasRenewalDeclaration: boolean`. The row IS the boolean — a present row
+     * means somebody declared — so taking the row keeps «did anyone declare» and «who, and
+     * when» answering out of one field. Two fields would be two homes for one fact, which is
+     * exactly the shape this file's own history records going wrong.
+     */
+    renewalDeclaration: {
+      actorNameShown: string;
+      declaredAt: Date;
+    } | null;
   },
   /** Every regulatory act on this office, in any order. Only the two renewal kinds are read. */
   acts: readonly {
@@ -434,10 +459,14 @@ export function deriveRenewalUnderStudy(
       kind: ending.kind as 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL',
     };
   }
-  if (!license.hasRenewalDeclaration) {
+  if (license.renewalDeclaration === null) {
     return { state: 'AWAITING_DECLARATION' };
   }
-  return { state: 'UNDER_STUDY' };
+  return {
+    state: 'UNDER_STUDY',
+    declaredByName: license.renewalDeclaration.actorNameShown,
+    declaredAt: license.renewalDeclaration.declaredAt,
+  };
 }
 
 /** ONE TERM as stored. */

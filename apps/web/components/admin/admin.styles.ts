@@ -60,6 +60,26 @@ export const matrixRowStyle: CSSProperties = {
   fontSize: '0.875rem',
 };
 
+/**
+ * 🔴 THE FINAL WALK, §ب-١ — A RATIFIED ARABIC NAME IS NOT AN IDENTIFIER.
+ *
+ * «أسماء الصلاحيات بخطّ الرموز: الحروف العربية متفرّقة («يُقرّ بـأن تـرخـيـص»)». The matrix
+ * rendered every permission name inside `<code>`, which was correct while the name WAS the code
+ * (decision 127 replaced it) — and a monospace family picked for Latin identifiers has no Arabic
+ * face, so the browser falls back per glyph and the letters lose their joins. The audience reads
+ * disjoined Arabic on the one screen the presenter grants a permission on.
+ *
+ * ⛔ THE CODE KEEPS ITS `<code>` IN ENGLISH, because in English `permissionDisplayName` still
+ * renders the CODE — the empty cell decision 127 left — and a code IS an identifier. So the
+ * element follows what is actually in it rather than which column it sits in.
+ *
+ * `font-weight: 500` and nothing else: the row needs the name to read as the heading of its own
+ * description, which is what the monospace was doing by accident.
+ */
+export const matrixNameStyle: CSSProperties = {
+  fontWeight: 500,
+};
+
 /** The five states on a CRUD-shaped family, kept on one line so the row reads as one decision. */
 export const matrixVerbStyle: CSSProperties = {
   display: 'flex',

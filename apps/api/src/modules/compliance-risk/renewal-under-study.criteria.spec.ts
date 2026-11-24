@@ -27,6 +27,18 @@ import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
+/**
+ * 🔴 OWNER DECISION 159 RULING 3 — the declaration as a ROW.
+ *
+ * The name is the one STORED on the day of the declaration, which is the whole point of
+ * `actorNameShown`: the account may be renamed, or the person may leave, and the record still
+ * names who swore to it.
+ */
+const DECLARATION = {
+  actorNameShown: 'مراد سالم الخطيب',
+  declaredAt: d('2027-01-20'),
+};
+
 /** Past the printed expiry, with everything in order unless a case says otherwise. */
 function term(over: Partial<LicenseTermRow> = {}): LicenseTermRow {
   return {
@@ -36,7 +48,9 @@ function term(over: Partial<LicenseTermRow> = {}): LicenseTermRow {
     renewalRequestedAt: d('2026-10-01'),
     renewalProofDocumentId: 'doc-proof-1',
     renewalReferenceNumber: 'CBJ/IN/2026/4471',
-    hasRenewalDeclaration: true,
+    // 🔴 OWNER DECISION 159 RULING 3 — the ROW rather than a boolean: its presence IS «somebody
+    // declared», and its two columns are what the screen prints under the standing.
+    renewalDeclaration: DECLARATION,
     ...over,
   };
 }
@@ -189,7 +203,7 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
       renewalRequestedAt: null,
       renewalProofDocumentId: null,
       renewalReferenceNumber: null,
-      hasRenewalDeclaration: false,
+      renewalDeclaration: null,
     });
     const s = standing(fresh, [act({ kind: 'RENEWAL_REFUSAL' })]);
     expect(s.status).toBe('ACTIVE');
@@ -245,7 +259,7 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
      *
      * `EXPIRED` is the honest status word: the term IS past its printed date.
      */
-    const s = standing(term({ hasRenewalDeclaration: false }));
+    const s = standing(term({ renewalDeclaration: null }));
     expect(s.renewalUnderStudy.state).toBe('AWAITING_DECLARATION');
     expect(s.mayPractise).toBe(false);
     expect(s.status).toBe('EXPIRED');
@@ -260,7 +274,7 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
      */
     for (const t of [
       term(),
-      term({ hasRenewalDeclaration: false }),
+      term({ renewalDeclaration: null }),
       term({ renewalProofDocumentId: null }),
       term({ renewalRequestedAt: null }),
     ]) {

@@ -28,6 +28,7 @@ import { permissionDisplayName } from '../../../../lib/admin/permission-names';
 import {
   createMatrixStyle,
   generatedNameStyle,
+  matrixNameStyle,
 } from '../../../../components/admin/admin.styles';
 import {
   machineNameProblem,
@@ -729,10 +730,27 @@ export default function RoleAdminPage() {
                   >
                     <Td>
                       {/* OWNER DECISION 127 — the approver's permission by its ratified name.
-                          English keeps the code: no decision rules an English name. */}
-                      <code>
-                        {permissionDisplayName(row.checkerPermission, language)}
-                      </code>
+                          English keeps the code: no decision rules an English name.
+
+                          🔴 THE FINAL WALK §ب-١, APPLIED HERE TOO. This is the SECOND site on
+                          the same screen where a ratified Arabic name sat inside `<code>`, and
+                          the cause is identical: a monospace family chosen for Latin
+                          identifiers has no Arabic face, so the letters lose their joins. The
+                          walk named the matrix; this is the dual-control table two sections
+                          below it, on the screen the presenter opens. Reported rather than
+                          found, because it was not in the walk's list. */}
+                      {language === 'AR' ? (
+                        <span
+                          style={matrixNameStyle}
+                          data-permission-name={row.checkerPermission}
+                        >
+                          {permissionDisplayName(row.checkerPermission, language)}
+                        </span>
+                      ) : (
+                        <code>
+                          {permissionDisplayName(row.checkerPermission, language)}
+                        </code>
+                      )}
                     </Td>
                     <Td>{row.holderCount}</Td>
                     <Td>

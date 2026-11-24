@@ -1426,3 +1426,103 @@ test('the Arabic search finds a row by a word from its name', async ({
   await matrix.locator('[data-matrix-search]').fill('zzz-nothing-matches');
   await expect(matrix.getByRole('status')).toBeVisible();
 });
+
+/*
+ * 🔴 THE FINAL WALK §ب-١ — A RATIFIED ARABIC NAME IS NOT AN IDENTIFIER.
+ *
+ * «أسماء الصلاحيات بخطّ الرموز: الحروف العربية متفرّقة («يُقرّ بـأن تـرخـيـص»)». Every name sat
+ * inside `<code>` — correct while the name WAS the code, which decision 127 replaced — and a
+ * monospace family picked for Latin identifiers has no Arabic face, so the browser falls back
+ * glyph by glyph and the letters lose their joins. This is the screen the presenter grants the
+ * declaration permission on, in front of the brokers.
+ *
+ * ⚠️ ASSERTED ON THE ELEMENT AND ON THE COMPUTED FONT, because either alone is weak: a `<span>`
+ * that inherited a monospace rule from an ancestor would pass a tag check, and a `<code>`
+ * overridden with a proportional `font-family` would pass a font check while still being marked
+ * up as an identifier for a screen reader.
+ */
+test('THE FINAL WALK §ب-١ — the Arabic matrix renders a name as text, not in a code element', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR'], 'AR');
+  await mockRoles(page);
+  /*
+   * ⚠️ A CATALOGUE OF ITS OWN, AND IT IS NOT A CONVENIENCE. Whether a family becomes a CRUD
+   * ROW is DERIVED — `MIN_CRUD_CODES` is two verb-shaped codes — and the shared `CATALOGUE`
+   * above has exactly one (`claim.read`), so it renders no family header at all and half of
+   * this test's subject does not exist on that screen. ⛔ The shared fixture is NOT widened:
+   * two tests assert «2 of 4» against its size, and growing it to reach one row here would
+   * change what they measure. Registered AFTER `mockRoles`, which is what makes it win.
+   */
+  await page.route('http://localhost:4000/rbac/permissions', (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        { code: 'claim.read', module: 'claims', description: 'View a claim' },
+        { code: 'claim.update', module: 'claims', description: 'Amend a claim' },
+        {
+          code: 'claim.register',
+          module: 'claims',
+          description: 'Register a notified claim',
+        },
+      ],
+    }),
+  );
+  await page.goto('/settings/roles');
+
+  const matrix = page.locator('form [data-permission-matrix]');
+  await expect(matrix).toBeVisible();
+  for (const detail of await matrix.locator('details[data-module]').all()) {
+    await detail.locator('summary').click();
+  }
+
+  /*
+   * A TOGGLE ROW's name and a FAMILY HEADER's name — the two sites the walk named.
+   *
+   * ⚠️ FOUND BY THEIR ATTRIBUTE RATHER THAN BY A CHOSEN CODE. Which codes become a CRUD family
+   * is DERIVED (`MIN_CRUD_CODES`, two verb-shaped codes), so naming one here would pin this test
+   * to an arrangement the matrix is free to change — the first version did and failed on
+   * `claim`, which has one CRUD verb and so has no family row at all. The counts below are what
+   * keep it non-vacuous.
+   */
+  const toggleName = matrix.locator('[data-permission-name]');
+  const familyName = matrix.locator('[data-permission-family-name]');
+  await expect(toggleName).not.toHaveCount(0);
+  await expect(familyName).not.toHaveCount(0);
+
+  for (const name of [toggleName.first(), familyName.first()]) {
+    await expect(name).toBeVisible();
+    // POSITIVE FIRST, from the same render: there is a ratified Arabic name in it.
+    await expect(name).not.toBeEmpty();
+    // ⛔ Not a `<code>`.
+    expect(
+      await name.evaluate((el) => el.tagName.toLowerCase()),
+    ).not.toBe('code');
+    // ⛔ And not monospace, however it got there.
+    const family = await name.evaluate((el) =>
+      getComputedStyle(el).fontFamily.toLowerCase(),
+    );
+    expect(family, `an Arabic permission name is set in ${family}`).not.toContain(
+      'mono',
+    );
+  }
+
+  // NON-VACUITY, and it is what keeps the rule honest rather than a blanket ban: in ENGLISH
+  // `permissionDisplayName` still renders the CODE — the empty cell decision 127 left — and a
+  // code IS an identifier, so there the `<code>` element is right.
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR'], 'EN');
+  await page.goto('/settings/roles');
+  const enMatrix = page.locator('form [data-permission-matrix]');
+  await expect(enMatrix).toBeVisible();
+  for (const detail of await enMatrix.locator('details[data-module]').all()) {
+    await detail.locator('summary').click();
+  }
+  // Every name on the English screen is still a `<code>`, and there are no name spans at all.
+  await expect(enMatrix.locator('code')).not.toHaveCount(0);
+  await expect(enMatrix.locator('[data-permission-name]')).toHaveCount(0);
+  await expect(enMatrix.locator('[data-permission-family-name]')).toHaveCount(0);
+  /* And it really is the CODE in there, which is what makes `<code>` right for that half.
+     ⚠️ `claim.register`, the TOGGLE — a code inside a CRUD family is rendered as the family
+     string plus its verb label, so `claim.read` never appears as a dotted code anywhere. */
+  await expect(enMatrix).toContainText('claim.register');
+});

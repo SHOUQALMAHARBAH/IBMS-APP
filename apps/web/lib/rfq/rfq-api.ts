@@ -83,6 +83,15 @@ export interface Article15DExemptionRecord {
   ceilingValueJod: string | null;
   evidenceCommunicationLogId: string | null;
   /**
+   * 🔴 OWNER DECISION 159 RULING 4 — the attached message, named by the SAME two facts the
+   * candidate row printed before it was chosen: when it came and how.
+   *
+   * `null` is exemptions 1-4 (which carry no evidence by CHECK) and an exemption 5 whose mark
+   * is still on it. Optional because every spec that builds this record predates the ruling,
+   * and absent reads as «nothing to name» — the quiet direction.
+   */
+  evidence?: { channel: string; sentAt: string } | null;
+  /**
    * 🔴 OWNER DECISION 139 ruling 2 — «بلا إثبات»: this exemption rests on a customer's
    * request that is not on file yet.
    *

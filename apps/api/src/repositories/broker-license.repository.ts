@@ -12,7 +12,11 @@ import { PrismaService } from '../prisma/prisma.service';
  * 136(ب)'s sentence exists for.
  */
 export type BrokerLicenseTermRow = BrokerLicense & {
-  renewalDeclaration: { id: string } | null;
+  renewalDeclaration: {
+    id: string;
+    actorNameShown: string;
+    declaredAt: Date;
+  } | null;
 };
 
 export interface CreateBrokerLicenseTermInput {
@@ -73,12 +77,24 @@ export class BrokerLicenseRepository {
        * gate asks it on every placement) and its own comment promises THREE READS, ONE ROUND TRIP.
        * A fourth read here would have broken that quietly.
        *
-       * `select: { id: true }` because the derivation needs a BOOLEAN — whether anyone declared —
-       * and nothing else. Pulling the declaration's text into every licence read would put the
-       * sentence, the actor's name and their network address on a query that answers «may this
-       * office place business», which is more personal data than the question needs.
+       * 🔴 OWNER DECISION 159 RULING 3 WIDENED THIS `select` BY EXACTLY TWO COLUMNS, and the
+       * sentence below is still the rule for everything it does not name.
+       *
+       * The screen now prints «أقرّ به {الاسم} في {التاريخ}» under the standing, so the name as
+       * it stood and the instant have to travel with the term — and `standing()` is the one read
+       * that carries the term to both the gate and the screen.
+       *
+       * ⛔ `declarationTextShown` and `networkAddress` STAY OUT. Pulling the declaration's text
+       * and the actor's address into every licence read would put them on a query that answers
+       * «may this office place business», which is more personal data than that question needs;
+       * `sensitive-data-handling.md` is the rule and an address is not something a standing
+       * needs. The two columns taken are exactly the two the ruling names.
        */
-      include: { renewalDeclaration: { select: { id: true } } },
+      include: {
+        renewalDeclaration: {
+          select: { id: true, actorNameShown: true, declaredAt: true },
+        },
+      },
     });
   }
 
