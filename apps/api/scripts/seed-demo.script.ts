@@ -635,6 +635,49 @@ function verifyWalkthroughNamesTheOffices(): void {
   }
 }
 
+/**
+ * 🔴 OWNER DECISION 158 TABLE ك, CHECKED AT THE END AGAINST WHAT IS ACTUALLY ON THE ROWS.
+ *
+ * ⚠️ AND THIS EXISTS BECAUSE A RUN FOUND WHAT EVERY STATIC CHECK MISSED. The demo numbers were
+ * in the source and `decision-158-seed-arabic.spec.ts` was green, but after a complete run from
+ * an EMPTY database office A's licence still read `CBJ-SEED-DEFAULT`: it already held a term
+ * from `db:seed`, so the creation path returned early and the demo values were never applied.
+ * A test that reads the SOURCE cannot see that; only reading the DATABASE at the end can.
+ *
+ * ⛔ It asserts, it does not write — `applyDemoLicenceValues` is what writes, on both branches.
+ * Reported through `recordBrokenPromise` like every other walkthrough promise: collected, never
+ * thrown, because this runs after all the data is in place and failing here must not cost it.
+ */
+async function verifyBothOfficesCarryTheDemoLicence(): Promise<void> {
+  for (const [slug, expected] of Object.entries(DEMO_LICENCE_NUMBER)) {
+    const terms = await rawPrisma.brokerLicense.findMany({
+      // BY ID, for the reason `applyDemoLicenceValues` records: `orgSlug` is this script's name
+      // for an office and the database `subdomain` is a different string.
+      where: { organizationId: DEMO_ORG_ID_BY_SLUG[slug] },
+      select: { licenseNumber: true },
+    });
+    if (terms.length === 0) {
+      recordBrokenPromise(
+        `${slug} holds no licence term at all, so decision 158 table ك's number ` +
+          `${JSON.stringify(expected)} is on nothing. Every pipeline in that office is ` +
+          'refused by the art. 21/a/9 gate, which is the guard working.',
+      );
+      continue;
+    }
+    const wrong = terms
+      .map((t) => t.licenseNumber)
+      .filter((number) => number !== expected);
+    if (wrong.length > 0) {
+      recordBrokenPromise(
+        `${slug} carries licence number(s) ${JSON.stringify(wrong)} where decision 158 ` +
+          `table ك says ${JSON.stringify(expected)}. The certificate a customer receives ` +
+          'prints this under the office name (decision 153 ruling 2), so a presenter opening ' +
+          'one in front of the brokers would show a number that looks like a real CBJ licence.',
+      );
+    }
+  }
+}
+
 const DUPLICATE_SPELLING_DEMO = {
   attempt: 'yarmouk insurance (Demo)',
   attemptAr: 'شركة اليرموك للتامين',
@@ -1537,6 +1580,12 @@ async function proveDuplicateSpellingIsRefused(
  * a certificate named so it cannot be read as a real filing. Three calendar years ending 31 December
  * (art. 10/b), derived from the current year so a later run cannot seed an already-expired term.
  */
+/** Slug -> organization id, derived from `DEMO_ORGS` so the two cannot drift. This script's
+ *  own `orgSlug` is NOT the database `subdomain` — office A's subdomain is `default`. */
+const DEMO_ORG_ID_BY_SLUG: Record<string, string> = Object.fromEntries(
+  DEMO_ORGS.map((o) => [o.orgSlug, o.orgId]),
+);
+
 /**
  * 🔴 OWNER DECISION 158 TABLE ك — THE DEMO OFFICES' LICENCE NUMBER SAYS IT IS A DEMO.
  *
@@ -1562,6 +1611,52 @@ const DEMO_LICENCE_NUMBER: Record<string, string> = {
 /** Table ك's third row — the scope text, on both demo offices. */
 const DEMO_LICENCE_SCOPE = 'وساطة تأمين عامّة (بيانات تجريبية)';
 
+/**
+ * 🔴 OWNER DECISION 158 TABLE ك ON AN OFFICE THAT ALREADY HAS A TERM — AND A RUN FOUND THIS.
+ *
+ * `ensureBrokerLicenseTermForOffice` returns early when the office already holds a term, which
+ * is right: a second term would change which one `pickCurrentTerm` calls current. But office A
+ * ALWAYS holds one by then — `db:seed`'s `ensureBrokerLicenseTerms` gives every brokerage
+ * office a placeholder — so the early return meant the demo number was applied to office B and
+ * NEVER to office A.
+ *
+ * ⚠️ MEASURED ON A REAL RUN FROM AN EMPTY DATABASE, not reasoned about: after the whole seeder
+ * finished, office A's licence still read `CBJ-SEED-DEFAULT` and only office B carried
+ * «تجريبي/002». Every static check passed — the paper's values ARE in the file, which is all a
+ * source-reading test can see. This is message 46's own lesson arriving again: run the seeder
+ * before believing it.
+ *
+ * ⟶ So the demo values are applied to the TERM THAT IS ALREADY THERE rather than by creating a
+ *   second one. ⛔ Nothing else on the row is touched: not the dates, not the certificate, not
+ *   the renewal fields that office B's expiry path writes.
+ *
+ * ⛔ AND ONLY FOR A SLUG IN THE MAP. An office this seeder did not create keeps whatever its
+ * licence says.
+ *
+ * 🔴 IT ADDRESSES THE OFFICE BY ID, AND THE FIRST VERSION DID NOT — WHICH A SECOND RUN CAUGHT.
+ *
+ * `orgSlug` is THIS SCRIPT'S OWN name for an office (`office-a`, `office-b`); the database
+ * `subdomain` is `default` and `demo-office-b`. A `where: { organization: { subdomain:
+ * orgSlug } }` therefore matched NOTHING for either, and `updateMany` reports a count of zero
+ * rather than failing — so the run stayed green and office A's licence still read
+ * `CBJ-SEED-DEFAULT`. ⟶ Addressing by `organizationId` is the only shape where a wrong key
+ * cannot look like a successful no-op; `DEMO_ORG_ID_BY_SLUG` is derived from `DEMO_ORGS` so the
+ * two cannot drift.
+ */
+async function applyDemoLicenceValues(
+  orgSlug: string,
+  tally: Tally,
+): Promise<void> {
+  const licenseNumber = DEMO_LICENCE_NUMBER[orgSlug];
+  const organizationId = DEMO_ORG_ID_BY_SLUG[orgSlug];
+  if (licenseNumber === undefined || organizationId === undefined) return;
+  const updated = await rawPrisma.brokerLicense.updateMany({
+    where: { organizationId },
+    data: { licenseNumber, scopeOfAuthorization: DEMO_LICENCE_SCOPE },
+  });
+  if (updated.count > 0) bump(tally, 'created', 'demoLicenceNumberApplied');
+}
+
 async function ensureBrokerLicenseTermForOffice(
   app: INestApplication<App>,
   orgSlug: string,
@@ -1575,7 +1670,10 @@ async function ensureBrokerLicenseTermForOffice(
     const body = existing.body as { terms?: unknown[] };
     // Idempotent, like the seeder it stands in for: a second run must not append a second term,
     // which would also change which term `pickCurrentTerm` calls current.
-    if (Array.isArray(body.terms) && body.terms.length > 0) return;
+    if (Array.isArray(body.terms) && body.terms.length > 0) {
+      await applyDemoLicenceValues(orgSlug, tally);
+      return;
+    }
   }
 
   const year = new Date().getUTCFullYear();
@@ -3602,6 +3700,8 @@ it(
           );
       }
       console.log('=====================================================\n');
+
+      await verifyBothOfficesCarryTheDemoLicence();
 
       const reportPath = path.join(__dirname, 'seed-demo-report.json');
       fs.writeFileSync(
