@@ -18,15 +18,16 @@ import {
 } from '../../lib/admin/permission-names';
 import {
   matrixCountStyle,
+  matrixDescriptionStyle,
+  matrixDismissNewStyle,
   matrixModuleStyle,
+  matrixNameStyle,
+  matrixNewBadgeStyle,
   matrixRowStyle,
   matrixSearchStyle,
+  matrixSectionAllStyle,
   matrixSummaryStyle,
   matrixVerbStyle,
-  matrixDescriptionStyle,
-  matrixNewBadgeStyle,
-  matrixDismissNewStyle,
-  matrixSectionAllStyle,
 } from './admin.styles';
 
 /**
@@ -207,7 +208,17 @@ export function PermissionMatrix({
             {/* ⛔ NO `data-code` HERE: the checkbox above already carries it, and a second one
                 on this element makes `[data-code="x"]` match twice — a Playwright strict-mode
                 violation in the specs that check a box by its code. */}
-            <code>{permissionDisplayName(row.code, language)}</code>
+            {/* 🔴 THE FINAL WALK §ب-١ — ORDINARY TEXT IN ARABIC, `<code>` IN ENGLISH.
+                A ratified Arabic NAME is not an identifier, and a monospace family chosen for
+                Latin identifiers renders Arabic letter by letter with its joins lost. In English
+                this still prints the CODE, so there the element is right as it was. */}
+            {language === 'AR' ? (
+              <span style={matrixNameStyle} data-permission-name={row.code}>
+                {permissionDisplayName(row.code, language)}
+              </span>
+            ) : (
+              <code>{permissionDisplayName(row.code, language)}</code>
+            )}
             {/* 🔴 OWNER DECISION 131 — «معلم عليها بالاخضر ع انها جديدة».
                 A permission this office has not decided on: it arrived after the office was
                 created, no role here holds it, and nobody here has ruled on it. Granting it to
@@ -269,7 +280,15 @@ export function PermissionMatrix({
             rendered as the checkbox labels beside it. That is «الاسم · الفعل» as decision 156's
             own example reads it: «أدوار المكتب» وتحتها «عرض · إنشاء · تعديل · تعطيل».
             `data-crud-family` keeps the family string for the tests. */}
-        <code>{familyDisplayName(row.family, language)}</code>
+        {/* Same as the toggle row above: the family's ratified Arabic name is text, and the
+            English half still renders an identifier. */}
+        {language === 'AR' ? (
+          <span style={matrixNameStyle} data-permission-family-name={row.family}>
+            {familyDisplayName(row.family, language)}
+          </span>
+        ) : (
+          <code>{familyDisplayName(row.family, language)}</code>
+        )}
         <span style={matrixVerbStyle}>
           {/* Full is a convenience over the same codes, never a separate grant — so a role can never
               hold "full" while missing one of the codes it is supposed to mean. */}

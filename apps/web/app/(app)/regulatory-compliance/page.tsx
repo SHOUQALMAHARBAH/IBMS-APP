@@ -93,10 +93,38 @@ const warningStyle: CSSProperties = {
   margin: '0.75rem 0',
   maxWidth: '48rem',
 };
+/*
+ * ⚠️ THE MARGIN IS LONGHAND, AND A GUARD DEMANDED IT.
+ *
+ * This read `margin: '0.35rem 0'`, and `noteUnderPanelStyle` below spreads it and overrides
+ * `marginTop`. `style-shorthand-conflict.test.ts` refuses that pair by name: React will not
+ * update a longhand on a rerender while the shorthand is set — «can lead to styling bugs», its
+ * own words — so the override is right once and wrong after any rerender that changes it.
+ *
+ * ⚠️ The pair predates the hoist: two sites already wrote `{ ...noteStyle, marginTop: … }`
+ * inline, where the guard (which reads named style objects) could not see it. Naming the object
+ * is what exposed it.
+ */
 const noteStyle: CSSProperties = {
-  margin: '0.35rem 0',
+  marginTop: '0.35rem',
+  marginBottom: '0.35rem',
+  marginLeft: 0,
+  marginRight: 0,
   maxWidth: '48rem',
   color: 'var(--ink-muted)',
+};
+/**
+ * The same note with a little air above it — for the two lines that sit directly under the
+ * standing panel rather than inside a block of their own.
+ *
+ * HOISTED rather than spread inline at each site: `check:screen-pass` refused this section at
+ * 1059 against a budget of 1058, and it was right to. Two sites wrote `{ ...noteStyle, marginTop:
+ * '0.5rem' }` by hand and a third was about to, which is three places for one decision about
+ * spacing.
+ */
+const noteUnderPanelStyle: CSSProperties = {
+  ...noteStyle,
+  marginTop: '0.5rem',
 };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
@@ -504,9 +532,35 @@ export default function RegulatoryCompliancePage() {
             </p>
           ) : null}
 
-          {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
-              system is content with, and explain neither. */}
-          {license.validPendingRenewalDecision ? (
+          {/*
+            Art. 11. Without this the screen would show an expiry in the past and a licence the
+            system is content with, and explain neither.
+
+            🔴 OWNER DECISION 159 RULING 1-ب — AND IT IS THE DECLARATION THAT PUTS IT THERE, NOT
+            THE DATE.
+
+            `validPendingRenewalDecision` is the DATE-ONLY rule (`isValidPendingRenewalDecision`
+            — past the printed expiry with a timely filing), which is precisely the rule decision
+            128 replaced. On its own it rendered «ما زال ساريًا» for an office the system was
+            REFUSING: filed on time with no proof, or with nobody having declared, and the
+            sentence said the licence was treated as current while the gate blocked all six
+            issuance acts.
+
+            ⛔ THE api FLAG IS NOT CHANGED, and that is measured rather than conceded. It has
+            exactly ONE product reader — this line — and it is asserted by
+            `broker-license.config.spec.ts`, `legal-figures.config.spec.ts` and
+            `regulatory-compliance.e2e-spec.ts` as the date-only fact it names;
+            `license-standing.config.ts`'s own header keeps it «preserved one level down» so an
+            officer can still see WHY the licence is past its date. Redefining it would move a
+            fact three specs name, to fix a condition that belongs to this render.
+
+            ⟶ So the SCREEN asks the four-condition state instead: the sentence stands exactly
+            when the state is `UNDER_STUDY`, which is after the declaration and never before.
+            The English half's words are not ruled and do not change; its condition moves with
+            the Arabic, because a condition is not a word.
+          */}
+          {license.validPendingRenewalDecision &&
+          standing?.renewalUnderStudy?.state === 'UNDER_STUDY' ? (
             <p
               style={warningStyle}
               role="status"
@@ -553,7 +607,35 @@ export default function RegulatoryCompliancePage() {
               {t('rcStandingDeemedCancelled')}
             </p>
           ) : null}
-          <p style={{ ...noteStyle, marginTop: '0.5rem' }} role="status">
+          {/*
+            🔴 OWNER DECISION 159 RULING 3 — WHO DECLARED, AND WHEN, UNDER THE STANDING.
+
+            «موافقة على الجملة الشغّالة» — her ruling approves the sentence already shipping on
+            the DPO assignment card, and `rcRenewalDeclaredBy` carries it byte for byte in its
+            own key (decision 157 ruling 2).
+
+            BOTH FACTS COME FROM THE STATE, which is the only place they exist: the name is
+            `actorNameShown`, STORED on the day of the declaration, so a renamed account or a
+            person who has left does not change who swore to it. The date goes through
+            `formatDate` (decision 156 ruling 1) — ⛔ never a slice of the ISO string, which
+            prints the UTC day and reads as yesterday in Amman's small hours.
+
+            The narrowing to `UNDER_STUDY` is what makes the two fields total rather than
+            nullable: there is no other state with an answer.
+          */}
+          {standing?.renewalUnderStudy?.state === 'UNDER_STUDY' ? (
+            <p
+              style={noteUnderPanelStyle}
+              role="status"
+              data-renewal-declared-by=""
+            >
+              {t('rcRenewalDeclaredBy', {
+                who: standing.renewalUnderStudy.declaredByName,
+                when: formatDate(standing.renewalUnderStudy.declaredAt, language),
+              })}
+            </p>
+          ) : null}
+          <p style={noteUnderPanelStyle} role="status">
             {t('rcStandingDerived')}
           </p>
 
@@ -1167,11 +1249,31 @@ export default function RegulatoryCompliancePage() {
               </Tr>
             </tbody>
           </table>
-          {/* A FILING IS NOT A DECISION — said in full, because an office that applied on time and
-              heard nothing is the one most likely to read a quiet screen as "handled". */}
-          <p style={{ margin: '0.35rem 0' }} data-renewal-notice-filing="">
-            {notice.renewalFiled ? t('rcNoticeFiled') : t('rcNoticeNotFiled')}
-          </p>
+          {/*
+            A FILING IS NOT A DECISION — said in full, because an office that applied on time and
+            heard nothing is the one most likely to read a quiet screen as "handled".
+
+            🔴 OWNER DECISION 160 RULING 1 — AND IT IS NOT SAID ONCE THE BLOCK IS LIFTED.
+
+            The final walk found `rcNoticeFiled` still on the screen after the declaration, in
+            `UNDER_STUDY`, saying «وهذا لا يَرفعُ المنعَ» — true of a filing and false of this
+            office, whose block the declaration HAD just lifted. That is decision 159's own open
+            question, answered by measurement rather than reworded.
+
+            ⛔ A CONDITION, NOT A REWORDING. Not one word of either sentence changes, and
+            `rcNoticeNotFiled` does NOT stand in its place: the filing IS recorded, so saying
+            there is none would be a second false sentence. The paragraph simply is not there,
+            and the «أقرّ به …» line above says what happened instead.
+
+            ⛔ The not-filed branch is untouched in every state — an office that never filed must
+            still be told so, however the rest of the panel reads.
+          */}
+          {notice.renewalFiled &&
+          standing?.renewalUnderStudy?.state === 'UNDER_STUDY' ? null : (
+            <p style={{ margin: '0.35rem 0' }} data-renewal-notice-filing="">
+              {notice.renewalFiled ? t('rcNoticeFiled') : t('rcNoticeNotFiled')}
+            </p>
+          )}
           {/* Where each figure comes from. 45 is art. 11; 30 is ours and says so, because a number
               shown beside a citation it does not have is this product asserting a provision. */}
           <p style={noteStyle}>{t('rcNoticeNoSource')}</p>

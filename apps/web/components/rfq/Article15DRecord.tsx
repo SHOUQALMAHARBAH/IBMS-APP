@@ -212,6 +212,36 @@ export function Article15DRecord({
       ) : null}
 
       {/*
+        🔴 OWNER DECISION 159 RULING 4 — AND WHAT WAS ATTACHED IS NAMED, WHERE THE MARK STOOD.
+
+        Before this, a successful attach left the record SILENT: the «بلا إثبات» paragraph
+        disappeared and nothing took its place, so the screen an inspector reads could not tell
+        an exemption whose evidence is on file from one that was never marked at all. The gap was
+        the whole value of the mark, running backwards.
+
+        ⛔ NO NEW WORD, AND THAT IS HER RULING RATHER THAN A SAVING. «موافقة على كلمات قائمة
+        الاختيار نفسها»: `a15dEvidenceLabel` is the sentence the creation window already ships
+        for this very evidence, and the «{date} · {channel}» row is the candidate row's own
+        shape, byte for byte — the same `formatDate` and the same `CHANNEL_LABEL_KEY`, so the
+        message the employee chose reads identically after it is attached.
+
+        It renders on `evidence`, which the api sends from the ATTACHED log, never on
+        `!lacksEvidence` — exemptions 1-4 carry no evidence by CHECK and are not marked either,
+        so that condition would print an evidence label on four exemptions that have none.
+      */}
+      {exemption.evidence ? (
+        <p style={a15dProseStyle} data-article-15-d="evidence-attached">
+          {t('a15dEvidenceLabel')}
+          {/* The colon-space this component already uses between a label and its value
+              (`a15dPremiumLabel` below) — ⛔ not a new separator and not a word. */}
+          {': '}
+          {formatDate(exemption.evidence.sentAt, language)}
+          {' · '}
+          {t(CHANNEL_LABEL_KEY[exemption.evidence.channel] ?? 'a15dEvidenceLabel')}
+        </p>
+      ) : null}
+
+      {/*
         🔴 OWNER DECISION 143 — «إرفاق المراسلة», THE WAY IN THE ROUTE DID NOT HAVE.
 
         `POST /rfqs/:id/article-15-d/evidence` shipped built, enforced and e2e-tested on

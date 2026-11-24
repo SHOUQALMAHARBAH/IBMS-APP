@@ -51,7 +51,7 @@ SITE = re.compile(r"style=\{\{")
 # unfocusable scroller around a focusable one is batch 3's keyboard trap one level out, and
 # axe is silent because the outer div rarely overflows. 16 more sites across 9 files still
 # do it — counted, not swept.
-SCREEN_BUDGET = 1058
+SCREEN_BUDGET = 1057
 # 1099 -> 1083: the sixteen redundant table scrollers (finding 7). `Table` has carried its own
 # `overflow-x: auto` with `tabIndex={0}` since batch 3, so an UNFOCUSABLE wrapper around it was
 # batch 3's keyboard trap one level out — and axe cannot see it, because it raises

@@ -104,6 +104,17 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
        * control would read «تقييم الاحتياجات ()». Measured before adding: 5 keys for 5 members.
        */
       ['NeedsAssessmentStatus', 5],
+      /*
+       * 🔴 ADDED 2026-11-24 WITH MESSAGE 52 §1 ITEM 8.
+       *
+       * `/financial-report`'s segment column printed `CORPORATE` / `INDIVIDUAL` AS STORED (the
+       * final walk, §ب-٨) and now renders `ENUM_LABEL.CustomerType`. That map is
+       * `satisfies Labels<'INDIVIDUAL' | 'CORPORATE'>` — a UNION, so unlike the `Labels<string>`
+       * maps above the compiler really does enforce coverage of those two. What it CANNOT see
+       * is the schema: a third member added to the enum would widen nothing here and the union
+       * would still be satisfied by two keys. The floor below is what catches that.
+       */
+      ['CustomerType', 2],
     ] as const) {
       const members = schemaEnumMembers(name);
       expect(members.length, `${name} parsed ${members.length} member(s)`).toBe(
@@ -120,6 +131,7 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     ['InteractionChannel', 'InteractionChannel'],
     ['DocumentCategory', 'DocumentCategory'],
     ['NeedsAssessmentStatus', 'NeedsAssessmentStatus'],
+    ['CustomerType', 'CustomerType'],
   ])(
     'ENUM_LABEL.%s is total over the database enum, and every key resolves in both languages',
     (mapName, enumName) => {

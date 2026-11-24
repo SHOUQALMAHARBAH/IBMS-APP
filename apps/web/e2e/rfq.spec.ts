@@ -506,6 +506,11 @@ async function mockRfqApi(
         insurerId: "ins-1",
         insurer,
         insuranceLine: "Property All Risks",
+        /* 🔴 THE FINAL WALK §ب-٧ — the Arabic line name, which the api now resolves from the
+           catalogue row the RFQ points at. A fixture carrying Arabic in `insuranceLine`
+           instead would pass against a card that never reads the pair, which is the vacuity
+           message 49 §1 item 5 measured in four document fixtures. */
+        insuranceLineAr: "تأمين جميع أخطار الممتلكات",
         premium: "12000.000",
         currency: "JOD",
         commissionRatePercent: "17.5",
@@ -2988,9 +2993,17 @@ test("files claim documentation and tracks the mandatory checklist", async ({
     .click();
   await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
-  // the documentation checklist shows the missing mandatory docs
+  /*
+   * The documentation checklist shows the missing mandatory docs — BY NAME.
+   *
+   * 🔴 THIS ASSERTION PINNED THE DEFECT AND IS CORRECTED RATHER THAN DELETED. The final walk
+   * §ب-٦ read «التوثيق · ناقص claim_form, medical_report, invoice» off the claim card: the
+   * header printed the STORED CODES directly above a list whose every row already carried the
+   * shipping name. The codes are the names now, through the same `ENUM_LABEL.ClaimDocType` the
+   * list uses.
+   */
   await expect(
-    page.getByText("missing claim_form, photo, repair_estimate"),
+    page.getByText("missing Claim form, Photo, Repair estimate"),
   ).toBeVisible();
 
   await page.getByLabel("Document type").selectOption("claim_form");
@@ -3002,7 +3015,9 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await expect(
     page.getByText("Documentation in progress", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
+  await expect(
+    page.getByText("missing Photo, Repair estimate"),
+  ).toBeVisible();
 });
 
 test("tracks the adjuster survey, submits for assessment once the checklist is complete, and records the verdict", async ({
@@ -3553,6 +3568,16 @@ async function mockMarkedRfq(
           ...EXEMPTION_5_UNPROVEN,
           evidenceCommunicationLogId: state.attachedTo,
           lacksEvidence: state.attachedTo === null,
+          /*
+           * 🔴 OWNER DECISION 159 RULING 4 — what the api sends once the message is attached:
+           * the chosen log's own means and date, flattened off the join. `null` while the mark
+           * is still on, which is the state every test above this one is in.
+           */
+          evidence:
+            state.attachedTo === null
+              ? null
+              : (EVIDENCE_CANDIDATES.find((c) => c.id === state.attachedTo) ??
+                null),
         },
         article15DAlerts: [],
       },
@@ -3967,4 +3992,126 @@ test("the art. 15/d question is in view the moment the shortlist raises it", asy
   const thresholdBox = await page.locator("#threshold").boundingBox();
   expect(thresholdBox).not.toBeNull();
   expect(box!.y).toBeLessThan(thresholdBox!.y);
+});
+
+/**
+ * 🔴 OWNER DECISION 159 RULING 4 — AND WHAT WAS ATTACHED IS NAMED, WHERE THE MARK STOOD.
+ *
+ * Before this the attach left the record SILENT: the «بلا إثبات» paragraph disappeared and
+ * nothing took its place, so the screen an inspector reads could not tell an exemption whose
+ * evidence is on file from one that was never marked.
+ *
+ * Rendered in ARABIC, because the words are the ruling: «موافقة على كلمات قائمة الاختيار نفسها»
+ * — the evidence label the creation window already ships, and the same «{date} · {channel}» the
+ * candidate row prints. An English render would prove a paragraph exists and nothing about which
+ * words are in it.
+ */
+test("OWNER DECISION 159 ruling 4 — the attached message is named where «بلا إثبات» stood", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  const state = await mockMarkedRfq(page);
+  await page.goto("/rfqs/rfq-1");
+
+  const record = page.locator('[data-article-15-d="record"]');
+  await expect(record).toBeVisible();
+  // BEFORE: the mark is showing and nothing names an attachment, because there is none.
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toBeVisible();
+  await expect(
+    record.locator('[data-article-15-d="evidence-attached"]'),
+  ).toHaveCount(0);
+
+  await record.locator('[data-evidence-id="log-1"]').check();
+  await record.locator('[data-article-15-d="attach-button"]').click();
+
+  // AFTER: the mark is gone and the message is named in its place.
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toHaveCount(0);
+  const named = record.locator('[data-article-15-d="evidence-attached"]');
+  await expect(named).toBeVisible();
+  // `a15dEvidenceLabel`, the creation window's own sentence — ⛔ no new word.
+  await expect(named).toContainText("طلب العميل، واصلاً بوسيلة تبليغ معتمدة");
+  // And the same two facts the candidate row printed: the date, then the means. The regex
+  // tolerates the bidi marks `ar-JO-u-nu-latn` writes around each solidus.
+  await expect(named).toContainText(/1.?\/3.?\/2026/);
+  await expect(named).toContainText("بريد إلكتروني");
+  // The attach really happened — so this is not a screen hiding the mark locally.
+  expect(state.attachedTo).toBe("log-1");
+});
+
+/**
+ * 🔴 THE FINAL WALK §ب-٧ — THE RECOMMENDATION CARD'S LINE, IN ARABIC.
+ *
+ * «Property All Risks · JOD … · 12.50% عمولة» on the opportunity page, which is the screen the
+ * whole demo path runs through. The RFQ's two line FK ids were already selected and the
+ * CATALOGUE ROWS they point at were not, so `insuranceLineNameAr` had nothing to read.
+ */
+test("THE FINAL WALK §ب-٧ — the Arabic recommendation card names the line in Arabic", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page, { seedApprovedRecommendation: true });
+  await page.goto("/opportunities/opp-1");
+
+  // Anchored on the rationale, which is on the SAME render as the line: an unhydrated page
+  // would satisfy the absence below and prove nothing.
+  await expect(page.locator("main")).toContainText("Widest cover for the price");
+
+  /*
+   * SCOPED TO THE CARD'S OWN LINE, and that scope is a finding rather than a convenience: the
+   * RFQ LIST higher up the same page still prints «Property All Risks», because `GET /rfqs`
+   * sends no `insuranceLineAr` for a list row. ⚠️ Reported and NOT built — §1 item 9 widens the
+   * RECOMMENDATION query only, and a page-wide absence here would have been a claim about a
+   * query nobody touched.
+   */
+  const line = page.locator("[data-recommendation-line]");
+  await expect(line).toBeVisible();
+  await expect(line).toContainText("تأمين جميع أخطار الممتلكات");
+  // ⛔ AND THE STORED ENGLISH IS NOT BESIDE IT. `lineDisplayName`'s fallback is ONE WAY, so an
+  // Arabic render never shows both — which is what a per-field coalesce would have produced.
+  await expect(line).not.toContainText("Property All Risks");
+});
+
+/**
+ * 🔴 THE FINAL WALK §ب-٢ — A 403 UNDER «المطالبات» PRINTED THE SERVER'S OWN ENGLISH.
+ *
+ * «You do not hold a permission required to perform this action», rendered under the claims
+ * heading on the opportunity page, for `demo.placement@office-a`. `ClaimSection` showed
+ * `err.message` for every `ApiError`, so the api's English refusal reached an Arabic screen —
+ * on the LAST section of the one screen the whole demo path runs through.
+ *
+ * Rendered in ARABIC, because that is where the defect is: in English the server's sentence is
+ * merely unhelpful, and here it is the wrong language.
+ */
+test("THE FINAL WALK §ب-٢ — the claims section refuses in Arabic, not in the server's English", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page);
+  /*
+   * REGISTERED AFTER `mockRfqApi`, which is what makes it win. 403 on the POLICIES read, which
+   * is the first of the two this section needs — the refusal names BOTH codes, because the
+   * reads are sequential in one `try` and the section cannot render without either.
+   */
+  await page.route("http://localhost:4000/policies**", (route) =>
+    route.fulfill({
+      status: 403,
+      json: {
+        message: "You do not hold a permission required to perform this action",
+      },
+    }),
+  );
+  await page.goto("/opportunities/opp-1");
+
+  const main = page.locator("main");
+  // POSITIVE FIRST, from the same render: the page itself loaded.
+  await expect(main).toContainText("فرصة تجارية");
+  // ⛔ The server's English sentence is nowhere on the screen.
+  await expect(main).not.toContainText("You do not hold a permission");
+  // And the refusal is the decided Arabic shape: the act, then who can grant it.
+  await expect(main).toContainText("عرض المطالبات");
+  await expect(main).toContainText("من يدير الصلاحيات في مكتبك");
 });

@@ -61,6 +61,10 @@ export interface Recommendation {
     insurerId: string;
     insurer: RecommendationInsurer;
     insuranceLine: string;
+    /** THE FINAL WALK §ب-٧ — the line's Arabic name, resolved by the api from the catalogue
+     *  row the RFQ points at. `null` when no Arabic name is known, and the screen then shows
+     *  the stored English through `lineDisplayName`. */
+    insuranceLineAr: string | null;
     premium: string;
     currency: string;
     commissionRatePercent: string | null;

@@ -1166,7 +1166,17 @@ export class RfqService {
     RfqForWire & {
       opportunity: { customerId: string };
       article15DExemption:
-        (RfqArticle15DExemption & { lacksEvidence: boolean }) | null;
+        | (RfqArticle15DExemption & {
+            lacksEvidence: boolean;
+            /** 🔴 OWNER DECISION 159 RULING 4 — the attached message, by its date and its
+             *  means. `null` for exemptions 1-4 (no evidence by CHECK) and for an exemption 5
+             *  still carrying the mark. */
+            evidence: { channel: InteractionChannel; sentAt: Date } | null;
+            /** ⛔ The relation itself does not travel. Named here as `undefined` so the
+             *  compiler keeps it off the wire rather than letting the raw join ride along. */
+            evidenceCommunicationLog: undefined;
+          })
+        | null;
       article15DAlerts: Article15DPremiumAlert[];
     }
   > {
@@ -1223,6 +1233,21 @@ export class RfqService {
           : {
               ...article15DExemption,
               lacksEvidence: exemptionLacksEvidence(article15DExemption),
+              /*
+               * 🔴 OWNER DECISION 159 RULING 4 — THE ATTACHED MESSAGE, NAMED.
+               *
+               * «موافقة على كلمات قائمة الاختيار نفسها» — her ruling names the words the
+               * CANDIDATE ROW already prints, so the screen needs no new word: the same date
+               * and the same means, now beside the evidence label instead of beside a radio.
+               *
+               * ⛔ AND THE JOIN ITSELF LEAVES THE WIRE. `evidenceCommunicationLog` is set
+               * `undefined` so the relation's own key cannot ride along beside the resolved
+               * one — the raw-join-as-payload shape message 45 §2 caught its own author
+               * committing. `null` is exemptions 1-4 and an unattached exemption 5 alike, and
+               * the screen tells them apart by `lacksEvidence`, which is already derived.
+               */
+              evidence: article15DExemption.evidenceCommunicationLog,
+              evidenceCommunicationLog: undefined,
             },
       article15DAlerts,
     };

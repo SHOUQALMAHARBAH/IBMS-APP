@@ -39,7 +39,7 @@ import {
   quoteFieldStyle,
 } from "../quotation/quotation.styles";
 import { DeactivatedInsurerBadge } from "../insurer/DeactivatedInsurerBadge";
-import { insurerDisplayName } from '../../lib/i18n/names';
+import { insurerDisplayName, lineDisplayName } from '../../lib/i18n/names';
 
 const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
   coverage: "recFactorCoverage",
@@ -396,8 +396,11 @@ export function RecommendationSection({
                     : t("recBlockedBadge")}
             </span>
           </div>
-          <p style={{ margin: "0.4rem 0" }}>
-            {rec.recommendedQuotation.insuranceLine} ·{" "}
+          <p style={{ margin: "0.4rem 0" }} data-recommendation-line="">
+            {/* THE FINAL WALK §ب-٧ — the line in Arabic where the api knows one.
+                `lineDisplayName` is the one helper (message 45 §2); ⛔ never `.insuranceLine`
+                raw, which is what `check:bilingual-names` matches. */}
+            {lineDisplayName(rec.recommendedQuotation, language)} ·{" "}
             {formatMoney(
               rec.recommendedQuotation.premium,
               language,

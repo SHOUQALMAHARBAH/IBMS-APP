@@ -150,7 +150,11 @@ describe('CRITERION 3 — an old transaction computes at the value in force on I
     issuedAt: new Date('2024-01-01T00:00:00.000Z'),
     renewalProofDocumentId: 'doc-proof-1',
     renewalReferenceNumber: 'CBJ/IN/2026/4471',
-    hasRenewalDeclaration: true,
+    // OWNER DECISION 159 ruling 3 — the declaration row; its presence is the old boolean.
+    renewalDeclaration: {
+      actorNameShown: 'مراد سالم الخطيب',
+      declaredAt: new Date('2027-01-20T00:00:00.000Z'),
+    },
   };
 
   it('a renewal filed on 20 November is TIMELY under a 45-day rule and LATE under a 60-day one', () => {

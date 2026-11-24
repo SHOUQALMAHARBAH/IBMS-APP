@@ -12,6 +12,7 @@ import {
   type Policy,
 } from '../../lib/policy/policy-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { permissionRefusalAllOf } from '../../lib/i18n/permission-refusal';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
@@ -87,7 +88,32 @@ export function ClaimSection({
     } catch (err) {
       setPolicy(null);
       setRows([]);
-      setLoadError(err instanceof ApiError ? err.message : t('claimLoadError'));
+      /*
+       * 🔴 THE FINAL WALK §ب-٢ — A 403 IS A REFUSAL, NOT AN ERROR MESSAGE.
+       *
+       * This rendered `err.message` for every `ApiError`, so a reader without the grant met the
+       * SERVER'S own English sentence — «You do not hold a permission required to perform this
+       * action» — under «المطالبات», in Arabic surroundings, on the last section of the
+       * opportunity page. Measured on the demo path: the placement account meets it every time.
+       *
+       * `permissionRefusalAllOf`, and the mode is the measured one rather than the convenient
+       * one: the two reads above are SEQUENTIAL in one `try`, so the section cannot render
+       * without BOTH `policy.read` (`GET /policies`) and `claim.read` (`GET /claims`) — which is
+       * the `allOf` shape `permission-refusal.ts` documents, and `anyOf` would tell the reader
+       * that either grant alone would do.
+       *
+       * ⛔ EVERY OTHER `ApiError` KEEPS `claimLoadError`. A 500 or a dropped connection is not a
+       * missing grant, and naming one would send a reader to their administrator over a fault
+       * nobody there can fix.
+       */
+      setLoadError(
+        err instanceof ApiError && err.status === 403
+          ? permissionRefusalAllOf(t, 'claimSectionRefusalAct', [
+              'policy.read',
+              'claim.read',
+            ])
+          : t('claimLoadError'),
+      );
     }
   }, [opportunityId, t]);
 

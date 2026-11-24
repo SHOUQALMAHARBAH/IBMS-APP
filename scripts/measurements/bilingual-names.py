@@ -119,9 +119,18 @@ LINE_DECLARED: dict[str, str] = {
         "the policy dashboard's cancellation rows. That aggregate sends no `insuranceLineAr`.",
     os.path.join("apps", "web", "app", "(app)", "renewal-cases", "page.tsx"):
         "a renewal case's line. `GET /renewal-cases` sends no `insuranceLineAr`.",
-    os.path.join("apps", "web", "components", "recommendation", "RecommendationSection.tsx"):
-        "the recommended QUOTATION's line. The quotation wire sends no `insuranceLineAr`; the "
-        "RFQ beside it does, and the two are different payloads.",
+    # 🔴 PAID 2026-11-24, AND THE STALE DIRECTION IS WHAT FORCED THE DELETION INTO THIS COMMIT.
+    #
+    # `RecommendationSection.tsx` was here with the reason «the quotation wire sends no
+    # `insuranceLineAr`». The final walk (§ب-٧) read «Property All Risks · JOD … · 17.5% عمولة»
+    # off the opportunity page, and the measurement was that the RFQ's two line FK ids were
+    # ALREADY selected by `RECOMMENDATION_INCLUDE` and the catalogue rows they point at were not
+    # — so the debt was two relations wide, not a payload redesign. The include names them now
+    # and `insuranceLineNameAr` resolves them, so the row came off and the call went in.
+    #
+    # ⛔ THE OTHER FOUR STAY. Each is a real api debt measured in message 47 §3: their payloads
+    # genuinely carry no Arabic line name, and writing `lineDisplayName` there would claim a
+    # by-language choice the screen cannot make.
     os.path.join("apps", "web", "components", "ui", "EntitySearch.tsx"):
         "the policy picker's detail line. `GET /policies/search` returns a picker projection, "
         "which carries the identifier and the name a person searches by and no Arabic line.",

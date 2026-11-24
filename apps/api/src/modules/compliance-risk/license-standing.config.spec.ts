@@ -124,7 +124,11 @@ describe('the term alone decides, when the regulator has done nothing', () => {
         renewalRequestedAt: d('2026-11-01'),
         renewalProofDocumentId: 'doc-proof-1',
         renewalReferenceNumber: 'CBJ/IN/2026/4471',
-        hasRenewalDeclaration: true,
+        // OWNER DECISION 159 ruling 3 — the row, whose presence is the old boolean.
+        renewalDeclaration: {
+          actorNameShown: 'مراد سالم الخطيب',
+          declaredAt: d('2027-01-20'),
+        },
       }),
       [],
       d('2027-02-01'),

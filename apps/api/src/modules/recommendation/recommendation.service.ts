@@ -45,6 +45,7 @@ import type { DraftRecommendationDto } from './dto/draft-recommendation.dto';
 import type { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-interest.dto';
 import type { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
@@ -62,6 +63,10 @@ export interface RecommendationView {
      *  the Prisma payload here hid a blank insurer name from both test suites. */
     insurer: ReturnType<typeof insurerIdentity>;
     insuranceLine: string;
+    /** 🔴 THE FINAL WALK §ب-٧ — the line's Arabic name, or null when none is known. Resolved
+     *  by `insuranceLineNameAr` from the ONE source that wins, exactly as the policy and RFQ
+     *  reads do; the screen falls back to the stored English and ⛔ invents nothing. */
+    insuranceLineAr: string | null;
     premium: string;
     currency: string;
     commissionRatePercent: string | null;
@@ -435,6 +440,7 @@ export class RecommendationService {
         // `rec.recommendedQuotation.insurer.name`, which the raw join does not have.
         insurer: insurerIdentity(q.insurer),
         insuranceLine: q.rfq.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(q.rfq),
         premium: formatMoney(q.premium),
         currency: q.currency,
         commissionRatePercent:

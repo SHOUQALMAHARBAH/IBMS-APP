@@ -28,6 +28,7 @@ import { permissionDisplayName } from '../../../../lib/admin/permission-names';
 import {
   createMatrixStyle,
   generatedNameStyle,
+  matrixNameStyle,
 } from '../../../../components/admin/admin.styles';
 import {
   machineNameProblem,
@@ -672,7 +673,14 @@ export default function RoleAdminPage() {
                 <p role="status">{t('roleMatrixNeedsCatalogue')}</p>
               )}
             </fieldset>
-            <button type="submit" disabled={busy || nameProblem !== null}>
+            {/* An explicit hook, for the same reason `data-create-name-en` above has one: the
+                edit panel below carries a submit button too, and `base-style.spec.ts` reads
+                this one's DISABLED state. */}
+            <button
+              type="submit"
+              data-create-role-submit
+              disabled={busy || nameProblem !== null}
+            >
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
@@ -729,10 +737,27 @@ export default function RoleAdminPage() {
                   >
                     <Td>
                       {/* OWNER DECISION 127 — the approver's permission by its ratified name.
-                          English keeps the code: no decision rules an English name. */}
-                      <code>
-                        {permissionDisplayName(row.checkerPermission, language)}
-                      </code>
+                          English keeps the code: no decision rules an English name.
+
+                          🔴 THE FINAL WALK §ب-١, APPLIED HERE TOO. This is the SECOND site on
+                          the same screen where a ratified Arabic name sat inside `<code>`, and
+                          the cause is identical: a monospace family chosen for Latin
+                          identifiers has no Arabic face, so the letters lose their joins. The
+                          walk named the matrix; this is the dual-control table two sections
+                          below it, on the screen the presenter opens. Reported rather than
+                          found, because it was not in the walk's list. */}
+                      {language === 'AR' ? (
+                        <span
+                          style={matrixNameStyle}
+                          data-permission-name={row.checkerPermission}
+                        >
+                          {permissionDisplayName(row.checkerPermission, language)}
+                        </span>
+                      ) : (
+                        <code>
+                          {permissionDisplayName(row.checkerPermission, language)}
+                        </code>
+                      )}
                     </Td>
                     <Td>{row.holderCount}</Td>
                     <Td>

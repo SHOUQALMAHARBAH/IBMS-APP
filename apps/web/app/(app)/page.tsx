@@ -91,9 +91,15 @@ export default function HomePage() {
                  * and so was every custom role. There is no fallback here because there is
                  * nothing to fall back to: `Role.nameAr` and `Role.nameEn` are both NOT NULL.
                  */
+                /* 🔴 THE FINAL WALK §ب-١١ — «تسجيل الدخول باسم مدير المكتب, …».
+                   Two Arabic role names joined with a LATIN comma, which in a right-to-left
+                   line sits on the wrong side of the word it follows. «، » is the Arabic comma
+                   this dictionary already joins lists with (`permissionRefusalAnyOf` and
+                   `permissionRefusalAllOf` both use it) — ⛔ not a new word, and the English
+                   half keeps the Latin comma it is right to have. */
                 user.roleNames
                   .map((r) => (language === 'AR' ? r.ar : r.en))
-                  .join(', ')
+                  .join(language === 'AR' ? '، ' : ', ')
               : t('homeNoRole'),
         })}
       </p>

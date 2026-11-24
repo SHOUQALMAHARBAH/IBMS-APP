@@ -19,6 +19,20 @@ import { PrismaService } from '../prisma/prisma.service';
  * anything else. Nothing in this file names an office, deliberately: a repository that could
  * would be a repository somebody could pass the wrong one to.
  */
+/**
+ * ONE exemption, with the attached message named by its date and its means and by nothing else.
+ *
+ * 🔴 OWNER DECISION 159 RULING 4. The relation is the CommunicationLog the evidence points at,
+ * narrowed to the two columns the record prints; `null` covers both «exemptions 1-4, which carry
+ * no evidence by CHECK» and «exemption 5 with the mark still on it».
+ */
+export type Article15DExemptionRow = RfqArticle15DExemption & {
+  evidenceCommunicationLog: {
+    channel: InteractionChannel;
+    sentAt: Date;
+  } | null;
+};
+
 @Injectable()
 export class Article15DRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -69,9 +83,27 @@ export class Article15DRepository {
     });
   }
 
-  findExemptionForRfq(rfqId: string): Promise<RfqArticle15DExemption | null> {
+  /**
+   * 🔴 OWNER DECISION 159 RULING 4 — AND THE ATTACHED MESSAGE COMES BACK NAMED.
+   *
+   * The attach used to leave the record silent: the «بلا إثبات» mark disappeared and nothing
+   * stood where it had been, so an inspector reading the screen could not tell an exemption whose
+   * evidence was on file from one that had never been marked.
+   *
+   * ⛔ `select` NAMES TWO COLUMNS, for the SAME reason the picker's does: the `body` of a
+   * communication is Confidential under `sensitive-data-handling.md` — loss history and sums
+   * insured live there — and this read is served to whoever may read the request. The screen
+   * identifies the message by WHEN it came and HOW, exactly as the candidate row did before it
+   * was chosen, which is also why no new word was needed.
+   */
+  findExemptionForRfq(rfqId: string): Promise<Article15DExemptionRow | null> {
     return this.prisma.client.rfqArticle15DExemption.findUnique({
       where: { rfqId },
+      include: {
+        evidenceCommunicationLog: {
+          select: { channel: true, sentAt: true },
+        },
+      },
     });
   }
 

@@ -189,7 +189,12 @@ export interface LicenseTermRow {
    *  proof», which is the non-widening direction: absent must never mean permitted. */
   renewalProofDocumentId?: string | null;
   renewalReferenceNumber?: string | null;
-  hasRenewalDeclaration?: boolean;
+  /** 🔴 OWNER DECISION 159 RULING 3 — the ROW, not a boolean: present means somebody declared,
+   *  and it carries the two facts the screen then prints. One field, one source. */
+  renewalDeclaration?: {
+    actorNameShown: string;
+    declaredAt: Date;
+  } | null;
 }
 
 export interface DerivedLicenseStanding {
@@ -598,7 +603,7 @@ function deriveOfficeWideStanding(
       renewalRequestedAt: term.renewalRequestedAt,
       renewalProofDocumentId: term.renewalProofDocumentId ?? null,
       renewalReferenceNumber: term.renewalReferenceNumber ?? null,
-      hasRenewalDeclaration: term.hasRenewalDeclaration ?? false,
+      renewalDeclaration: term.renewalDeclaration ?? null,
     },
     acts,
     now,

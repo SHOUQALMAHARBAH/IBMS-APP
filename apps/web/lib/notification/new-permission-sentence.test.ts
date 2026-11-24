@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 import { describePermission } from '../admin/permission-descriptions';
 import { permissionNameAr } from '../admin/permission-names';
+import { DESTINATION_GROUPS } from '../../components/app/destinations';
 import { translate, type TranslationKey } from '../i18n/translations';
 import { newPermissionSentence } from './new-permission-sentence';
 
@@ -36,6 +37,21 @@ const tEn = ((key: TranslationKey, vars?: Record<string, string>) =>
 ) => string;
 
 const notice = (code: string) => ({ code, screen: null, routes: ['GET /x'] });
+
+/** The same notice with a screen the nav map really has, so the clause IS rendered. */
+const noticeWithScreen = (code: string, screen: string) => ({
+  code,
+  screen,
+  routes: ['GET /x'],
+});
+
+const AR_TEMPLATES = [
+  'notifNewPermissionSentence',
+  'notifNewPermissionSentenceNoName',
+] as const;
+
+const CLAUSE_AR = ' تتحكّم في: {controls}.';
+const CLAUSE_EN = ' It controls: {controls}.';
 
 describe('owner decision 156 ruling 2 — the new-permission sentence', () => {
   it('prints a sliced name ONCE, not twice — license-renewal.declare', () => {
@@ -105,5 +121,104 @@ describe('owner decision 156 ruling 2 — the new-permission sentence', () => {
     const sentence = newPermissionSentence(notice(code), tEn, 'EN');
     expect(sentence).not.toContain(permissionNameAr(code));
     expect(sentence).toContain(describePermission(code, 'EN') ?? '');
+  });
+});
+
+/**
+ * 🔴 OWNER DECISION 160 RULING 2 — THE ARABIC SENTENCE CARRIES NO ROUTE AND NO CODE.
+ *
+ * The final walk read «تتحكّم في: POST /rfqs (the art. 15/d declaration branch)» out of the
+ * office administrator's bell. Her ruling: the Arabic sentence carries no api route, no
+ * permission code and no Latin word, and where no screen can be named in Arabic the «تتحكّم
+ * في:» clause is not rendered at all.
+ */
+describe('owner decision 160 ruling 2 — no route in the Arabic sentence', () => {
+  /*
+   * ⛔ THE NEW TEMPLATES ARE DERIVED AND CHECKED, NEVER COMPARED TO A COPY OF HER WORDS.
+   *
+   * Each no-screen template must be exactly its parent with her ruled clause deleted — so a
+   * second word reworded beside the deletion fails here, which is «لا تتغيّر كلمة» made
+   * checkable rather than promised in a comment.
+   */
+  it('each no-screen template is its parent minus exactly the ruled clause', () => {
+    for (const key of AR_TEMPLATES) {
+      for (const [language, clause] of [
+        ['AR', CLAUSE_AR],
+        ['EN', CLAUSE_EN],
+      ] as const) {
+        const parent = translate(language, key);
+        const child = translate(language, `${key}NoScreen` as TranslationKey);
+        // NON-VACUITY: the clause must really be in the parent, or the derivation below is the
+        // identity function and this test would pass against two identical strings.
+        expect(parent, `${key}/${language} no longer carries the clause`).toContain(
+          clause,
+        );
+        expect(child).toBe(parent.replace(clause, ''));
+        expect(child).not.toBe(parent);
+      }
+    }
+  });
+
+  /*
+   * ALL 234 CODES, which is the only honest denominator: the bell fires for whichever code an
+   * office has not decided on yet, and «the one I checked reads well» is not a property of the
+   * screen.
+   */
+  it('no Arabic sentence for any of the 234 codes carries a route or its own code', () => {
+    expect(PERMISSION_CATALOGUE.length).toBe(234);
+    const latinWord = /[A-Za-z]{2,}/;
+    const offenders: string[] = [];
+    for (const entry of PERMISSION_CATALOGUE) {
+      const sentence = newPermissionSentence(notice(entry.code), t, 'AR');
+      // The route the fixture supplies, the HTTP verb, and the code itself.
+      if (
+        sentence.includes('GET /x') ||
+        sentence.includes(entry.code) ||
+        latinWord.test(sentence)
+      ) {
+        offenders.push(`${entry.code}: ${sentence}`);
+      }
+    }
+    expect(offenders, 'an Arabic bell sentence carries Latin text').toEqual([]);
+  });
+
+  it('and the «تتحكّم في:» clause is absent, not empty', () => {
+    const sentence = newPermissionSentence(
+      notice('license-renewal.declare'),
+      t,
+      'AR',
+    );
+    expect(sentence).not.toContain('تتحكّم في');
+    // ⛔ And the rest of her sentence is still there — the clause went, the sentence did not.
+    expect(sentence).toContain('صلاحية جديدة في النظام');
+    expect(sentence).toContain('قرّر لمن تعطيها من مصفوفة الصلاحيات');
+  });
+
+  /*
+   * THE OTHER DIRECTION, and without it the implementation could satisfy everything above by
+   * never rendering the clause at all — which would delete a sentence of hers rather than
+   * conditioning it.
+   */
+  it('a permission that DOES open a screen still names it, in Arabic', () => {
+    const screen = DESTINATION_GROUPS.flatMap((g) => g.items)[0];
+    const sentence = newPermissionSentence(
+      noticeWithScreen('customer.read', screen.href),
+      t,
+      'AR',
+    );
+    expect(sentence).toContain('تتحكّم في');
+    expect(sentence).toContain(translate('AR', screen.labelKey));
+  });
+
+  it('a screen the nav map does not have prints no path either', () => {
+    // The href fallback is gone: an unmapped screen has no Arabic title, so printing its path
+    // would be the same Latin-in-Arabic defect reached by a different branch.
+    const sentence = newPermissionSentence(
+      noticeWithScreen('customer.read', '/not-in-the-nav-map'),
+      t,
+      'AR',
+    );
+    expect(sentence).not.toContain('/not-in-the-nav-map');
+    expect(sentence).not.toContain('تتحكّم في');
   });
 });

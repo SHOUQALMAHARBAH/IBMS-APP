@@ -12,6 +12,20 @@ const RECOMMENDATION_INCLUDE = {
       // identity from the RFQ it was placed off rather than resolving it again. Selecting only
       // `insuranceLine` here is what left `Policy.insuranceLineId` unpopulated after migration
       // `20261019100000` — the writer had nothing to copy.
+      /*
+       * 🔴 THE FINAL WALK §ب-٧ — AND IT IS THE ONLY QUERY WIDENED IN THIS BATCH.
+       *
+       * «Property All Risks · JOD … · 12.50% عمولة» on the recommendation card, on the
+       * opportunity page the whole demo path runs through. The two FK ids were already
+       * selected and the CATALOGUE ROWS they point at were not, so `insuranceLineNameAr`
+       * had nothing to read — the same shape message 49 §1 item 4 reported and declared.
+       *
+       * ⚠️ `select` AND `include` CANNOT BOTH APPEAR ON ONE PRISMA ARGUMENT, so the two
+       * relations are named inside this `select` rather than through
+       * `INSURANCE_LINE_NAME_INCLUDE`. The SELECTED COLUMNS are the same two the shared
+       * constant names, and `insuranceLineNameAr` is still the one resolver — ⛔ no second
+       * implementation of «which source wins».
+       */
       rfq: {
         select: {
           id: true,
@@ -19,6 +33,8 @@ const RECOMMENDATION_INCLUDE = {
           insuranceLineId: true,
           officeInsuranceLineId: true,
           opportunityId: true,
+          insuranceLine_managed: { select: { nameEn: true, nameAr: true } },
+          officeInsuranceLine: { select: { nameEn: true, nameAr: true } },
         },
       },
     },
