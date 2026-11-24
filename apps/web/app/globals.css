@@ -497,6 +497,146 @@ h4 { font-size: var(--text-md); }
 }
 
 /*
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * OWNER DECISION 161 RULING 2 — ONE BASE SHAPE FOR THE CONTROLS NOBODY STYLED.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * «الشكل بيخزي … حاسة بخزي و مش خرج نورجيه لحد الصراحة» — her own words, about the look rather
+ * than the defects.
+ *
+ * ## WHAT WAS MEASURED, AND IT IS ONE CAUSE RATHER THAN FIVE HUNDRED
+ *
+ * This file was 729 lines with NOT ONE RULE for a button, a field, a select, a long-text box or
+ * the disabled state. Re-derived in this repo on 2026-11-24, with JSX braces respected:
+ *
+ *     button    418 tags, 221 carrying neither `style` nor `className`
+ *     input     335 tags, 242   (plus 41 bare checkbox/radio/file, excluded below)
+ *     select    103 tags,  89
+ *     textarea   45 tags,  30
+ *     ───────────────────────────────────────
+ *     total     901 tags, 582
+ *
+ * Every one of those 582 was drawn by the browser's own default: a small grey button, a pale
+ * disabled one, and — when it fell into a flex column — a button stretched across the width of
+ * the screen, which is what the walk recorded as the «→ كل المطالبات» bar.
+ *
+ * ⛔ AND IT IS NOT HAND-WRITTEN COLOURS. Measured: three literal colours in the whole of
+ * `apps/web`, none of them on a field, and the two shared shapes that DO exist
+ * (`auth-form.styles.ts:99-130`) read the dark-theme tokens correctly. So there was nothing to
+ * correct — there was something missing.
+ *
+ * ## HOW IT YIELDS TO AN ELEMENT'S OWN LOOK: `:not([style]):not([class])`
+ *
+ * Her ruling: «والعنصر الذي له شكل خاصّ يبقى كما هو» — an element with its own look keeps it.
+ * This selector is the MEASUREMENT'S OWN DEFINITION of «بلا شكل», so the rule matches exactly
+ * the 582 bare controls and CANNOT reach a styled one at all — which is stronger than losing a
+ * cascade to one. An inline `style` already beats any stylesheet; a `className` does NOT beat a
+ * rule it does not mention, so a class setting only `background` would otherwise have taken
+ * this rule's padding, border and radius with it, and that is not «keeping» anything.
+ *
+ * ⛔ NO `!important` ANYWHERE, which is the same decision read from the other side.
+ *
+ * 🔴 AND IT IS NOT WRAPPED IN `:where()`, WHICH IS A MEASUREMENT RATHER THAN A PREFERENCE.
+ *
+ * The first version was `:where(button:not([style]):not([class]), …)` — specificity zero, so
+ * anything that ever did apply would win outright. It COMPUTED correctly and PAINTED WRONG:
+ * measured in Chromium, a bare `<input>` in the dark theme reported
+ * `getComputedStyle(el).backgroundColor === 'rgb(30, 39, 51)'` — this file's `--surface-card` —
+ * while the pixel under it was `rgb(59, 59, 59)`, Chromium's own native dark field colour. The
+ * same declarations in a rule NOT wrapped in `:where()` paint at `rgb(30, 39, 51)`.
+ *
+ * ⟶ Chromium decides whether to drop a form control's NATIVE APPEARANCE by asking whether the
+ *   author gave it a background, and a declaration reached through `:where()` does not answer
+ *   that question. So the owner's own «الخانات الفاتحة في الوضع الداكن» would have survived a
+ *   rule that every computed-style check called correct. ⛔ Do not re-wrap this.
+ *
+ * ⚠️ A COMPUTED-STYLE ASSERTION CANNOT SEE THIS. `base-style.spec.ts` reads the PIXEL as well,
+ * for exactly that reason.
+ *
+ * ## THE RESTING BUTTON IS NEUTRAL, AND THAT IS A STATED JUDGEMENT
+ *
+ * ⚠️ Her English section names `--brand-600` and `--on-brand` among the tokens. Those are
+ * `buttonStyle`'s, and `buttonStyle` is the SIGN-IN button: one brand-filled action, `width:
+ * 100%`, at the top of an otherwise empty screen. There are 221 bare buttons across 99 screens,
+ * and a screen with eleven brand-blue buttons has no primary action at all — so the resting
+ * shape here is the SECONDARY one (card surface, default border, primary ink) and the brand fill
+ * stays with `buttonStyle` and `Button`'s own `primary` variant, which already carry it. The two
+ * brand tokens are read by the focus ring above, which applies to every control here.
+ * ⟶ REPORTED so she can reverse it in one line.
+ *
+ * ## AND THE DISABLED STATE USES NO OPACITY
+ *
+ * `--ink-muted` on `--surface-sunken`, both of which this file already proves against WCAG AA in
+ * both themes. ⛔ Not `opacity`, which `check:opacity-muting` bans by name and for the measured
+ * reason: axe reads the BLEND, so a muted control can fail contrast while its token passes.
+ *
+ * ⛔ CHECKBOX, RADIO AND FILE INPUTS ARE UNTOUCHED, by her ruling's own words. A checkbox given
+ * a card background and a 2.25rem height stops looking like a checkbox, and the 41 bare ones are
+ * on the art. 15/d question and the permission matrix — the two controls the presenter uses most.
+ * `type="range"` and `type="color"` are not excluded because, measured, this product renders
+ * neither.
+ */
+button:not([style]):not([class]),
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]),
+select:not([style]):not([class]),
+textarea:not([style]):not([class]) {
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--ink-primary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  /* No `width`. A bare control's width is its container's business, and `width: 100%` is exactly
+     what turned a button in a flex column into a bar across the screen. */
+  box-sizing: border-box;
+}
+
+button:not([style]):not([class]) {
+  /* Enough to read as a control rather than as a word, without competing with the brand fill a
+     real primary action carries. */
+  font-weight: var(--weight-medium);
+  padding: var(--space-2) var(--space-4);
+  min-height: 2.25rem;
+  cursor: pointer;
+  /* A button sets its own width from its label; stretching is the container's decision. */
+  align-self: flex-start;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]),
+select:not([style]):not([class]),
+textarea:not([style]):not([class]) {
+  min-height: 2.25rem;
+}
+
+/* A select is a control, and a browser default `textarea` resizes in both directions, which
+   breaks a form's column the moment somebody drags it sideways. */
+select:not([style]):not([class]) {
+  cursor: pointer;
+}
+
+textarea:not([style]):not([class]) {
+  resize: vertical;
+}
+
+button:not([style]):not([class]):hover:not(:disabled) {
+  background: var(--surface-sunken);
+  border-color: var(--border-strong);
+}
+
+/* THE DISABLED STATE, in both themes, on tokens this file already proves. */
+button:not([style]):not([class]):disabled,
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]):disabled,
+select:not([style]):not([class]):disabled,
+textarea:not([style]):not([class]):disabled {
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
+}
+
+/*
  * Arabic renders RTL. Component styles use logical properties so they mirror
  * for free; this only has to fix the things that cannot be expressed that
  * way. Numerals stay LTR inside an RTL paragraph (a policy number or an

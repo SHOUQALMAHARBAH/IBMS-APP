@@ -93,8 +93,23 @@ const warningStyle: CSSProperties = {
   margin: '0.75rem 0',
   maxWidth: '48rem',
 };
+/*
+ * ⚠️ THE MARGIN IS LONGHAND, AND A GUARD DEMANDED IT.
+ *
+ * This read `margin: '0.35rem 0'`, and `noteUnderPanelStyle` below spreads it and overrides
+ * `marginTop`. `style-shorthand-conflict.test.ts` refuses that pair by name: React will not
+ * update a longhand on a rerender while the shorthand is set — «can lead to styling bugs», its
+ * own words — so the override is right once and wrong after any rerender that changes it.
+ *
+ * ⚠️ The pair predates the hoist: two sites already wrote `{ ...noteStyle, marginTop: … }`
+ * inline, where the guard (which reads named style objects) could not see it. Naming the object
+ * is what exposed it.
+ */
 const noteStyle: CSSProperties = {
-  margin: '0.35rem 0',
+  marginTop: '0.35rem',
+  marginBottom: '0.35rem',
+  marginLeft: 0,
+  marginRight: 0,
   maxWidth: '48rem',
   color: 'var(--ink-muted)',
 };

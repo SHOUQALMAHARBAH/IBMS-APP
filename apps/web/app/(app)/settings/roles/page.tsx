@@ -673,7 +673,14 @@ export default function RoleAdminPage() {
                 <p role="status">{t('roleMatrixNeedsCatalogue')}</p>
               )}
             </fieldset>
-            <button type="submit" disabled={busy || nameProblem !== null}>
+            {/* An explicit hook, for the same reason `data-create-name-en` above has one: the
+                edit panel below carries a submit button too, and `base-style.spec.ts` reads
+                this one's DISABLED state. */}
+            <button
+              type="submit"
+              data-create-role-submit
+              disabled={busy || nameProblem !== null}
+            >
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
