@@ -54,6 +54,9 @@ const ROW_B: QuotationComparisonRow = {
 
 const BASE_DATA: QuotationComparisonData = {
   insuranceLine: 'Property All Risks',
+  // Contents §أ row ١١ — genuinely different from the Latin name, so an assertion that
+  // reads one cannot pass against a template that printed the other.
+  insuranceLineAr: 'تأمين جميع أخطار الممتلكات',
   customerLegalName: 'شركة الأفق للتأمين',
   builtAt: new Date('2026-03-05T00:00:00Z'),
   rows: [ROW_A, ROW_B],
@@ -198,17 +201,52 @@ describe('buildQuotationComparisonHtml', () => {
     expect(ar).not.toContain('Al-Ittihad Insurance');
 
     /*
-     * ⚠️ THE LINE IS STILL THE STORED ENGLISH STRING, AND THAT IS ASSERTED RATHER THAN
-     * LEFT UNSAID. `COMPARISON_INCLUDE` selects the RFQ's `insuranceLine` string only, so
-     * there is no Arabic line name to read here; §1 of message 49 rules out the query
-     * change that would give it one. If this ever stops being true, this line fails and
-     * whoever changed the query is told to finish the job.
+     * ✅ AND THE LINE IS NOW THE ARABIC NAME — contents §أ row ١١, and THIS ASSERTION IS THE
+     * REASON THE CHANGE WAS FINISHED RATHER THAN HALF-MADE.
+     *
+     * It used to read `toContain('Property All Risks')` with a paragraph explaining that
+     * `COMPARISON_INCLUDE` selected the RFQ's `insuranceLine` STRING only, so there was no
+     * Arabic name here to read — and that message 49 §1 ruled the query change out. Its own
+     * closing sentence said: *if this ever stops being true, this line fails and whoever
+     * changed the query is told to finish the job.* It did exactly that, on the commit that
+     * widened the include. ⟶ CORRECTED, not deleted: a reversed assertion still records what
+     * the template does, and a deleted one records nothing.
+     *
+     * Both directions, so neither half can regress on its own: the Arabic render carries the
+     * Arabic name and NOT the stored English, and the English render is checked below.
      */
-    expect(ar).toContain('Property All Risks');
+    expect(ar).toContain('تأمين جميع أخطار الممتلكات');
+    expect(ar).not.toContain('Property All Risks');
 
     const en = buildQuotationComparisonHtml(data, 'EN');
     expect(en).toContain('Al-Ittihad Insurance');
     expect(en).not.toContain('الاتحاد للتأمين');
+    // The one-way fallback: English requested never shows the Arabic name.
+    expect(en).toContain('Property All Risks');
+    expect(en).not.toContain('تأمين جميع أخطار الممتلكات');
+  });
+
+  /**
+   * ⚠️ AND A ROW WITH NO ARABIC LINE NAME FALLS BACK TO THE STORED ENGLISH — the direction the
+   * test above cannot exercise, because its fixture has one.
+   *
+   * `insuranceLineId` is NULLABLE in the schema (migration `20261019100000` «mapped what it
+   * could»), so `insuranceLineNameAr` answers `null` for a row that predates the column. A
+   * template that rendered that as nothing would print an empty cell on a document a customer
+   * receives — decision 148's own defect.
+   */
+  it('contents §أ row ١١ — a comparison with no Arabic line name prints the stored English', () => {
+    const data: QuotationComparisonData = {
+      ...BASE_DATA,
+      insuranceLineAr: null,
+      rows: [ROW_A],
+      missingInsurers: [],
+      declinedInsurers: [],
+    };
+
+    const ar = buildQuotationComparisonHtml(data, 'AR');
+    expect(ar).toContain('فرع التأمين');
+    expect(ar).toContain('Property All Risks');
   });
 });
 

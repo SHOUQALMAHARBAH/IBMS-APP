@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import type { CoverageLineNamesRepository } from '../../repositories/coverage-line-names.repository';
 import type { UserRepository } from '../../repositories/user.repository';
 import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import { NeedsAssessmentService } from './needs-assessment.service';
@@ -111,6 +112,27 @@ function makeDeps() {
     );
   });
   const users = { displayNamesForUserIds } as unknown as UserRepository;
+  /*
+   * Contents §ج row ٢١ — the recommended cover's Arabic names.
+   *
+   * A PARTIAL map, for the same reason the name resolver above is partial: a double that answered
+   * for every line could not tell a resolved Arabic name from the English fallback this change
+   * exists to produce. «Property All Risks (Fire)» has one here; «Group Medical» deliberately
+   * does not.
+   */
+  const coverageNamesArFor = vi.fn((lines: readonly string[]) => {
+    const known: Record<string, string> = {
+      'Property All Risks (Fire)': 'تأمين جميع أخطار الممتلكات',
+    };
+    return Promise.resolve(
+      Object.fromEntries(
+        lines.filter((l) => known[l]).map((l) => [l, known[l]]),
+      ),
+    );
+  });
+  const coverageLineNames = {
+    namesArFor: coverageNamesArFor,
+  } as unknown as CoverageLineNamesRepository;
 
   return {
     service: new NeedsAssessmentService(
@@ -121,9 +143,11 @@ function makeDeps() {
       workflow,
       dutySegregation,
       users,
+      coverageLineNames,
     ),
     mocks: {
       displayNamesForUserIds,
+      coverageNamesArFor,
       createAssessment,
       findAssessmentById,
       findManyAssessments,
@@ -208,6 +232,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'DRAFT',
         createdByUserId: 'sales-1',
       });
@@ -228,6 +253,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
       });
@@ -240,6 +266,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'DRAFT',
         createdByUserId: 'sales-1',
       });
@@ -254,6 +281,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'DRAFT',
         createdByUserId: 'sales-1',
       });
@@ -271,6 +299,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'DRAFT',
         createdByUserId: 'sales-2',
       });
@@ -286,6 +315,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'manager-1',
       });
@@ -309,6 +339,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
         reviewedByUserId: 'manager-1',
@@ -323,6 +354,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
         reviewedByUserId: 'a-user-who-no-longer-resolves',
@@ -337,13 +369,24 @@ describe('NeedsAssessmentService', () => {
     it('resolves a LIST in ONE query, not one per row', async () => {
       const { service, mocks } = makeDeps();
       mocks.findManyAssessments.mockResolvedValue([
-        { id: 'na-1', reviewedByUserId: 'manager-1', approvedByUserId: null },
+        {
+          recommendedCoverageLines: [],
+          id: 'na-1',
+          reviewedByUserId: 'manager-1',
+          approvedByUserId: null,
+        },
         {
           id: 'na-2',
+          recommendedCoverageLines: [],
           reviewedByUserId: 'manager-1',
           approvedByUserId: 'manager-1',
         },
-        { id: 'na-3', reviewedByUserId: null, approvedByUserId: null },
+        {
+          recommendedCoverageLines: [],
+          id: 'na-3',
+          reviewedByUserId: null,
+          approvedByUserId: null,
+        },
       ]);
       const rows = await service.list({}, MANAGER);
       expect(rows.map((r) => r.reviewedByName)).toEqual([
@@ -359,6 +402,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
       });
@@ -378,6 +422,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'REVIEWED',
         createdByUserId: 'manager-1',
       });
@@ -387,6 +432,7 @@ describe('NeedsAssessmentService', () => {
 
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'REVIEWED',
         createdByUserId: 'sales-1',
       });
@@ -411,6 +457,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'REVIEWED',
         createdByUserId: 'sales-1',
       });
@@ -431,6 +478,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'manager-1',
       });
@@ -440,6 +488,7 @@ describe('NeedsAssessmentService', () => {
 
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
       });
@@ -484,6 +533,90 @@ describe('NeedsAssessmentService', () => {
   });
 
   describe('get', () => {
+    /**
+     * 🔴 CONTENTS §ج ROW ٢١ — THE RECOMMENDED COVER'S ARABIC NAMES TRAVEL WITH THE RECORD.
+     *
+     * The screen cannot resolve them: `GET /insurance-lines` is gated on five permissions and
+     * `needs-assessment.read` is not one of them (measured, message 45 §2). ⛔ And the thirteen
+     * coverage-line strings are NOT the catalogue's vocabulary — 7 of them differ from its
+     * `nameEn` deliberately, so a name lookup on the stored string would answer for six and
+     * silently miss seven.
+     *
+     * NON-VACUOUS BY ITS FIXTURE, which is the point: the double answers for «Property All Risks
+     * (Fire)» and deliberately NOT for «Group Medical». So this asserts BOTH directions in one
+     * test — the resolved name present, and the unresolved line ABSENT from the map rather than
+     * present with an empty string. An empty string renders as nothing on screen, which is
+     * decision 148's own defect; absent means the screen shows the English it stored.
+     */
+    it('contents §ج row ٢١ — carries the recommended cover Arabic names, and omits the lines that have none', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findAssessmentById.mockResolvedValue({
+        id: 'na-1',
+        recommendedCoverageLines: [
+          'Property All Risks (Fire)',
+          'Group Medical',
+        ],
+        status: 'APPROVED',
+        createdByUserId: 'sales-1',
+        reviewedByUserId: null,
+        approvedByUserId: null,
+      });
+
+      const row = await service.get('na-1', MANAGER);
+
+      expect(row.recommendedCoverageLineNamesAr).toEqual({
+        'Property All Risks (Fire)': 'تأمين جميع أخطار الممتلكات',
+      });
+      // The line with no Arabic name is ABSENT, never an empty string.
+      expect('Group Medical' in row.recommendedCoverageLineNamesAr).toBe(false);
+      // ⛔ And the stored strings are untouched beside it — the English is what the screen falls
+      // back to, so losing it would make the unresolved line render as nothing.
+      expect(row.recommendedCoverageLines).toEqual([
+        'Property All Risks (Fire)',
+        'Group Medical',
+      ]);
+    });
+
+    /**
+     * ⚠️ ONE QUERY FOR THE WHOLE PAGE, NOT ONE PER ROW — the rule the reviewer/approver names
+     * beside it already follow, asserted for this resolver too. A per-row lookup would be one
+     * query per assessment on a register.
+     */
+    it('contents §ج row ٢١ — resolves a LIST of assessments in ONE query', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findManyAssessments.mockResolvedValue([
+        {
+          id: 'na-1',
+          recommendedCoverageLines: ['Property All Risks (Fire)'],
+          reviewedByUserId: null,
+          approvedByUserId: null,
+        },
+        {
+          id: 'na-2',
+          recommendedCoverageLines: ['Group Medical'],
+          reviewedByUserId: null,
+          approvedByUserId: null,
+        },
+        {
+          id: 'na-3',
+          recommendedCoverageLines: ['Property All Risks (Fire)'],
+          reviewedByUserId: null,
+          approvedByUserId: null,
+        },
+      ]);
+
+      const rows = await service.list({}, MANAGER);
+
+      expect(mocks.coverageNamesArFor).toHaveBeenCalledTimes(1);
+      // And each row got only ITS OWN lines' names — na-2 recommends a line with no Arabic name,
+      // so its map is empty rather than carrying na-1's.
+      expect(rows.map((r) => r.recommendedCoverageLineNamesAr)).toEqual([
+        { 'Property All Risks (Fire)': 'تأمين جميع أخطار الممتلكات' },
+        {},
+        { 'Property All Risks (Fire)': 'تأمين جميع أخطار الممتلكات' },
+      ]);
+    });
+
     it("resolves customerId off the parent Risk Profile (Part D §5.1 touchpoint #3's consent-capture control needs it)", async () => {
       /*
        * 🔴 CHANGED 2026-11-17 (§W4) — THE SECOND READ IS GONE, AND THAT IS THE FIX.
@@ -501,6 +634,7 @@ describe('NeedsAssessmentService', () => {
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
+        recommendedCoverageLines: [],
         riskProfileId: 'rp-1',
         createdByUserId: 'sales-1',
         status: 'DRAFT',

@@ -36,6 +36,7 @@ import {
 } from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { formatDate } from '../../../../lib/i18n/format';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
@@ -103,7 +104,10 @@ export default function CustomerProfilePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  // `language` ADDED — contents §ج row ٢٠: the date of birth goes through `formatDate`,
+  // which renders in the reader's locale, and the nationality's Arabic name is read by
+  // language.
+  const { t, language } = useLanguage();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [ubos, setUbos] = useState<Ubo[]>([]);
@@ -306,14 +310,42 @@ export default function CustomerProfilePage() {
                     sanctions match from a coincidence of names were invisible to
                     the person reviewing the match. Stored in the CLEAR by decision
                     (see the column's own comment), so no reveal control. */}
+                {/* 🔴 CONTENTS §ج ROW ٢٠ — THESE TWO PRINTED THE RAW STORED VALUES.
+                    The date read «1986-01-22T00:00:00.000Z», a full ISO instant on a customer
+                    file, and the nationality read «JO».
+
+                    The date goes through `formatDate` (decision 156 ruling 1), which is the one
+                    date shape on every screen. ⛔ NOT `.slice(0, 10)`: that prints the UTC day
+                    and shows YESTERDAY in Amman's small hours (message 50 §17) — though a date
+                    of birth is a CALENDAR DATE carried at UTC midnight, so the two agree here;
+                    the formatter is used because it is the one home, not because this row is the
+                    risky one. */}
                 <ProfileField
                   label={t('customerFieldDateOfBirth')}
-                  value={customer.dateOfBirth}
+                  value={
+                    customer.dateOfBirth
+                      ? formatDate(customer.dateOfBirth, language)
+                      : null
+                  }
                   revealLabel={t('customerProfileFieldReveal')}
                 />
+                {/* The nationality's Arabic country name, resolved by the SERVER — the screen
+                    cannot do it: `GET /reference-data` is gated on `provider.office.register`,
+                    which no customer-file reader holds, and ⛔ widening that gate to make a
+                    screen work is not available.
+
+                    ⚠️ AND THE CODE IS THE FALLBACK, NOT A BLANK. Measured 2026-11-25: the
+                    provider's `Country` table holds ONE row (`JO`), while `nationality` is a
+                    free two-letter code with no picker — so most codes have no Arabic name and
+                    the stored code is shown. That is an EMPTY ARABIC CELL for the provider to
+                    fill with a row, ⛔ never a name invented here. */}
                 <ProfileField
                   label={t('impFieldNationality')}
-                  value={customer.nationality}
+                  value={
+                    language === 'AR' && customer.nationalityNameAr
+                      ? customer.nationalityNameAr
+                      : customer.nationality
+                  }
                   revealLabel={t('customerProfileFieldReveal')}
                 />
               </>
@@ -360,9 +392,11 @@ export default function CustomerProfilePage() {
                 />
               </>
             ) : null}
+            {/* Contents §ج row ٢٠ — this printed the stored token «AR». ⛔ No new word: both
+                labels are the ENDONYMS already on the header's language switch. */}
             <ProfileField
               label={t('customerFieldLanguagePreference')}
-              value={customer.languagePreference}
+              value={t(ENUM_LABEL.LanguagePreference[customer.languagePreference])}
               revealLabel={t('customerProfileFieldReveal')}
             />
             {customer.customerType === 'INDIVIDUAL' ? (

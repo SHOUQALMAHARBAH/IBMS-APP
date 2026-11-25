@@ -32,6 +32,7 @@ import {
 } from '../../../../lib/management-reporting/claims-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { groupLabelDisplayName } from '../../../../lib/i18n/names';
 import {
   formatLossRatio,
   formatMoney,
@@ -67,7 +68,12 @@ function LossRatioTable({
             {rows.map((r) => (
               <Tr key={r.key}>
                 <Td>
-                  <bdi>{r.label}</bdi>
+                  {/* Contents §أ row ١١ — the insurer and the line in the reader's language.
+                      This printed «Public Liability» and «Middle East Insurance Company
+                      (demo)» to an Arabic reader while the Arabic names sat on the records.
+                      `labelAr` is populated for the insurer and line groupings only, so the
+                      by-client and by-policy tables are unchanged. */}
+                  <bdi>{groupLabelDisplayName(r, language)}</bdi>
                 </Td>
                 {/* Money through the money formatter — this table sat under a tile reading
                     `JOD 37,500.000` while printing `40000.000` itself. */}

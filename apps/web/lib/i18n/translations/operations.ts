@@ -685,6 +685,22 @@ export const OPERATIONS = {
     roleDeleteConfirmBody:
       'سيُحذف الدور فوراً ويُسحب من كل من يحمله — بلا إعادة إسناد. من يبقى بلا أدوار يبقى بلا صلاحيات، وهذا مقبول. ويبقى سجلّ من حمل الدور ومتى محفوظاً.',
     roleDeleteConfirmButton: 'أكّد الحذف',
+    /**
+     * 🔴 OWNER DECISION 164 RULING 1 — THE WORD DECISION 163 RULING 5 ASKED FOR, AND IT IS HERS.
+     *
+     * Her words: «تم إنشاء الدور بنجاح», sliced from her paper by
+     * `decision-164.strings.test.ts` and re-sliced byte-for-byte at test time.
+     *
+     * ⛔ AND IT CARRIES NO FULL STOP, WHICH IS HERS TOO. `roleDeleted` directly below ends in
+     * one; appending a stop here «for consistency» would be editing her ratified text, which is
+     * exactly what decision 145 forbade when «تعذّر إرفاق المراسلة.» was given its own ending.
+     * Pinned in both directions.
+     *
+     * ⚠️ This is NOT the «تم إنشاء الدور.» that decision 163 ruling 5 declined to build: that
+     * would have been «تم إنشاء» from `empdLoginCreated` joined to «الدور» from `roleDeleted`, a
+     * third word made out of two shipped ones. She wrote this one.
+     */
+    roleCreatedToast: 'تم إنشاء الدور بنجاح',
     roleDeleted: 'تم حذف الدور.',
     roleRefusalAct: 'عرض أدوار مكتبك',
     roleCouldNotLoad: 'تعذّر تحميل الأدوار — حاول مرة أخرى.',
@@ -1381,6 +1397,16 @@ export const OPERATIONS = {
     roleDeleteConfirmBody:
       'The role goes immediately and is withdrawn from everyone holding it — with no reassignment. Anyone left with no roles has no permissions, which is an accepted outcome. The record of who held it, and when, is kept.',
     roleDeleteConfirmButton: 'Confirm delete',
+    /**
+     * ⚠️ THE ENGLISH HALF COMES FROM HER PAPER'S ENGINEER SECTION, NOT FROM «كلام الإدارة بحرفه».
+     *
+     * Decision 164's ratified text is the Arabic; its «For the engineer» section supplies
+     * *"Role created successfully."* for the English. That is the paper's own instruction rather
+     * than an invention here — and it is reported as the weaker of the two provenances, because
+     * every other ratified name in this repository is Arabic with the English an EMPTY CELL
+     * (message 50 §13). Hers to correct in one line.
+     */
+    roleCreatedToast: 'Role created successfully.',
     roleDeleted: 'The role was deleted.',
     roleRefusalAct: "view this office's roles",
     roleCouldNotLoad: 'Could not load roles — try again.',

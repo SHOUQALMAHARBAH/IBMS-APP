@@ -93,6 +93,11 @@ const APPROVED_NA = {
   riskProfileId: 'rp-1',
   questionnaireAnswers: {},
   recommendedCoverageLines: ['Property All Risks (Fire)', 'Public Liability'],
+  // Contents §ج row ٢١ — the api sends this on EVERY needs-assessment route, and this fixture
+  // is served at `/needs-assessments/na-1`. Empty is the honest value here: this spec is about
+  // the programme and asserts the English line names, so no Arabic name is needed — but the KEY
+  // must exist, or an Arabic render of that route reads it off `undefined`.
+  recommendedCoverageLineNamesAr: {},
   status: 'APPROVED',
   createdByUserId: 'sales-1',
   reviewedByUserId: 'mgr-1',

@@ -6,7 +6,11 @@ import {
   FINANCIAL_REPORT_ROW_LIMIT,
   type CommissionRollupEntryRow,
 } from '../modules/finance/finance.config';
-import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
+import {
+  INSURER_IDENTITY_SELECT,
+  insurerName,
+  resolveInsurerNamePair,
+} from './insurer-identity';
 
 /**
  * Process 40 — Financial Reporting (backlog Part C #40, Domain D). The
@@ -93,6 +97,7 @@ export class FinancialReportRepository {
       entryId: r.id,
       insurerId: r.policy.insurerId,
       insurerName: insurerName(r.policy.insurer),
+      insurerNameAr: resolveInsurerNamePair(r.policy.insurer).nameAr,
       amount: r.amount,
       vatAmount: r.vatAmount,
       paidAmount: r.paidAmount,

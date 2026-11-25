@@ -22,6 +22,7 @@ import {
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { groupLabelDisplayName } from '../../../../lib/i18n/names';
 import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
@@ -93,10 +94,16 @@ function ProfitabilityTable({
             {rows.map((r) => (
               <Tr key={r.key}>
                 <Td>
+                  {/* Two vocabularies in one field, and now two mechanisms, one each.
+                      `bySegment` passes a VOCABULARY (`customerType` is a fixed enum the
+                      screen maps). `byLine` passes NONE and takes `labelAr`, which the api
+                      sends from the line FK — contents §أ row ١١. The header above records
+                      that this used to render the English string raw because the payload
+                      carried no Arabic name; it does now. */}
                   <bdi>
                     {vocabulary && r.label in vocabulary
                       ? t(vocabulary[r.label])
-                      : r.label}
+                      : groupLabelDisplayName(r, language)}
                   </bdi>
                 </Td>
                 <Td>{formatMoney(r.premiumWritten, language)}</Td>

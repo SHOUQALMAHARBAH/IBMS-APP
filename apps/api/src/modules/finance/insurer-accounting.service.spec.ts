@@ -32,6 +32,7 @@ const obligation = (
   invoiceId: `inv-${insurerId}-${collectedAt.getTime()}`,
   insurerId,
   insurerName: `Insurer ${insurerId}`,
+  insurerNameAr: `شركة ${insurerId}`,
   premiumAmount: new Prisma.Decimal(premium),
   commissionDeducted: new Prisma.Decimal(commission),
   collectedAt,
@@ -45,6 +46,7 @@ const remittance = (
   remittanceId: `rem-${insurerId}-${remittedAt.getTime()}`,
   insurerId,
   insurerName: `Insurer ${insurerId}`,
+  insurerNameAr: `شركة ${insurerId}`,
   amount: new Prisma.Decimal(amount),
   remittedAt,
 });

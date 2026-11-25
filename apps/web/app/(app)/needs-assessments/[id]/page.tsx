@@ -230,9 +230,23 @@ export default function NeedsAssessmentDetailPage() {
               </p>
             ) : (
               <ul style={coverageTagListStyle}>
+                {/* 🔴 CONTENTS §ج ROW ٢١ — THIS PRINTED «Property All Risks (Fire)» AND
+                    «Group Medical» ON AN OTHERWISE-ARABIC SCREEN, while the programme and the
+                    quote request both show their line in Arabic.
+
+                    ⚠️ The name comes from the SERVER, keyed on the stored string. It cannot be
+                    looked up here: `GET /insurance-lines` does not admit `needs-assessment.read`,
+                    and these thirteen values are NOT the catalogue's vocabulary — 7 of them
+                    differ from its `nameEn` deliberately, which is why the api bridges them
+                    through the pairing that already exists rather than by name.
+
+                    ⛔ A line with no Arabic name keeps its English, and the KEY stays the stored
+                    string so the list order and React's identity are unchanged. */}
                 {assessment.recommendedCoverageLines.map((line) => (
                   <li key={line} style={coverageTagStyle}>
-                    {line}
+                    {language === 'AR'
+                      ? (assessment.recommendedCoverageLineNamesAr[line] ?? line)
+                      : line}
                   </li>
                 ))}
               </ul>

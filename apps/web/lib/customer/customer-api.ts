@@ -30,6 +30,10 @@ export interface Customer {
   // EntitySearch is what needs exactly that, for its disambiguation line.
   dateOfBirth: string | null;
   nationality: string | null;
+  /** The nationality code's Arabic country name, or null — contents §ج row ٢٠. ⚠️ NULL IS THE
+   *  COMMON CASE: the provider's `Country` table holds one row, so most codes have no Arabic
+   *  name and the screen shows the code it stored. See the api's `CountryRepository`. */
+  nationalityNameAr: string | null;
   registrationNumber: string | null;
   taxRegistrationNumber: string | null;
   registeredAddress: string | null;

@@ -23,7 +23,11 @@ import {
   type InsurerRemittanceRow,
   type OutstandingInvoiceRow,
 } from '../modules/finance/finance.config';
-import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
+import {
+  INSURER_IDENTITY_SELECT,
+  insurerName,
+  resolveInsurerNamePair,
+} from './insurer-identity';
 
 export interface CreateInvoiceRow {
   policyId: string;
@@ -300,6 +304,7 @@ export class InvoiceRepository {
         invoiceId: string;
         insurerId: string;
         insurerName: string;
+        insurerNameAr: string | null;
         premiumAmount: Prisma.Decimal;
         commissionDeducted: Prisma.Decimal;
         collectedAt: Date;
@@ -308,9 +313,27 @@ export class InvoiceRepository {
       SELECT
         i.id AS "invoiceId",
         p."insurerId",
-        -- COALESCE, not im."legalName": an office-local insurer has no master
-        -- row and carries its own name. See the LEFT JOIN below.
-        COALESCE(im."legalName", ins."legalName") AS "insurerName",
+        -- ONE SOURCE IS CHOSEN AND BOTH NAMES ARE READ FROM IT -- the rule
+        -- resolveInsurerNamePair states, and the reason it exists. A per-field
+        -- COALESCE on the Arabic half would fall through to the OFFICE's Arabic
+        -- name for a master-linked insurer whose master has none, printing one
+        -- company's Latin name beside another's Arabic one.
+        --
+        -- AND THE LATIN HALF IS UNCHANGED BY THIS, PROVABLY: it was
+        -- COALESCE(im."legalName", ins."legalName"), and InsurerMaster."legalName"
+        -- is NOT NULL in the schema -- so whenever im.id is present the COALESCE
+        -- already took it, and whenever it is absent both forms take ins. The CASE
+        -- says the same thing about the name and makes the SOURCE explicit, so the
+        -- Arabic half can follow it instead of being coalesced separately.
+        --
+        -- An office-local insurer has no master row and carries its own names.
+        -- See the LEFT JOIN below.
+        -- (No backticks in this comment: it sits inside a template literal.)
+        CASE WHEN im.id IS NOT NULL THEN im."legalName"
+             ELSE ins."legalName" END AS "insurerName",
+        -- Contents §أ row ١١ -- the Arabic name, from the SAME source.
+        CASE WHEN im.id IS NOT NULL THEN im."legalNameAr"
+             ELSE ins."legalNameAr" END AS "insurerNameAr",
         i."premiumAmount",
         i."commissionDeducted",
         -- The instalment that COMPLETED collection starts the clock: the
@@ -353,6 +376,7 @@ export class InvoiceRepository {
       invoiceId: r.invoiceId,
       insurerId: r.insurerId,
       insurerName: r.insurerName,
+      insurerNameAr: r.insurerNameAr,
       premiumAmount: r.premiumAmount,
       commissionDeducted: r.commissionDeducted,
       collectedAt: r.collectedAt,
@@ -406,6 +430,7 @@ export class InvoiceRepository {
       remittanceId: r.id,
       insurerId: r.insurerId,
       insurerName: insurerName(r.insurer),
+      insurerNameAr: resolveInsurerNamePair(r.insurer).nameAr,
       amount: r.amount,
       // the `remittedAt: { lt: ... }` filter guarantees non-null
       remittedAt: r.remittedAt as Date,

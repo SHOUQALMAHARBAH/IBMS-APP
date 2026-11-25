@@ -1,5 +1,6 @@
 import { Prisma } from '@ibms/db';
 import { formatMoney, quantizeMoney, sumMoney } from '../../common/money.util';
+import { unanimousGroupName } from '../../common/group-name.util';
 
 /** `LossRatio.ratio` is `@db.Decimal(7, 4)`. */
 export const LOSS_RATIO_SCALE = 4;
@@ -96,8 +97,10 @@ export interface AnalyticsPolicyLike {
   customerId: string;
   customerLegalName: string;
   insuranceLine: string;
+  insuranceLineAr: string | null;
   insurerId: string;
   insurerName: string;
+  insurerNameAr: string | null;
   policyRef: string;
   premium: Prisma.Decimal | string;
   claimNetSettlements: (Prisma.Decimal | string | null)[];
@@ -108,6 +111,18 @@ export interface LossRatioBreakdownRow {
   key: string;
   /** human-readable: the customer legal name, the policy reference, or the line. */
   label: string;
+  /**
+   * The same label in Arabic, or null — contents §أ row ١١.
+   *
+   * POPULATED FOR THE `insurer` AND `line` GROUPINGS ONLY, and that is the owner's scope rather
+   * than an omission: her row names the insurer and the line. ⛔ `customer` is NULL because
+   * widening the by-language rule to customer names reaches 20 sites she has ruled nothing about
+   * (measured, message 50), and `policy` is NULL because a policy reference is an ASCII code with
+   * no Arabic form at all.
+   *
+   * `null` means the screen renders `label`, which is the English the record stored.
+   */
+  labelAr: string | null;
   periodClaims: string;
   periodPremium: string;
   ratio: string;
@@ -121,7 +136,7 @@ export interface LossRatioBreakdown {
   groupBy: LossRatioGroupBy;
   /** highest ratio first, then `label` A→Z. */
   rows: LossRatioBreakdownRow[];
-  totals: Omit<LossRatioBreakdownRow, 'key' | 'label'>;
+  totals: Omit<LossRatioBreakdownRow, 'key' | 'label' | 'labelAr'>;
 }
 
 function groupKeyLabel(
@@ -140,9 +155,30 @@ function groupKeyLabel(
   return { key: p.insuranceLine, label: p.insuranceLine };
 }
 
+/**
+ * The ARABIC name this row contributes to its group's label, or null when it contributes none —
+ * contents §أ row ١١.
+ *
+ * ⛔ `customer` and `policy` return null BY SCOPE, not by accident: the owner's row names the
+ * insurer and the line. See `LossRatioBreakdownRow.labelAr`.
+ *
+ * The group's own name is then `unanimousGroupName` over these — ⚠️ which matters for `line` and
+ * cannot for `insurer`: the insurer group key IS the insurer id, so every row in it carries the
+ * same name, while the line group key is the STORED STRING and the Arabic name comes from the
+ * FK. One helper over both is correct for both and leaves no branch to get wrong.
+ */
+function groupNameAr(
+  groupBy: LossRatioGroupBy,
+  p: AnalyticsPolicyLike,
+): string | null {
+  if (groupBy === 'insurer') return p.insurerNameAr;
+  if (groupBy === 'line') return p.insuranceLineAr;
+  return null;
+}
+
 function breakdownRowFor(
   policies: AnalyticsPolicyLike[],
-): Omit<LossRatioBreakdownRow, 'key' | 'label'> {
+): Omit<LossRatioBreakdownRow, 'key' | 'label' | 'labelAr'> {
   const nets = policies.flatMap((p) => p.claimNetSettlements);
   const figures = computeLossRatio({
     claimNetSettlements: nets,
@@ -185,6 +221,9 @@ export function buildLossRatioBreakdown(input: {
     .map(([key, g]) => ({
       key,
       label: g.label,
+      labelAr: unanimousGroupName(
+        g.policies.map((p) => groupNameAr(input.groupBy, p)),
+      ),
       ...breakdownRowFor(g.policies),
     }))
     .sort((a, b) => {

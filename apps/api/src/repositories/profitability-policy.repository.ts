@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { ANALYTICS_WRITTEN_POLICY_STATUSES } from './loss-ratio.repository';
+import {
+  INSURANCE_LINE_NAME_INCLUDE,
+  insuranceLineNameAr,
+} from './insurance-line-names';
 
 /** One written policy's contribution to a profitability breakdown. Shared
  * between #40 (`FinancialReportService`'s premium/claims/commission
@@ -14,6 +18,9 @@ import { ANALYTICS_WRITTEN_POLICY_STATUSES } from './loss-ratio.repository';
 export interface ProfitabilityPolicyRow {
   policyId: string;
   insuranceLine: string;
+  /** The line's Arabic name, or null when none is known for this row — contents §أ row ١١.
+   *  Resolved from the line FK through `insuranceLineNameAr`, never from the string above. */
+  insuranceLineAr: string | null;
   /** `CustomerType` — `'CORPORATE'` | `'INDIVIDUAL'`. */
   customerType: string;
   /** `issuedPremium ?? requestedPremium` — written premium (a cancelled /
@@ -69,6 +76,9 @@ export class ProfitabilityPolicyRepository {
         issuedPremium: true,
         requestedPremium: true,
         customer: { select: { customerType: true } },
+        // ⚠️ Spread INSIDE the `select` — Prisma refuses `select` and `include` on one argument
+        // (message 52 §10). Two relations, the same two the shared constant names.
+        ...INSURANCE_LINE_NAME_INCLUDE,
         claims: {
           where: { status: { in: ['SETTLED', 'CLOSED'] } },
           select: { settlement: { select: { netSettlement: true } } },
@@ -86,6 +96,7 @@ export class ProfitabilityPolicyRepository {
       return {
         policyId: p.id,
         insuranceLine: p.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(p),
         customerType: p.customer.customerType,
         premium: p.issuedPremium ?? p.requestedPremium,
         claimNetSettlements: p.claims.map(

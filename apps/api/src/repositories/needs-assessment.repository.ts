@@ -103,6 +103,18 @@ export type NeedsAssessmentWithNames = Omit<
     customerId: string | null;
     /** Identity only — never the `Customer` row. The policy list's precedent. */
     customer: { id: string; legalName: string } | null;
+    /**
+     * The Arabic name of each recommended coverage line that has one — contents §ج row ٢١.
+     *
+     * A MAP rather than a parallel array, so no caller can pair the wrong name with the wrong
+     * line by index, and a line with no known Arabic name is simply ABSENT rather than a null
+     * hole somebody has to align. The screen then renders the English string it stored.
+     *
+     * ⚠️ `recommendedCoverageLines` is NOT the insurance-line catalogue's vocabulary — 7 of its
+     * 13 values differ from the catalogue's `nameEn` deliberately, and the owner cancelled the
+     * rename that would have aligned them. See `CoverageLineNamesRepository`.
+     */
+    recommendedCoverageLineNamesAr: Record<string, string>;
   };
 
 @Injectable()

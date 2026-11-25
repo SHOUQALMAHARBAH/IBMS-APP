@@ -63,6 +63,9 @@ export interface FlaggedInsurerData {
 
 export interface QuotationComparisonData {
   insuranceLine: string;
+  /** The line's Arabic name, or null — contents §أ row ١١. The debt the comment below recorded
+   *  is paid: `COMPARISON_INCLUDE` now names the two catalogue relations. */
+  insuranceLineAr: string | null;
   customerLegalName: string;
   builtAt: Date;
   rows: QuotationComparisonRow[];
@@ -206,11 +209,17 @@ function renderSection(
           ['العميل', data.customerLegalName],
           // 🔴 «خط التأمين» -> «فرع التأمين», decision 150 ruling 5, as on the certificate.
           //
-          // ⚠️ THE VALUE BESIDE IT IS STILL THE STORED ENGLISH LINE, reported rather than
-          // fixed: `COMPARISON_INCLUDE` selects the RFQ's `insuranceLine` STRING only — not
-          // the catalogue rows — so there is no Arabic name here to read, and giving it one
-          // is a query change that §1 of this message rules out.
-          ['فرع التأمين', data.insuranceLine],
+          // ✅ AND THE VALUE BESIDE IT IS NOW THE ARABIC NAME — contents §أ row ١١. This
+          // comment used to record the opposite as a measured debt: `COMPARISON_INCLUDE`
+          // selected the RFQ's `insuranceLine` STRING only and not the catalogue rows its two
+          // line FK ids point at, so there was no Arabic name here to read. The include names
+          // them now, exactly the two-relations-wide change message 52 §10 made for the
+          // recommendation card, and `preferLanguage` falls back to the stored English for a
+          // row that carries no FK.
+          [
+            'فرع التأمين',
+            preferLanguage(data.insuranceLine, data.insuranceLineAr, lang),
+          ],
           ['تاريخ الإعداد', formatDocumentDate(data.builtAt, 'ar')],
         ]
       : [

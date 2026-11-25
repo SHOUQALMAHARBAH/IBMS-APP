@@ -42,6 +42,8 @@ export interface CommissionRollupFigures {
 export interface CommissionRollupInsurerRow extends CommissionRollupFigures {
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. */
+  insurerNameAr: string | null;
 }
 
 export interface CommissionRollup extends CommissionRollupFigures {
@@ -51,6 +53,9 @@ export interface CommissionRollup extends CommissionRollupFigures {
 export interface ProfitabilityRow {
   key: string;
   label: string;
+  /** The same label in Arabic, or null — contents §أ row ١١. Populated for the insurer and
+   *  line groupings only; `null` means render `label`, the English the record stored. */
+  labelAr: string | null;
   premiumWritten: string;
   claimsPaid: string;
   commissionEarned: string;

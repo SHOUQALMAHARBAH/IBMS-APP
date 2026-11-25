@@ -8,6 +8,7 @@ import {
   RfqRepository,
   type RfqWithSubmissions,
 } from '../../repositories/rfq.repository';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { QuotationRepository } from '../../repositories/quotation.repository';
 import { OpportunityRepository } from '../../repositories/opportunity.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -64,6 +65,8 @@ export interface ComparisonView {
   id: string;
   rfqId: string;
   insuranceLine: string;
+  /** The line's Arabic name, or null when none is known — contents §أ row ١١. */
+  insuranceLineAr: string | null;
   builtAt: Date;
   builtByUserId: string | null;
   rows: MatrixRow[];
@@ -249,6 +252,7 @@ export class ComparisonService {
       id: matrix.id,
       rfqId: matrix.rfqId,
       insuranceLine: matrix.rfq.insuranceLine,
+      insuranceLineAr: insuranceLineNameAr(matrix.rfq),
       builtAt: matrix.builtAt,
       builtByUserId: matrix.builtByUserId,
       // Every row's insurer goes through the one definition of "read an
