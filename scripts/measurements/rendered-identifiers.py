@@ -345,7 +345,9 @@ def self_test():
 #
 # ⚠️ THE RATCHET DEMANDED THIS, BY NAME, on the commit that earned it — a budget left
 # above the real count stops being a ratchet and silently re-admits what it just paid for.
-RENDERED_IDENTIFIER_BUDGET = 10
+# 10 -> 7 on 2026-11-25: OWNER DECISION 163 RULING 1 removed three at once (the opportunity's
+# title, its programme link and its list card). The DOWN direction below demanded it by name.
+RENDERED_IDENTIFIER_BUDGET = 7
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

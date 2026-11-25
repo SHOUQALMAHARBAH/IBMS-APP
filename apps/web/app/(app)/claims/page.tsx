@@ -85,7 +85,7 @@ const CLAIM_STATUS_OPTIONS: readonly ClaimStatus[] = [
 export default function ClaimsQueuePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [claims, setClaims] = useState<Claim[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -256,7 +256,8 @@ export default function ClaimsQueuePage() {
         ) : (
           <>
             <p style={{ color: 'var(--ink-muted)', fontSize: 'var(--text-sm)' }}>
-              {t('claimsQueueCountLabel', { count: total })}
+              {/* Decision 163 ruling 3 — «6 مطالبة» was a flat key with no forms. */}
+              {tPlural('claimsQueueCount', total)}
             </p>
             <div style={listGridStyle}>
               {claims.map((claim) => {

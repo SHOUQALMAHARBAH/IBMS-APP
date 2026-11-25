@@ -1004,7 +1004,14 @@ export function ClaimCard({
       {claim.insurerClaimReference || claim.adjuster ? (
         <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
           {claim.insurerClaimReference ? (
-            <>{t('claimInsurerRefShort')}<bdi>{claim.insurerClaimReference}</bdi>
+            /* The space was missing, so the screen read «مرجع شركة التأمينINS-REF-…» — the
+               label and the reference run together. `{' '}` rather than a literal space,
+               because JSX drops whitespace that sits alone between two expressions on
+               separate lines; the adjuster branch below has always had one on its own line
+               and that is why only this half showed the defect. */
+            <>
+              {t('claimInsurerRefShort')}{' '}
+              <bdi>{claim.insurerClaimReference}</bdi>
             </>
           ) : (
             ''

@@ -65,6 +65,26 @@ function makeDeps() {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+  /*
+   * 🔴 OWNER DECISION 163 RULING 1 — the DETAIL read, which carries the two names its title is
+   * made of. A separate stub rather than a wider `findById`: that one has ten callers across
+   * seven modules, none of which renders a title.
+   */
+  const findOpportunityByIdWithNames = vi.fn().mockResolvedValue({
+    id: 'opp-1',
+    customerId: 'cust-1',
+    insuranceProgramId: 'prog-1',
+    status: 'NEEDS_CONFIRMED',
+    isRenewal: false,
+    createdByUserId: 'plc-1',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    customer: { id: 'cust-1', legalName: 'Acme Trading' },
+    insuranceProgram: {
+      id: 'prog-1',
+      riskProfile: { siteLabel: 'Head office' },
+    },
+  });
   const findManyByCustomerId = vi.fn().mockResolvedValue([]);
   const findManyForActor = vi.fn().mockResolvedValue([]);
   const countForActor = vi.fn().mockResolvedValue(0);
@@ -86,6 +106,7 @@ function makeDeps() {
   const opportunities = {
     create: createOpportunity,
     findById: findOpportunityById,
+    findByIdWithNames: findOpportunityByIdWithNames,
     findManyByCustomerId,
     findManyForActor,
     countForActor,
@@ -130,6 +151,7 @@ function makeDeps() {
     mocks: {
       createOpportunity,
       findOpportunityById,
+      findByIdWithNames: findOpportunityByIdWithNames,
       findManyByCustomerId,
       findManyForActor,
       countForActor,
@@ -253,6 +275,37 @@ describe('OpportunityService', () => {
       const view = await service.get('opp-1', placement());
       expect(view.context.insuranceProgramId).toBe('prog-1');
       expect(view.context.customerId).toBe('cust-1');
+      /*
+       * 🔴 OWNER DECISION 163 RULING 1 — the two NAMES the title is made of, where the screen
+       * printed eight characters of a uuid.
+       */
+      expect(view.context.customerLegalName).toBe('Acme Trading');
+      expect(view.context.insuranceProgramName).toBe('Head office');
+      // ⛔ AND THE TWO JOINS ARE NOT ON THE WIRE. The raw-join-as-payload shape left the RFQ's
+      // insurer column blank for months (message 45 §2); both are flattened and stripped.
+      expect(view).not.toHaveProperty('customer');
+      expect(view).not.toHaveProperty('insuranceProgram');
+    });
+
+    /* A renewal opportunity has no programme, so there is no programme name to print. Asserted
+     * because the screen's link branch depends on exactly this pairing. */
+    it('sends a null programme name when there is no programme', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findByIdWithNames.mockResolvedValueOnce({
+        id: 'opp-2',
+        customerId: 'cust-1',
+        insuranceProgramId: null,
+        status: 'NEEDS_CONFIRMED',
+        isRenewal: true,
+        createdByUserId: 'plc-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        customer: { id: 'cust-1', legalName: 'Acme Trading' },
+        insuranceProgram: null,
+      });
+      const view = await service.get('opp-2', placement());
+      expect(view.context.insuranceProgramName).toBeNull();
+      expect(view.context.customerLegalName).toBe('Acme Trading');
     });
 
     it('list resolves visibility against the customer then returns its opportunities', async () => {

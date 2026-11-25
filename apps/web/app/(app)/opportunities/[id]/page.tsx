@@ -6,7 +6,7 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   getOpportunity,
   type OpportunityStatus,
-  type OpportunityWithContext,
+  type OpportunityWithDetailContext,
 } from '../../../../lib/opportunity/opportunity-api';
 import { listRfqs, type Rfq, type RfqInsurerStatus } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
@@ -74,9 +74,9 @@ export default function OpportunityDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
-  const [opportunity, setOpportunity] = useState<OpportunityWithContext | null>(
+  const [opportunity, setOpportunity] = useState<OpportunityWithDetailContext | null>(
     null,
   );
   const [rfqs, setRfqs] = useState<Rfq[] | null>(null);
@@ -195,7 +195,14 @@ export default function OpportunityDetailPage() {
 
       {opportunity ? (
         <>
-          <h1>{t('oppDetailHeading', { id: opportunity.id.slice(0, 8) })}</h1>
+          {/* 🔴 OWNER DECISION 163 RULING 1 — the customer's name, not eight characters of a
+              uuid. ⛔ The name travels with the record (`context.customerLegalName`), so this
+              screen writes its own title without a second read it could be refused. */}
+          <h1>
+            {t('oppDetailHeading', {
+              customer: opportunity.context.customerLegalName,
+            })}
+          </h1>
           <p style={{ margin: '0 0 1rem' }}>
             <WorkflowHistoryLink entityType='Opportunity' entityId={opportunity.id} />
           </p>
@@ -222,7 +229,10 @@ export default function OpportunityDetailPage() {
                   )
                 }
               >
-                {opportunity.context.insuranceProgramId.slice(0, 8)}
+                {/* Decision 163 ruling 1 — the programme's own name. `insuranceProgramName` is
+                    non-null exactly when `insuranceProgramId` is, so inside this branch there
+                    is nothing to fall back to. */}
+                {opportunity.context.insuranceProgramName}
               </button>
             </div>
           ) : null}
@@ -267,10 +277,8 @@ export default function OpportunityDetailPage() {
                       <bdi>{lineDisplayName(rfq, language)}</bdi>
                     </strong>
                     <span style={rfqBadgeStyle}>
-                      {t(
-                        rfq.insurerSubmissions.length === 1 ? 'rfqInsurerCountOne' : 'rfqInsurerCountOther',
-                        { count: rfq.insurerSubmissions.length },
-                      )}
+                      {/* Decision 163 ruling 3 — see `/rfqs`: one entry, six forms. */}
+                      {tPlural('rfqInsurerCount', rfq.insurerSubmissions.length)}
                     </span>
                   </div>
                   <div style={cardMetaStyle}>

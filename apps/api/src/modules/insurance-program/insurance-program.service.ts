@@ -50,6 +50,12 @@ export interface InsuranceProgramContext {
   recommendedCoverageLines: string[];
   riskProfileId: string;
   customerId: string | null;
+  /** 🔴 OWNER DECISION 163 RULING 1 — «برنامج التأمين — {اسم البرنامج} — {اسم العميل}». The
+   *  name travels with the record, so the screen writes its own title without a second read and
+   *  cannot be refused a name for a record it is already showing. Null only where `customerId`
+   *  is (no risk profile on the row). ⚠️ `legalName`, not a bilingual pair — see the opportunity
+   *  repository's note: customer and office names are an unruled empty cell. */
+  customerLegalName: string | null;
   siteLabel: string | null;
   /** The Risk Profile's currently-derived Sum Insured — a re-assembly would
    * seed the Property / BI lines from these figures. */
@@ -263,12 +269,19 @@ export class InsuranceProgramService {
       this.loadSummary(program.riskProfileId),
       this.riskProfiles.findById(program.riskProfileId),
     ]);
+    // Decision 163 ruling 1 — the title's customer name. Sequential rather than inside the
+    // `Promise.all` above because it depends on that read's answer; `this.customers` is already
+    // injected and this runs once per record, not once per row of a list.
+    const customer = riskProfile
+      ? await this.customers.findById(riskProfile.customerId)
+      : null;
     return {
       needsAssessmentId: program.needsAssessmentId,
       needsAssessmentStatus: assessment?.status ?? null,
       recommendedCoverageLines: assessment?.recommendedCoverageLines ?? [],
       riskProfileId: program.riskProfileId,
       customerId: riskProfile?.customerId ?? null,
+      customerLegalName: customer?.legalName ?? null,
       siteLabel: riskProfile?.siteLabel ?? null,
       sumInsured: summary,
       surveyComplete: summary.assetCount > 0,

@@ -195,7 +195,6 @@ export const POLICY = {
     claimsQueueNoneYet:
       'لا توجد مطالبات بعد. تظهر المطالبة هنا فور الإبلاغ عنها على وثيقة صادرة.',
     claimsQueueNoneMatch: 'لا توجد مطالبة تطابق هذا البحث. جرّب مرجعاً أو حالة أخرى.',
-    claimsQueueCountLabel: '{count} مطالبة',
     claimsQueueRefusalAct: 'عرض المطالبات',
     /*
      * 🔴 THE FINAL WALK §ب-٢ — THE CLAIMS SECTION'S OWN REFUSAL ACT.
@@ -550,7 +549,6 @@ export const POLICY = {
     claimsQueueNoneYet:
       'No claims yet. A claim appears here as soon as one is notified against an issued policy.',
     claimsQueueNoneMatch: 'No claim matches this search. Try another reference or status.',
-    claimsQueueCountLabel: '{count} claims',
     claimsQueueRefusalAct: 'view claims',
     // The final walk §ب-٢ — the claims section's own act, same text, its own key.
     claimSectionRefusalAct: 'view claims',

@@ -189,7 +189,18 @@ export default function NeedsAssessmentDetailPage() {
 
       {assessment ? (
         <>
-          <PageHeader title={t('nadHeading')} />
+          {/* 🔴 OWNER DECISION 163 RULING 1 — the customer's name in the title. The wire has
+              carried `customer` since message 45 §4 (resolved off the parent risk profile and
+              flattened), so no query changed for this. */}
+          <PageHeader
+            title={
+              assessment.customer
+                ? t('nadHeadingWithCustomer', {
+                    customer: assessment.customer.legalName,
+                  })
+                : t('nadHeading')
+            }
+          />
           <p style={{ margin: '0 0 1rem' }}>
             <WorkflowHistoryLink entityType='NeedsAssessment' entityId={assessment.id} />
           </p>

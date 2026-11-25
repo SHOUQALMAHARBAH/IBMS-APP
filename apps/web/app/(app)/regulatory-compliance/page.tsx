@@ -48,6 +48,7 @@ import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { Button } from '../../../components/ui/Button';
 
 /**
  * The six derived states, as a TOTAL map over the union.
@@ -135,7 +136,21 @@ const formStyle: CSSProperties = {
 /* OWNER DECISION 128's declaration block. A NAMED style rather than an inline literal:
  * `check:screen-pass` refused the inline site and its budget may only FALL, so the declaration
  * moves out instead of the number moving up. */
-const renewalBlockStyle: CSSProperties = { marginTop: '0.5rem' };
+/* 🔴 OWNER DECISION 163 — the declaration's own block, so «بمكان بيبين» is a place and not only
+   an order. `--info-*` is this file's existing notice triple (both themes proved against WCAG AA
+   in `globals.css`); ⛔ no literal colour and ⛔ no new token. */
+const declarationBlockStyle: CSSProperties = {
+  marginTop: '0.75rem',
+  marginBottom: '0.75rem',
+  padding: 'var(--space-3)',
+  background: 'var(--info-bg)',
+  border: '1px solid var(--info-border)',
+  borderRadius: 'var(--radius-md)',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 'var(--space-2)',
+};
 
 const labelStyle: CSSProperties = {
   display: 'flex',
@@ -640,6 +655,63 @@ export default function RegulatoryCompliancePage() {
           </p>
 
           {/*
+            🔴 OWNER DECISION 128 — THE STANDING DECLARATION, AND ITS OWN PERMISSION.
+
+            `frontend-ux-directive.md`: a control a role cannot use does not exist on their
+            screen. The route carries `license-renewal.declare`, which is held by NO role until
+            an office grants it (decision 131) — so this is the one control on this screen that
+            a licence manager may not see, and that is the decision working rather than a bug.
+
+            ⛔ IT SHOWS ONLY WHERE IT CAN ACT: past the printed expiry, with the filing and the
+            proof already in, and no declaration yet. Standing it up earlier would invite a
+            person to swear to something before there is anything to swear about, and the row is
+            append-only — there is no undo.
+          */}
+          {/*
+            🔴 OWNER DECISION 163 — AND IT IS THE FIRST THING IN THIS REGION, NOT THE LAST.
+            It used to render BELOW the regulatory-action form (nine fields) and below the
+            renewal filing block (three more), so the presenter's one act sat at the bottom of a
+            twelve-field column — «مدفون بين خانات تدوين القرار», in the owner's own words.
+            ⛔ Nothing else moved: the two forms below are in the order they were.
+          */}
+          {canDeclareRenewal &&
+          standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
+            <div style={declarationBlockStyle} data-renewal-declaration="">
+              {/*
+                ⛔ THE SENTENCE IS SHOWN, AND THE BUTTON IS NOT THE SENTENCE.
+                A control whose label is a 70-character oath is unreadable, and worse, it would
+                make the oath look like the name of a button rather than something the person is
+                stating. She is SHOWN what she is declaring; the control says what pressing it
+                does. The api stores the sentence verbatim either way — it never takes a caller's
+                wording — so the record testifies to the text above and not to the label.
+              */}
+              <p style={noteStyle} data-renewal-declaration-sentence="">
+                {t('rcRenewalDeclarationSentence')}
+              </p>
+              {/* 🔴 OWNER DECISION 153 §٢ ROW ٣ — «تسجيل الإقرار», its OWN key.
+                  This control used to carry `rcRecordRenewalButton`, the FILING control's
+                  label, so the screen offered two different acts under one name. ⛔ The filing
+                  control above keeps that label; one key cannot name both. */}
+              {/* 🔴 OWNER DECISION 163 — «يكون الزرّ الرئيسي بقسمه، وبمكان بيبين». It was a bare
+                  `<button>`, which the base shape draws on the card surface with a default
+                  border — correct for the 587 controls nobody styled, and wrong for the ONE act
+                  this whole screen exists to make possible on the day. `Button`'s own `primary`
+                  variant is the product's answer to "the single main action on a screen", and
+                  ⛔ it is used rather than a new style: a brand fill written here would be a
+                  second home for the one the primitive already carries.
+                  ⛔ AND NO WORD CHANGES — `rcRecordDeclarationButton` is decision 153 §٢ row ٣. */}
+              <Button
+                type="button"
+                variant="primary"
+                data-renewal-declare=""
+                disabled={busy}
+                onClick={() => void submitRenewalDeclaration()}
+              >
+                {t('rcRecordDeclarationButton')}
+              </Button>
+            </div>
+          ) : null}
+          {/*
             THE OFFICE RECORDS THE LETTER IT RECEIVED — in place of a one-click button that marked
             the licence lapsed and stored nothing about why.
 
@@ -805,47 +877,6 @@ export default function RegulatoryCompliancePage() {
                 onClick={() => void submitRenewalRequest()}
               >
                 {t('rcRecordRenewalButton')}
-              </button>
-            </div>
-          ) : null}
-          {/*
-            🔴 OWNER DECISION 128 — THE STANDING DECLARATION, AND ITS OWN PERMISSION.
-
-            `frontend-ux-directive.md`: a control a role cannot use does not exist on their
-            screen. The route carries `license-renewal.declare`, which is held by NO role until
-            an office grants it (decision 131) — so this is the one control on this screen that
-            a licence manager may not see, and that is the decision working rather than a bug.
-
-            ⛔ IT SHOWS ONLY WHERE IT CAN ACT: past the printed expiry, with the filing and the
-            proof already in, and no declaration yet. Standing it up earlier would invite a
-            person to swear to something before there is anything to swear about, and the row is
-            append-only — there is no undo.
-          */}
-          {canDeclareRenewal &&
-          standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
-            <div style={renewalBlockStyle} data-renewal-declaration="">
-              {/*
-                ⛔ THE SENTENCE IS SHOWN, AND THE BUTTON IS NOT THE SENTENCE.
-                A control whose label is a 70-character oath is unreadable, and worse, it would
-                make the oath look like the name of a button rather than something the person is
-                stating. She is SHOWN what she is declaring; the control says what pressing it
-                does. The api stores the sentence verbatim either way — it never takes a caller's
-                wording — so the record testifies to the text above and not to the label.
-              */}
-              <p style={noteStyle} data-renewal-declaration-sentence="">
-                {t('rcRenewalDeclarationSentence')}
-              </p>
-              {/* 🔴 OWNER DECISION 153 §٢ ROW ٣ — «تسجيل الإقرار», its OWN key.
-                  This control used to carry `rcRecordRenewalButton`, the FILING control's
-                  label, so the screen offered two different acts under one name. ⛔ The filing
-                  control above keeps that label; one key cannot name both. */}
-              <button
-                type="button"
-                data-renewal-declare=""
-                disabled={busy}
-                onClick={() => void submitRenewalDeclaration()}
-              >
-                {t('rcRecordDeclarationButton')}
               </button>
             </div>
           ) : null}

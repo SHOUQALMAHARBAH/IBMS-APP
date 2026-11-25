@@ -218,7 +218,11 @@ describe('every screen speaks both languages (rule 6)', () => {
  * ⚠️ The ratchet DEMANDED this, by name, on the commit that earned it: a budget left above the
  * real count stops being a ratchet and silently re-admits what it just paid for.
  */
-const RENDERED_IDENTIFIER_BUDGET = 10;
+/* 10 -> 7 on 2026-11-25: OWNER DECISION 163 RULING 1 took three off the screen at once — the
+   opportunity's title, its programme link and its list card all printed eight characters of a
+   uuid. The gate's DOWN direction demanded this figure BY NAME, which is the tenth batch
+   running that it has caught its own author. */
+const RENDERED_IDENTIFIER_BUDGET = 7;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

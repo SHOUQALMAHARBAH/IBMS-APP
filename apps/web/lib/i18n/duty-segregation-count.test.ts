@@ -27,11 +27,18 @@ import { lookupOptional } from './translations';
  * inventing Arabic, which decision 125 forbids. What it CAN do is fail: the day the registry
  * gains a row, this test goes red naming both figures, and the new word is asked for.
  *
- * ## ⚠️ AND THE TWO NEEDS-ASSESSMENT ROWS ARE A KNOWN DEFECT SHE ACCEPTED
+ * ## ⚠️ AND THE TWO NEEDS-ASSESSMENT ROWS WERE A KNOWN DEFECT SHE ACCEPTED — SHE HAS NOW RULED IT
  *
- * They carry the same checker permission, so with the operation column removed they read alike.
- * Decision 157 records it in her own words: «عيب معلوم قبلته الإدارة». ⛔ It is not to be
- * "fixed" by de-duplicating the registry — they are two different acts.
+ * They carry the same checker permission, so with the operation column removed they read alike,
+ * and decision 157 recorded that in her own words: «عيب معلوم قبلته الإدارة». 🔴 OWNER DECISION
+ * 163 RULING 4 ENDS IT: each row is qualified with the word the needs-assessment screen itself
+ * uses — «(راجعه)» and «(اعتمده)» — and `lib/admin/duty-segregation-rows.test.ts` is what holds
+ * that, in both directions.
+ *
+ * ⛔ THE ⛔ BELOW STILL STANDS, AND IS WHY THIS COUNT DID NOT MOVE: the registry is NOT
+ * de-duplicated. They are two different acts with two different escape columns, and collapsing
+ * them would let a declared combined REVIEW excuse a self-APPROVAL. What ruling 4 changed is the
+ * DISPLAY, so the sentence still says «ستّ عشرة» and this file still measures sixteen.
  */
 
 const REPO = join(__dirname, '..', '..', '..', '..');

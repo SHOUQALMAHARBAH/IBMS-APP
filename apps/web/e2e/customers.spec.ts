@@ -2,6 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { expectAbsentWithin } from "./support/anchored";
+import {
+  expectLayoutOnlyControl,
+  useTheme,
+  type BaseTheme,
+} from "./fixtures/base-style";
 
 const ME_BASE = {
   id: "user-1",
@@ -1264,3 +1269,42 @@ test("§P2 — and a caller without opportunity.read is told, rather than shown 
     page.getByRole("button", { name: "View", exact: true }),
   ).toHaveCount(0);
 });
+
+/*
+ * 🔴 MESSAGE 53 §1 ITEM 1 — THE CONTROL(S) ON THIS SCREEN THAT THE BASE SHAPE USED TO SKIP.
+ *
+ * Decision 161 ruling 2's first selector asked only WHETHER a control had an inline style, so a
+ * control whose style names a margin, a width or a cursor and nothing else was left to the
+ * browser's own default. The rule now reads the property NAMES; see `globals.css`.
+ *
+ * ⚠️ RUN HERE rather than in `base-style.spec.ts`, on this file's own PROVEN fixtures — message
+ * 44 lost a session to an invented fixture that rendered «This page couldn't load» and read
+ * exactly like a product defect. ⚠️ And in BOTH themes, because ruling 4 says the presenter
+ * shows the LIGHT one, which is why nobody will be looking at the dark one on the day.
+ */
+for (const theme of ["light", "dark"] as BaseTheme[]) {
+  test(`decision 163 §1 — the two bare customer-list controls take the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+    await page.route("http://localhost:4000/customers", (route) =>
+      route.fulfill({ status: 200, json: paged([CUSTOMER]) }),
+    );
+    await page.goto("/customers");
+    await expect(
+      page.getByRole("heading", { name: "Customers" }),
+    ).toBeVisible();
+
+    await expectLayoutOnlyControl(
+      page.getByRole("button", { name: "+ Onboard a new customer" }),
+      theme,
+      "/customers onboard button",
+    );
+    await expectLayoutOnlyControl(
+      page.locator("form").getByRole("button", { name: "Search" }),
+      theme,
+      "/customers search button",
+    );
+  });
+}

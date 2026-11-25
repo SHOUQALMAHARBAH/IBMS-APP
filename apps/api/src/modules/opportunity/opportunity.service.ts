@@ -37,6 +37,33 @@ export interface OpportunityView extends Opportunity {
 }
 
 /**
+ * 🔴 OWNER DECISION 163 RULING 1 — WHAT THE DETAIL SCREEN'S TITLE IS MADE OF.
+ *
+ * «فرصة تجارية — {اسم العميل}», and the programme link carries the programme's name. Both
+ * names travel WITH the record, so the screen does not fetch a customer to write its own
+ * heading and cannot be told 403 for a name it is already showing the record of.
+ *
+ * ⛔ A SEPARATE VIEW TYPE RATHER THAN NULLABLE FIELDS ON `OpportunityView`. `create` and
+ * `setTargetPremiumThreshold` also return a view, and measured, both callers DISCARD the body —
+ * `create`'s is read for its id and the threshold's is dropped in favour of a re-read. Making
+ * the names nullable on the shared type would put a branch on the screen that renders a uuid
+ * again, and that branch is exactly the defect the ruling is about.
+ */
+export interface OpportunityDetailContext extends OpportunityContext {
+  /** The customer's legal name, for the title. Never null: `Opportunity.customerId` is a
+   *  required FK. */
+  customerLegalName: string;
+  /** The programme's own name — `RiskProfile.siteLabel`, which `iprogdHeadingWithSite` already
+   *  renders, so the two screens name one programme the same way. Null exactly when
+   *  `insuranceProgramId` is null (a renewal opportunity has no programme). */
+  insuranceProgramName: string | null;
+}
+
+export interface OpportunityDetailView extends Opportunity {
+  context: OpportunityDetailContext;
+}
+
+/**
  * Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B). This
  * module is the **minimal parent** an `RFQ` hangs off, in the same shape as
  * Process 5's minimal RiskProfile parent: it creates an `Opportunity` from a
@@ -271,8 +298,33 @@ export class OpportunityService {
     return { items: rows, total, page: window.page, pageSize: window.pageSize };
   }
 
-  async get(id: string, actor: AuthenticatedUser): Promise<OpportunityView> {
-    return this.toView(await this.findVisible(id, actor));
+  async get(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<OpportunityDetailView> {
+    const opportunity = await this.opportunities.findByIdWithNames(id);
+    if (!opportunity) {
+      throw new NotFoundException('Opportunity not found');
+    }
+    // The same two-step refusal `findVisible` makes, and for the same reason: a caller who
+    // cannot reach the customer is told the opportunity does not exist rather than that it does.
+    try {
+      await this.assertCustomerVisible(opportunity.customerId, actor);
+    } catch {
+      throw new NotFoundException('Opportunity not found');
+    }
+    const { customer, insuranceProgram, ...rest } = opportunity;
+    // ⛔ The two joins are FLATTENED and STRIPPED — the raw-join-as-payload shape that left the
+    // RFQ's insurer column blank for months (message 45 §2).
+    return {
+      ...rest,
+      context: {
+        insuranceProgramId: opportunity.insuranceProgramId,
+        customerId: opportunity.customerId,
+        customerLegalName: customer.legalName,
+        insuranceProgramName: insuranceProgram?.riskProfile.siteLabel ?? null,
+      },
+    };
   }
 
   /**

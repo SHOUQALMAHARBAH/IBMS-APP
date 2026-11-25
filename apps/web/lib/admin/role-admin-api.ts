@@ -251,6 +251,9 @@ export interface DutySegregationReadiness {
   pairLabel: string;
   constraint: string | null;
   checkerPermission: string;
+  /** 🔴 OWNER DECISION 163 RULING 4 — the two `NeedsAssessment` pairs name one permission, and
+   *  this is what they differ by. ⛔ Never `pairLabel`, which is prose. */
+  checkerField: string;
   holderCount: number;
   status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
 }

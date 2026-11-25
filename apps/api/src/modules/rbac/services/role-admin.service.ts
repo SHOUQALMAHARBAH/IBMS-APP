@@ -103,6 +103,20 @@ export interface DutySegregationReadiness {
   pairLabel: string;
   constraint: string | null;
   checkerPermission: string;
+  /**
+   * 🔴 OWNER DECISION 163 RULING 4 — WHAT TELLS TWO ROWS WITH ONE PERMISSION NAME APART.
+   *
+   * `NeedsAssessment` carries TWO pairs — reviewer and approver — and both name
+   * `needs-assessment.approve`, so the table printed «يعتمد تقييم حاجات العميل» twice. Her
+   * ruling qualifies each with the word the needs-assessment screen already uses.
+   *
+   * ⛔ The screen must not split `pairLabel` to find this. That label is prose
+   * (`'createdByUserId / reviewedByUserId'`), decision 157 ruling 11 took it off the table for
+   * being programmatic, and a screen parsing it would break the day somebody rewords it. The
+   * CHECKER FIELD is the thing the two pairs actually differ by — it is one escape column per
+   * constraint, which is the distinction `maker-checker-pairs.config.ts` calls load-bearing.
+   */
+  checkerField: string;
   /** Distinct ACTIVE users holding the checker permission. */
   holderCount: number;
   status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
@@ -872,6 +886,7 @@ export class RoleAdminService {
         pairLabel: pair.pairLabel,
         constraint: pair.dbCheckConstraint,
         checkerPermission: pair.checkerPermission,
+        checkerField: pair.checkerField,
         holderCount,
         status:
           holderCount === 0

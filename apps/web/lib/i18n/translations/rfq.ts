@@ -30,7 +30,7 @@ export const RFQ = {
     oppListNoneYet:
       'لا توجد فرص تجارية لهذا العميل بعد. افتح برنامج تأمين معتمد نهائياً واختر ' +
       '"طرح في السوق" لإنشاء واحدة.',
-    oppCardHeading: 'فرصة تجارية {id}',
+    oppCardHeading: 'فرصة تجارية — {customer}',
     oppRenewal: 'تجديد',
     oppNewBusiness: 'أعمال جديدة',
     oppCreatedMeta: '{type} · أُنشئت {date}',
@@ -58,15 +58,13 @@ export const RFQ = {
     oppDetailNotFound:
       'تعذر العثور على هذه الفرصة التجارية — قد لا تكون موجودة، أو لا تملك صلاحية الوصول إليها.',
     oppDetailLoadError: 'تعذر تحميل هذه الفرصة التجارية — حاول مرة أخرى.',
-    oppDetailHeading: 'فرصة تجارية {id}',
+    oppDetailHeading: 'فرصة تجارية — {customer}',
     oppDetailStatusLine: 'الحالة: {status}',
     oppDetailFromProgramPrefix: 'من برنامج التأمين',
     oppCreateRfqButton: 'إنشاء طلب عرض أسعار لفرع تأمين',
     oppRfqsHeading: 'طلبات عروض الأسعار',
     oppRfqsNone:
       'لا توجد طلبات عروض أسعار بعد. أنشئ طلباً لكل فرع تأمين وأرسله إلى قائمة مختصرة من شركات التأمين.',
-    rfqInsurerCountOne: '{count} مؤمِّن',
-    rfqInsurerCountOther: '{count} مؤمِّن',
     oppRfqIssuedMeta: 'صدر بتاريخ {date} · {breakdown}',
     oppRfqNoInsurersYet: 'لا يوجد مؤمِّنون بعد',
     oppClaimsConsentLabel: 'موافقة المطالبات',
@@ -488,7 +486,7 @@ export const RFQ = {
     oppListNoneYet:
       'No opportunities for this customer yet. Open a finalized insurance ' +
       'program and choose "Take to market" to create one.',
-    oppCardHeading: 'Opportunity {id}',
+    oppCardHeading: 'Opportunity — {customer}',
     oppRenewal: 'Renewal',
     oppNewBusiness: 'New business',
     oppCreatedMeta: '{type} · created {date}',
@@ -504,14 +502,12 @@ export const RFQ = {
     oppDetailNotFound:
       'This opportunity could not be found — it may not exist, or you may not have access to it.',
     oppDetailLoadError: 'Could not load this opportunity — try again.',
-    oppDetailHeading: 'Opportunity {id}',
+    oppDetailHeading: 'Opportunity — {customer}',
     oppDetailStatusLine: 'Status: {status}',
     oppDetailFromProgramPrefix: 'From insurance program',
     oppCreateRfqButton: 'Create RFQ for a line',
     oppRfqsHeading: 'RFQs',
     oppRfqsNone: 'No RFQs yet. Create one per insurance line and send it to a shortlist of insurers.',
-    rfqInsurerCountOne: '{count} insurer',
-    rfqInsurerCountOther: '{count} insurers',
     oppRfqIssuedMeta: 'Issued {date} · {breakdown}',
     oppRfqNoInsurersYet: 'no insurers yet',
     oppClaimsConsentLabel: 'Claims consent',

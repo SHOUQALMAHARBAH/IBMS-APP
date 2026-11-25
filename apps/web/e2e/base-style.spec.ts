@@ -192,15 +192,33 @@ test('⛔ an element that carries its own style or className keeps it', async ({
   page,
 }) => {
   /*
-   * Her ruling's other half: «والعنصر الذي له شكل خاصّ يبقى كما هو». The selector is
-   * `:not([style]):not([class])`, so a styled control is not merely out-ranked — it is NOT
-   * MATCHED, which is the stronger guarantee and the one asserted here.
+   * Her ruling's other half: «والعنصر الذي له شكل خاصّ يبقى كما هو». A styled control is not
+   * merely out-ranked — it is NOT MATCHED, which is the stronger guarantee and the one asserted
+   * here.
+   *
+   * ⚠️ AND WHAT MAKES A CONTROL «STYLED» CHANGED ON 2026-11-25. The selector asked
+   * `:not([style])` — any inline style at all — and `/rfqs/new`'s line select was skipped for
+   * saying `minWidth` and `marginTop`. It now asks whether the style NAMES `background`, `color`
+   * or `border`. `matrixSearchStyle` names all three, so this probe is still a styled control;
+   * the assertion below says so OUT LOUD rather than relying on it.
+   *
+   * ⟶ The other direction — a LAYOUT-ONLY inline style the rule now reaches — is asserted on
+   *   the eleven controls the owner's walk named, in the six specs that already own their
+   *   screens, through `e2e/fixtures/base-style.ts`.
    */
   await openRoles(page, 'light', CATALOGUE);
   const styled = page.locator('[data-matrix-search]');
   await expect(styled).toBeVisible();
-  const hasOwn = await styled.evaluate((el) => el.hasAttribute('style'));
-  expect(hasOwn, 'the probe is no longer a STYLED control').toBe(true);
+  const own = await styled.evaluate((el) => el.getAttribute('style') ?? '');
+  expect(own, 'the probe is no longer a STYLED control').not.toBe('');
+  // AND IT IS STYLED BY THE RULE'S OWN TEST, not merely by having an attribute: at least one of
+  // the three look words. Without this, the day `matrixSearchStyle` loses its colours this test
+  // would start asserting the opposite of what it claims and keep passing.
+  expect(
+    ['background', 'color', 'border'].some((w) => own.toLowerCase().includes(w)),
+    'the probe`s inline style no longer names a LOOK, so the rule REACHES it now and this ' +
+      'test is measuring the wrong direction',
+  ).toBe(true);
 
   // Its own padding, from `matrixSearchStyle`, not this rule's `var(--space-2) var(--space-3)`.
   const padding = await styled.evaluate(

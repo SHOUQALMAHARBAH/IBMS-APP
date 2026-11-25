@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
-import type { OpportunityWithContext } from "../lib/opportunity/opportunity-api";
+import type { OpportunityWithDetailContext } from "../lib/opportunity/opportunity-api";
 import type { Policy } from "../lib/policy/policy-api";
 
 /**
@@ -57,7 +57,7 @@ async function mockAuth(page: Page, roles: string[]) {
  * has cost this project three wrong diagnoses. The type annotation is what makes the next one a
  * compile error instead.
  */
-const OPPORTUNITY: OpportunityWithContext = {
+const OPPORTUNITY: OpportunityWithDetailContext = {
   id: "opp-1",
   customerId: "cust-1",
   insuranceProgramId: "prog-1",
@@ -67,7 +67,14 @@ const OPPORTUNITY: OpportunityWithContext = {
   createdByUserId: "user-1",
   createdAt: "2026-09-01T00:00:00.000Z",
   updatedAt: "2026-09-08T00:00:00.000Z",
-  context: { insuranceProgramId: "prog-1", customerId: "cust-1" },
+  context: {
+    insuranceProgramId: "prog-1",
+    customerId: "cust-1",
+    // 🔴 OWNER DECISION 163 RULING 1 — the two names the title is made of. A fixture
+    // without them renders «Opportunity — undefined», so they are not optional.
+    customerLegalName: "Acme Trading",
+    insuranceProgramName: "Head office",
+  },
 };
 
 /** An override APPROVED BY SOMEBODY ELSE — the ordinary two-person case. */

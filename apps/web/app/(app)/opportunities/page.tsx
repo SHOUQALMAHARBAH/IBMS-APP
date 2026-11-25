@@ -58,15 +58,27 @@ function OpportunityCard({ opportunity }: { opportunity: OpportunityListRow }) {
       style={rfqCardStyle}
       onClick={() => router.push(`/opportunities/${opportunity.id}`)}
     >
+      {/* 🔴 OWNER DECISION 163 RULING 1 — the card's heading names the customer, where it named
+          eight characters of a uuid.
+
+          ⚠️ AND THE SEPARATE «العميل: X» META ROW IS DELETED, WHICH IS A STATED JUDGEMENT. It
+          was decision 150 ruling 1's — «a reader who arrived from the sidebar has no customer in
+          hand» — and that requirement is still met, one line higher up. What is not kept is
+          printing one fact twice under two labels, which is decision 153 ruling 1's own reason
+          for removing the certificate's duplicate reference row. ⟶ REPORTED so she can reverse
+          it in one line.
+
+          ⚠️ AND `oppListCustomerLabel` IS NOW READ NOWHERE — kept rather than deleted, because
+          the Arabic in it is hers; its two siblings `rfqListCustomerLabel` and
+          `iprogListCustomerLabel` are still read by their own cards, whose headings name a line
+          and a status rather than the customer, so those three cards are unchanged. */}
       <div style={listCardHeaderRowStyle}>
-        <strong>{t('oppCardHeading', { id: opportunity.id.slice(0, 8) })}</strong>
+        <strong>
+          {t('oppCardHeading', {
+            customer: opportunity.customer.legalName,
+          })}
+        </strong>
         <span style={rfqBadgeStyle}>{t(OPPORTUNITY_STATUS_LABEL_KEY[opportunity.status])}</span>
-      </div>
-      {/* The customer, because a reader who arrived from the sidebar has none in hand — which is
-          the whole reason this screen was empty. `<bdi>` for the reason every other list screen
-          uses it: a Latin company name inside an Arabic line. */}
-      <div style={cardMetaStyle}>
-        {t('oppListCustomerLabel')}: <bdi>{opportunity.customer.legalName}</bdi>
       </div>
       <div style={cardMetaStyle}>
         {t('oppCreatedMeta', {

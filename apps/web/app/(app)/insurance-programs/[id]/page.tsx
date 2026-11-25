@@ -141,10 +141,23 @@ export default function InsuranceProgramDetailPage() {
 
       {program && ctx ? (
         <>
+          {/* 🔴 OWNER DECISION 163 RULING 1 — «برنامج التأمين — {اسم البرنامج} — {اسم العميل}».
+              Four branches rather than two because either name can be absent on a row with no
+              risk profile, and a title reading «برنامج التأمين —  — » would be worse than the
+              shorter one. */}
           <h1>
-            {ctx.siteLabel
-              ? t('iprogdHeadingWithSite', { site: ctx.siteLabel })
-              : t('iprogdHeading')}
+            {ctx.siteLabel && ctx.customerLegalName
+              ? t('iprogdHeadingWithSiteAndCustomer', {
+                  site: ctx.siteLabel,
+                  customer: ctx.customerLegalName,
+                })
+              : ctx.siteLabel
+                ? t('iprogdHeadingWithSite', { site: ctx.siteLabel })
+                : ctx.customerLegalName
+                  ? t('iprogdHeadingWithCustomer', {
+                      customer: ctx.customerLegalName,
+                    })
+                  : t('iprogdHeading')}
           </h1>
           <p style={{ margin: '0 0 1rem' }}>
             <WorkflowHistoryLink entityType='InsuranceProgram' entityId={program.id} />

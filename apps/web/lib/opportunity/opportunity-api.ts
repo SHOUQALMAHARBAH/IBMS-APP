@@ -42,6 +42,22 @@ export interface OpportunityWithContext extends Opportunity {
   context: OpportunityContext;
 }
 
+/**
+ * The DETAIL read's context, which carries the two names its title is made of (decision 163
+ * ruling 1). Separate from `OpportunityContext` because `createOpportunity` and
+ * `setTargetPremiumThreshold` return the narrow one — and both callers discard the body, so a
+ * nullable pair on the shared type would only add a branch that renders a uuid again.
+ */
+export interface OpportunityDetailContext extends OpportunityContext {
+  customerLegalName: string;
+  /** The programme's own name, null exactly when `insuranceProgramId` is. */
+  insuranceProgramName: string | null;
+}
+
+export interface OpportunityWithDetailContext extends Opportunity {
+  context: OpportunityDetailContext;
+}
+
 export function createOpportunity(
   insuranceProgramId: string,
 ): Promise<OpportunityWithContext> {
@@ -86,7 +102,9 @@ export function listAllOpportunities(
   return apiGet(`/opportunities${suffix ? `?${suffix}` : ''}`);
 }
 
-export function getOpportunity(id: string): Promise<OpportunityWithContext> {
+export function getOpportunity(
+  id: string,
+): Promise<OpportunityWithDetailContext> {
   return apiGet(`/opportunities/${id}`);
 }
 

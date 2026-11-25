@@ -34,7 +34,7 @@ import { insurerDisplayName, lineDisplayName } from '../../../lib/i18n/names';
  */
 function RfqCard({ rfq }: { rfq: RfqListRow }) {
   const router = useRouter();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
   return (
     <button
       type="button"
@@ -46,12 +46,9 @@ function RfqCard({ rfq }: { rfq: RfqListRow }) {
           <bdi>{lineDisplayName(rfq, language)}</bdi>
         </strong>
         <span style={rfqBadgeStyle}>
-          {t(
-            rfq.insurerSubmissions.length === 1
-              ? 'rfqInsurerCountOne'
-              : 'rfqInsurerCountOther',
-            { count: rfq.insurerSubmissions.length },
-          )}
+          {/* Decision 163 ruling 3 — the two flat keys carried the SAME text, so the
+              ternary selected between «{count} مؤمِّن» and «{count} مؤمِّن». */}
+          {tPlural('rfqInsurerCount', rfq.insurerSubmissions.length)}
         </span>
       </div>
       {/* The customer, because a reader who arrived from the sidebar has none in hand. */}

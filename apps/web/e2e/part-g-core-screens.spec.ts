@@ -4,7 +4,7 @@ import type { Lead } from "../lib/lead/lead-api";
 import type { Policy } from "../lib/policy/policy-api";
 import type { Claim } from "../lib/claim/claim-api";
 import type { RenewalCase } from "../lib/renewal/renewal-api";
-import type { OpportunityWithContext } from "../lib/opportunity/opportunity-api";
+import type { OpportunityWithDetailContext } from "../lib/opportunity/opportunity-api";
 
 /*
  * Part G, checklist item 7 — "The core screens (Lead→Policy→Claim→Renewal)
@@ -334,7 +334,7 @@ for (const lang of LANGS) {
  * `docs/scope-and-gaps.md` on 2026-10-30.
  */
 
-const OPPORTUNITY: OpportunityWithContext = {
+const OPPORTUNITY: OpportunityWithDetailContext = {
   id: "opp-1",
   customerId: "cust-1",
   insuranceProgramId: "prog-1",
@@ -344,7 +344,14 @@ const OPPORTUNITY: OpportunityWithContext = {
   createdByUserId: "user-1",
   createdAt: "2026-09-01T00:00:00.000Z",
   updatedAt: "2026-09-08T00:00:00.000Z",
-  context: { insuranceProgramId: "prog-1", customerId: "cust-1" },
+  context: {
+    insuranceProgramId: "prog-1",
+    customerId: "cust-1",
+    // 🔴 OWNER DECISION 163 RULING 1 — the two names the title is made of. A fixture
+    // without them renders «Opportunity — undefined», so they are not optional.
+    customerLegalName: "Acme Trading",
+    insuranceProgramName: "Head office",
+  },
 };
 
 const CLAIM: Claim = {
