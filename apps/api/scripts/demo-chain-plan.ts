@@ -36,6 +36,22 @@ export const HALTED_STAGES = [
    * waiting to be attached to it.
    */
   'rfqIssuedAwaitingEvidence',
+  /**
+   * 🔴 MESSAGE 53 §2 — A POLICY ISSUED AND NOT YET CHECKED, so the policy-checking account has
+   * work to open.
+   *
+   * Message 52 §3-A promised this and the walk from an empty database did not find it. MEASURED
+   * on `main` at `7f7c6a66` and the reason is structural: all four stages above stop BEFORE a
+   * policy exists, and `runFullPipeline` calls `POST /policies/:id/checking` unconditionally —
+   * so every policy in the demo file was already checked and `demo.policy_check` opened a screen
+   * with nothing on it.
+   *
+   * ⚠️ AND THIS STAGE BREAKS THE SENTENCE BELOW, WHICH IS WHY THAT SENTENCE IS CORRECTED RATHER
+   * THAN LEFT: this is the FIRST halted chain that DOES become a policy. It is deliberately not
+   * counted into `policies`, so it is never invoiced and never claimed — a policy nobody has
+   * checked must not have money moving against it, which is what the maker/checker pair is for.
+   */
+  'policyAwaitingCheck',
 ] as const;
 
 export type HaltedStage = (typeof HALTED_STAGES)[number];
@@ -43,15 +59,22 @@ export type HaltedStage = (typeof HALTED_STAGES)[number];
 /**
  * How many chains halt at each stage, PER OFFICE.
  *
- * Small and fixed. The point is that a presenter can find one, not that the file looks busy —
- * and every chain here is a chain that does NOT become a policy, so a large number would quietly
- * empty the dashboards item 5 exists to fill.
+ * Small and fixed. The point is that a presenter can find one, not that the file looks busy.
+ *
+ * ⚠️ CORRECTED 2026-11-25: this used to say «every chain here is a chain that does NOT become a
+ * policy», which stopped being true when `policyAwaitingCheck` was added. The REASON behind it
+ * still holds and is why the numbers stay small — a chain that halts is a chain that does not
+ * reach the invoicing and claims the dashboards are filled from, and `policyAwaitingCheck` is
+ * excluded from those two steps as well.
  */
 export const HALTED_CHAINS_PER_OFFICE: Readonly<Record<HaltedStage, number>> = {
   needsAssessmentApproved: 2,
   programmeFinalized: 2,
   opportunityNeedsConfirmed: 2,
   rfqIssuedAwaitingEvidence: 2,
+  /** ONE per office: the point is that the checking queue is not empty, and every extra one is a
+   *  policy taken out of the figures the dashboards show. */
+  policyAwaitingCheck: 1,
 };
 
 /** Every stage, expanded one entry per chain, in pipeline order. */
