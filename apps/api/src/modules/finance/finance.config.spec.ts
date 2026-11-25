@@ -706,7 +706,6 @@ describe('buildInsurerPayables (Process 34)', () => {
       withoutAr.rows.map((r) => r.insurerNameAr),
     );
   });
-
 });
 
 describe('invoiceAuditSnapshot', () => {
@@ -1148,7 +1147,6 @@ describe('buildCommissionRollup (Process 40)', () => {
       b.map((r) => r.insurerNameAr),
     );
   });
-
 });
 
 describe('buildProfitability (Process 40)', () => {
@@ -1291,5 +1289,4 @@ describe('buildProfitability (Process 40)', () => {
       withoutAr.byLine.map((r) => r.labelAr),
     );
   });
-
 });

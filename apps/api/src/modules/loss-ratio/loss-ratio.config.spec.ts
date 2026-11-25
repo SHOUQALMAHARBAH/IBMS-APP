@@ -293,7 +293,8 @@ describe('buildLossRatioBreakdown (Process 30)', () => {
   it('§أ-١١ — the by-customer and by-policy labels carry NO Arabic name', () => {
     const policies = [pol({})];
     expect(
-      buildLossRatioBreakdown({ groupBy: 'customer', policies }).rows[0].labelAr,
+      buildLossRatioBreakdown({ groupBy: 'customer', policies }).rows[0]
+        .labelAr,
     ).toBeNull();
     expect(
       buildLossRatioBreakdown({ groupBy: 'policy', policies }).rows[0].labelAr,
