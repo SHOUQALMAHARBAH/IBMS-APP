@@ -23,12 +23,23 @@ import {
  * needed: a plan nobody executes and an execution nobody planned fail differently.
  */
 describe('the demo seed’s halted-chain plan', () => {
-  it('names every stage message 46 §2.1 asks for', () => {
+  it('names every stage message 46 §2.1 and message 53 §2 ask for', () => {
     expect([...HALTED_STAGES]).toEqual([
       'needsAssessmentApproved',
       'programmeFinalized',
       'opportunityNeedsConfirmed',
       'rfqIssuedAwaitingEvidence',
+      /*
+       * 🔴 MESSAGE 53 §2 — added because the walk from an empty database found
+       * `demo.policy_check` with nothing to open. All four stages above stop BEFORE a policy
+       * exists and `runFullPipeline` checked every policy it placed, so the checking queue was
+       * structurally empty whatever the data looked like.
+       *
+       * ⚠️ It is LAST, and the order is asserted by the next test but one: a policy awaiting its
+       * check is the furthest-along halt there is, and a stage list out of pipeline order would
+       * let a later stage be seeded «before» an earlier one.
+       */
+      'policyAwaitingCheck',
     ]);
   });
 

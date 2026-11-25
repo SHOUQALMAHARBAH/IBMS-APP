@@ -1,6 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { expectNone } from "./support/anchored";
+import {
+  expectLayoutOnlyControl,
+  useTheme,
+  type BaseTheme,
+} from "./fixtures/base-style";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 /*
@@ -319,3 +324,33 @@ test("claims queue screens have no serious/critical accessibility violations @a1
     ),
   ).toEqual([]);
 });
+
+/*
+ * 🔴 MESSAGE 53 §1 ITEM 1 — THE CONTROL(S) ON THIS SCREEN THAT THE BASE SHAPE USED TO SKIP.
+ *
+ * Decision 161 ruling 2's first selector asked only WHETHER a control had an inline style, so a
+ * control whose style names a margin, a width or a cursor and nothing else was left to the
+ * browser's own default. The rule now reads the property NAMES; see `globals.css`.
+ *
+ * ⚠️ RUN HERE rather than in `base-style.spec.ts`, on this file's own PROVEN fixtures — message
+ * 44 lost a session to an invented fixture that rendered «This page couldn't load» and read
+ * exactly like a product defect. ⚠️ And in BOTH themes, because ruling 4 says the presenter
+ * shows the LIGHT one, which is why nobody will be looking at the dark one on the day.
+ */
+for (const theme of ["light", "dark"] as BaseTheme[]) {
+  test(`decision 163 §1 — the claim back button takes the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ["CLAIMS_OFFICER"]);
+    await page.route(DETAIL_URL, (route) =>
+      route.fulfill({ status: 200, json: CLAIM }),
+    );
+    await page.goto("/claims/clm-1");
+    await expectLayoutOnlyControl(
+      page.getByRole("button", { name: "← All claims" }),
+      theme,
+      "/claims/[id] back button",
+    );
+  });
+}

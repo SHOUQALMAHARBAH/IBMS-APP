@@ -193,7 +193,14 @@ test("SCREEN 3 of 4 — the policy's electronic file shows an insurer licence ce
         createdByUserId: "user-1",
         createdAt: "2026-09-01T00:00:00.000Z",
         updatedAt: "2026-09-08T00:00:00.000Z",
-        context: { insuranceProgramId: "prog-1", customerId: "cust-1" },
+        context: {
+          insuranceProgramId: "prog-1",
+          customerId: "cust-1",
+          // 🔴 OWNER DECISION 163 RULING 1 — the two names the title is made of. A fixture
+          // without them renders «Opportunity — undefined», so they are not optional.
+          customerLegalName: "Acme Trading",
+          insuranceProgramName: "Head office",
+        },
       },
     }),
   );

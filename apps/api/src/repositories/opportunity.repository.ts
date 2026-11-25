@@ -31,6 +31,36 @@ export type OpportunityWithCustomer = Opportunity & {
   customer: { id: string; legalName: string };
 };
 
+/*
+ * 🔴 OWNER DECISION 163 RULING 1 — THE DETAIL READ CARRIES THE TWO NAMES ITS TITLE NEEDS.
+ *
+ * The opportunity screen's title was «فرصة تجارية 78684085» and its programme link was
+ * «من برنامج التأمين 7c0b5103» — eight characters of a uuid in both places, on the screen a
+ * placement officer opens first. The ruling is the customer's name in the title and the
+ * programme's name on the link.
+ *
+ * ⛔ So the DETAIL read joins what the title needs rather than the screen fetching it. The list
+ * read has carried `customer.legalName` since decision 150 ruling 1; this adds the same join to
+ * the single-row read, plus ONE hop further for the programme's own name — which lives on the
+ * `RiskProfile.siteLabel` that `iprogdHeadingWithSite` already renders, so the two screens name
+ * a programme the same way and cannot disagree.
+ *
+ * ⚠️ AND `legalName`, NOT a bilingual pair. Message 50 measured that widening customer and
+ * office names to `legalNameAr` reaches 20 sites the owner has ruled nothing about; the three
+ * lists already name their customer from `legalName` and this follows them. An empty cell,
+ * reported rather than decided.
+ */
+const OPPORTUNITY_DETAIL_INCLUDE = {
+  customer: { select: { id: true, legalName: true } },
+  insuranceProgram: {
+    select: { id: true, riskProfile: { select: { siteLabel: true } } },
+  },
+} as const;
+
+export type OpportunityWithNames = OpportunityWithCustomer & {
+  insuranceProgram: { id: string; riskProfile: { siteLabel: string } } | null;
+};
+
 function buildOpportunityListWhere(
   filter: ListOpportunitiesFilter,
 ): Prisma.OpportunityWhereInput {
@@ -72,6 +102,21 @@ export class OpportunityRepository {
 
   findById(id: string): Promise<Opportunity | null> {
     return this.prisma.client.opportunity.findUnique({ where: { id } });
+  }
+
+  /**
+   * The single-row read for the DETAIL screen, carrying the two names its title needs
+   * (decision 163 ruling 1).
+   *
+   * ⛔ A SEPARATE METHOD RATHER THAN A WIDER `findById`: that one has ten callers across seven
+   * modules — client decision, comparison, cross-sell, policy, quotation and two more — none of
+   * which renders a title, and widening it would put two joins on every one of their reads.
+   */
+  findByIdWithNames(id: string): Promise<OpportunityWithNames | null> {
+    return this.prisma.client.opportunity.findUnique({
+      where: { id },
+      include: OPPORTUNITY_DETAIL_INCLUDE,
+    });
   }
 
   findManyByCustomerId(customerId: string): Promise<OpportunityWithCustomer[]> {

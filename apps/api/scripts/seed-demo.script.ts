@@ -1,5 +1,9 @@
 import { it } from 'vitest';
 import { lineCodeForProgrammeLine } from '../src/modules/insurance-program/insurance-program.config';
+// Message 53 §2 item 7 — the PRODUCT's own line-family classifier, imported rather than
+// re-implemented: a second copy would disagree the first time a line was renamed, and the
+// disagreement would surface as exactly the defect it is here to fix.
+import { classifyInsuranceLine } from '../src/modules/claim/claim.config';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -111,6 +115,15 @@ const NUM = {
   complaintsPerOrg: envInt('DEMO_COMPLAINTS_PER_ORG', 6),
   incidentsPerOrg: envInt('DEMO_INCIDENTS_PER_ORG', 5),
   vendorsPerOrg: envInt('DEMO_VENDORS_PER_ORG', 6),
+  /*
+   * MESSAGE 53 §2 ITEM 2 — the share of customers whose KYC is completed.
+   *
+   * ⚠️ A SHARE RATHER THAN ALL, by the owner's own words («جزء من العملاء»): a list where
+   * every row reads «نشِط» has no KYC queue to show, and `/customers/kyc-queue` is in the
+   * scenario. Expressed as a fraction here rather than a count so it scales with
+   * `customersPerOrg`, and overridable for a quick run.
+   */
+  kycShare: envInt('DEMO_KYC_PERCENT', 70) / 100,
 };
 
 /**
@@ -225,6 +238,54 @@ function jordanianPhone(): string {
 
 function uniqueEmail(local: string): string {
   return `${local}.${Date.now()}.${nextSeq()}@demo-seed.ibms.test`;
+}
+
+/*
+ * 🔴 MESSAGE 53 §2 ITEM 4 — THE POLICY SECTION'S TWO ADDRESSES, AND THE SHAPE WAS WRONG BEFORE
+ * THE LENGTH WAS.
+ *
+ * The walk read `client-acceptance.1795519941693.558@demo-seed.ibms.test` under the client's
+ * acceptance evidence, and the same shape beside the delivery recipient. The owner asked for
+ * «عناوين قصيرة ومعقولة».
+ *
+ * ⟶ AND WHAT EACH FIELD SHOULD HOLD IS WRITTEN IN ITS OWN DTO, so neither of these is invented:
+ *
+ *   `CaptureClientDecisionDto.evidenceRef`  «a document id, an e-signature envelope id, or an
+ *                                            email message reference. Not the evidence content.»
+ *   `RecordDeliveryDto.recipient`           «a name, an email address, or a courier reference.»
+ *
+ * So `evidenceRef` was not merely long — a mailbox address is not an email MESSAGE reference,
+ * which is the `<local@host>` form a mail client shows. And `recipient` ignored the `method`
+ * beside it, so a policy delivered `in_person` or by `courier` recorded an email address as the
+ * person who took it.
+ *
+ * ⛔ NEITHER FIELD IS UNIQUE-CONSTRAINED and neither is validated as an email (both are
+ * `@IsString()` with a length bound), so the timestamp and sequence were buying nothing. Both
+ * carry the record's own id instead, which is short, stable across a re-run, and traceable.
+ */
+function emailMessageRef(seed: string): string {
+  return `<accept.${seed.slice(0, 8)}@mail.demo.test>`;
+}
+
+/** The delivery recipient, in the shape the `method` beside it implies. */
+function deliveryRecipient(
+  method: string,
+  customerLabel: string,
+  policyId: string,
+): string {
+  // ⚠️ `customerLabel` defaults to '' on a pipeline called without one, so every branch that
+  // wants a name has a fallback that is still a plausible value rather than an empty string —
+  // which `@MinLength(2)` would refuse, turning a cosmetic choice into a failed delivery.
+  const who = customerLabel.trim() || 'مسؤول التأمين';
+  switch (method) {
+    case 'email':
+      return `insurance@${policyId.slice(0, 6)}.demo.test`;
+    case 'courier':
+      return `ARAMEX-${policyId.slice(0, 8).toUpperCase()}`;
+    default:
+      // `portal` and `in_person` are both a PERSON taking the document.
+      return who;
+  }
 }
 
 function isoDateDaysFromNow(days: number): string {
@@ -783,8 +844,27 @@ function personName(): {
   return { given, father, grandfather, family, gender };
 }
 
+/*
+ * 🔴 MESSAGE 53 §2 ITEM 3 — «أسماء بدون أرقام»: THE «#NN» SUFFIX GOES.
+ *
+ * It read «شركة النور للصناعات #77» on every corporate customer card, including the ones in the
+ * rehearsed path.
+ *
+ * ⛔ AND IT WAS NEVER LOAD-BEARING, MEASURED RATHER THAN ASSUMED. A company's identity in this
+ * product is its COMMERCIAL REGISTRATION NUMBER: `customer.service.ts` pre-checks
+ * `findCanonicalCollision` on `{ customerType: 'CORPORATE', registrationNumber }` and the
+ * database constraint beneath it is keyed the same way. The legal NAME carries no corporate
+ * uniqueness at all — its own comment says a name collision is answered by the create screen's
+ * question rather than by a 409, and that half is about INDIVIDUALS. `registrationNumber` here
+ * stays `REG-<timestamp>-<seq>`, so nothing that was unique has stopped being unique.
+ *
+ * ⚠️ SO TWO CUSTOMERS MAY NOW SHARE A NAME, and that is reported rather than hidden: the pool is
+ * 12 prefixes × 10 suffixes = 120 combinations against about 112 corporate customers an office,
+ * so a repeat is likely and looks exactly like what it is — two similarly-named companies, which
+ * is what a real book holds. ⛔ A third word axis would be new Arabic, which is the owner's.
+ */
 function companyName(): string {
-  return `${pick(COMPANY_PREFIXES)} ${pick(COMPANY_SUFFIXES)} #${nextSeq()}`;
+  return `${pick(COMPANY_PREFIXES)} ${pick(COMPANY_SUFFIXES)}`;
 }
 
 function randomQuestionnaire(): Record<string, boolean | number> {
@@ -1776,16 +1856,56 @@ async function expireOfficeLicenceAwaitingDeclaration(
     return;
   }
 
-  const expiredAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const shiftMs = terms[0].expiresAt.getTime() - expiredAt.getTime();
+  /*
+   * 🔴 MESSAGE 53 §2 ITEM 6 — THE EXPIRY LANDS ON A 31 DECEMBER, AND THE ISSUE DATE MOVES WITH IT.
+   *
+   * This used to shift the expiry to «thirty days ago», which on the walk was 25/10/2026 — and
+   * the licence screen then showed TWO yellow warnings reading «تاريخ الانتهاء المُدخل ليس
+   * الحادي والثلاثين من كانون الأول…», on the screen the presenter's whole demonstration happens
+   * on.
+   *
+   * ⟶ AND THEY WERE RIGHT. Art. 10/b: «يُمنح الترخيص لمدة ثلاث سنوات ميلادية تنتهي في الحادي
+   *   والثلاثين من شهر كانون الأول», and `expiryMatchesThreeYearTerm` asks exactly whether
+   *   `expiresAt === Date.UTC(issuedAt.year + 2, 11, 31)`. The term was CREATED satisfying that
+   *   (1 January to 31 December two years on) and this function then moved ONE of the two dates.
+   *   So the warning was not a cosmetic problem with the screen — it was a true statement about
+   *   data this seed had made inconsistent.
+   *
+   * ⛔ SO BOTH DATES MOVE. The expiry goes to the most recent 31 December strictly in the past
+   * and the issue date to the 1 January three calendar years before it, which is the relation
+   * art. 10/b states. The licence still reads «منتهي», the filing is still inside art. 11's
+   * window, and the declaration still lifts the block — all three measured by
+   * `licence-demo-dates.spec.ts`.
+   *
+   * ⚠️ AND THE WHOLE SERIES STILL SHIFTS BY ONE INTERVAL, which is the lesson
+   * `license-renewal-awaiting-declaration.e2e-spec.ts` paid for: `pickCurrentTerm` chooses among
+   * ALL of an office's terms, so moving one only promotes the next. Each term's issue date is
+   * re-derived from its OWN new expiry, so a many-term series keeps both its order and art. 10/b.
+   */
+  /*
+   * The most recent 31 December STRICTLY in the past, which is always last year's: this year's
+   * has either not arrived or is today, and today is not past. Written as one expression rather
+   * than a ternary over the two cases, because both answers are the same and a ternary that
+   * returns one value twice reads as though it had found a distinction.
+   */
+  const targetExpiry = new Date(
+    Date.UTC(new Date().getUTCFullYear() - 1, 11, 31),
+  );
+  const shiftMs = terms[0].expiresAt.getTime() - targetExpiry.getTime();
   if (shiftMs <= 0) {
     // Already past expiry with nothing filed — leave the dates alone and just file.
     bump(tally, 'created', 'expiredLicenceAlreadyPastExpiry');
   } else {
     for (const t of terms) {
+      const expiresAt = new Date(t.expiresAt.getTime() - shiftMs);
       await rawPrisma.brokerLicense.update({
         where: { id: t.id },
-        data: { expiresAt: new Date(t.expiresAt.getTime() - shiftMs) },
+        data: {
+          expiresAt,
+          // Art. 10/b, re-derived from this term's own new expiry rather than shifted by the
+          // same milliseconds — a shifted 1 January is not a 1 January.
+          issuedAt: new Date(Date.UTC(expiresAt.getUTCFullYear() - 2, 0, 1)),
+        },
       });
     }
   }
@@ -2377,6 +2497,9 @@ interface PipelineResult {
   premium: number;
   /** So a claim can pick a loss date that actually falls inside cover. */
   inceptionDaysAgo: number;
+  /** 🔴 MESSAGE 53 §2 ITEM 7 — so a claim's CAUSE OF LOSS can match the cover it is made on.
+   *  See `causeOfLossFor`. */
+  insuranceLine: string;
 }
 
 /**
@@ -2398,6 +2521,10 @@ interface HaltedChain {
   rfqId?: string;
   insurerCount?: number;
   evidenceWaiting?: boolean;
+  /** Only `policyAwaitingCheck` fills these — the policy sitting in the checking queue, named so
+   *  the report can tell `demo.policy_check` which one to open. */
+  policyId?: string;
+  policyNumber?: string;
 }
 
 function isHalted(
@@ -2634,7 +2761,56 @@ async function runFullPipeline(
     );
     return undefined;
   }
-  const insuranceLine = pick([...writersByLine.keys()]);
+  /*
+   * 🔴 MESSAGE 53 §2 — THE LINE IS CHOSEN FOR WHAT THE CHAIN IS MEANT TO DO, AND THAT CLOSES THE
+   * 403s DECISION 158 §3 NAMED.
+   *
+   * This used to `pick(...)` any designed line with a writer. Message 46 §2 then recorded the
+   * consequence and left it: «5 of 12 full pipelines ABORT at `POST /rfqs` with a 403 — the line
+   * drew fewer than three writers and the placement officer holds no declaration code, so the
+   * chain ends with no policy.» Decision 158 §3 asks for those requests to carry three insurers
+   * instead.
+   *
+   * ⛔ AND NOTHING BENDS ART. 15/d TO DO IT. The rule is untouched, no exemption is invented and
+   * no permission is granted — what changes is WHICH LINE the chain designs for, which is an
+   * ordinary choice an office makes. A chain that must reach three companies asks for a line
+   * three companies write.
+   *
+   * ⚠️ AND THE THIN-LINE CASE IS STILL SEEDED, DELIBERATELY: the `rfqIssuedAwaitingEvidence`
+   * stage WANTS a line below the minimum, because its whole subject is the art. 15/d/5 exemption
+   * marked «بلا إثبات». So the preference is inverted for that stage rather than dropped — and
+   * it falls back to any line rather than refusing, because a run where every line happened to
+   * be well served must still produce that stage (the lesson the stage's own header records).
+   */
+  const minInsurersForFullChain = 3;
+  const wellServed = [...writersByLine.keys()].filter(
+    (line) => (writersByLine.get(line) ?? []).length >= minInsurersForFullChain,
+  );
+  const thin = [...writersByLine.keys()].filter(
+    (line) => (writersByLine.get(line) ?? []).length < minInsurersForFullChain,
+  );
+  const preferred =
+    stopAfter === 'rfqIssuedAwaitingEvidence'
+      ? thin.length > 0
+        ? thin
+        : [...writersByLine.keys()]
+      : wellServed.length > 0
+        ? wellServed
+        : [...writersByLine.keys()];
+  if (stopAfter !== 'rfqIssuedAwaitingEvidence' && wellServed.length === 0) {
+    /*
+     * Counted and named rather than left to the 403 downstream. This is the honest report the
+     * owner's instruction asks for: if it ever prints, the demo insurers' line coverage — not
+     * this chooser — is what needs changing.
+     */
+    bump(tally, 'failed', 'rfqNoWellServedLine');
+    tally.errors.push(
+      `[rfqNoWellServedLine] programme designed [${[...designedLines].join(', ')}] — no designed ` +
+        `line has ${minInsurersForFullChain} writers among the demo insurers, so this chain will ` +
+        'be refused by art. 15/d unless an exemption is declared, which it must not be',
+    );
+  }
+  const insuranceLine = pick(preferred);
   const lineWriters = writersByLine.get(insuranceLine) ?? [];
   /*
    * 🔴 STAGE 4 — AN RFQ THAT WENT TO FEWER THAN THREE, MARKED «بلا إثبات» — message 46 §2.1.
@@ -2812,7 +2988,9 @@ async function runFullPipeline(
       opportunityId: opportunity.id,
       decision: 'ACCEPT',
       evidenceType: 'email_confirmation',
-      evidenceRef: uniqueEmail('client-acceptance'),
+      // An email MESSAGE reference, which is what this field's own docblock asks for — see
+      // `emailMessageRef`. It used to be a mailbox address with a timestamp in it.
+      evidenceRef: emailMessageRef(opportunity.id),
     }),
   );
   if (!decisionOk) return undefined;
@@ -2827,6 +3005,20 @@ async function runFullPipeline(
     postAs<{ id: string }>(app, actors.placement.token, '/policies', {
       opportunityId: opportunity.id,
       inceptionDate: isoDateDaysAgo(inceptionDaysAgo),
+      /*
+       * 🔴 MESSAGE 53 §2 ITEM 5 — THE EXPIRY DATE, WHICH READ «—» ON EVERY DEMO POLICY.
+       *
+       * `expiryDate` is OPTIONAL at placement by design — the DTO says «the insurer confirms the
+       * exact period at issuance» — and this seed never supplied it, so the policy section
+       * printed an em dash where a customer and an inspector both look for the end of cover.
+       *
+       * A 365-day term from inception, which is the annual period every other figure in this
+       * script assumes (the renewal window on `/dashboards/policy`, the 365-day
+       * `CommissionAgreement` effectiveFrom). ⛔ The DTO requires it to be AFTER
+       * `inceptionDate`, and `inceptionDaysAgo` is 45–200, so this always lands in the FUTURE —
+       * which is also what makes the renewal screens have something to show.
+       */
+      expiryDate: isoDateDaysFromNow(365 - inceptionDaysAgo),
     }),
   );
   if (!policy) return undefined;
@@ -2837,11 +3029,44 @@ async function runFullPipeline(
     postAs(app, actors.placement.token, `/policies/${policy.id}/issuance`, {
       policyNumber,
       issuedPremium: money(premium),
+      /*
+       * ⚠️ MESSAGE 53 §2 ITEM 5 — `namedPerils` AND `extensions` ARE AN EMPTY ARABIC CELL, AND
+       * THEY ARE REPORTED RATHER THAN FILLED.
+       *
+       * `PolicyScheduleInputDto` accepts both as optional `string[]`, so the route is ready and
+       * the screen's «الأخطار المسمّاة» and «التوسعات» rows are blank only because nothing is
+       * sent. ⛔ What is missing is the WORDS: these are schedule TERMS an underwriter writes,
+       * no decision ratifies one, and none ships anywhere in this product (measured across
+       * `translations/` and `seed-data/`).
+       *
+       * ⛔ AND DECISION 158's TABLE و IS NOT A SOURCE FOR THEM, which is the trap worth naming:
+       * it ratifies «ضرر حريق في معدّات المكتب.» and «سرقة بضاعة من المخزن.» — CLAIM
+       * DESCRIPTIONS, whole sentences about one event. A named peril is a term («حريق»,
+       * «سرقة»), and slicing a noun out of her sentence to make one would be composing a word
+       * she did not give. The expiry date beside them IS built, because a date is not a word.
+       */
       schedule: { limits: coverage.limits, sumsInsured: coverage.sumsInsured },
       documents: [],
     }),
   );
   if (!issued) return undefined;
+
+  /*
+   * 🔴 MESSAGE 53 §2 — THE CHAIN THAT STOPS WITH THE POLICY ISSUED AND UNCHECKED.
+   *
+   * `demo.policy_check` holds `policy.check` and had nothing to open: every policy this seeder
+   * produced was checked in the same breath as it was issued. Halting here leaves exactly the
+   * work that account exists for.
+   *
+   * ⛔ RETURNED AS A HALT rather than by skipping the call and carrying on, which is this file's
+   * own rule: a chain that stopped because it was TOLD to and one that stopped because it FAILED
+   * are identical in the data unless the halt is declared. And because a halt is not pushed into
+   * `policies`, this policy is never invoiced and never claimed — which is correct rather than
+   * incidental: money must not move against cover nobody has checked.
+   */
+  if (stopAfter === 'policyAwaitingCheck') {
+    return halt('policyAwaitingCheck', { policyId: policy.id, policyNumber });
+  }
 
   // Maker/checker: the checker must be a DIFFERENT user than whoever placed
   // the cover (Placement) — see policy.controller.ts's own comment.
@@ -2855,10 +3080,13 @@ async function runFullPipeline(
   );
   if (!checked) return undefined;
 
+  // The method is chosen FIRST, because the recipient's shape follows from it: an email address
+  // recorded against an `in_person` delivery says the wrong thing about who took the document.
+  const deliveryMethod = pick(['email', 'portal', 'courier', 'in_person']);
   const delivered = await attempt(tally, 'policyDelivery', () =>
     postAs(app, actors.sales.token, `/policies/${policy.id}/delivery`, {
-      method: pick(['email', 'portal', 'courier', 'in_person']),
-      recipient: uniqueEmail('client-contact'),
+      method: deliveryMethod,
+      recipient: deliveryRecipient(deliveryMethod, customerLabel, policy.id),
     }),
   );
   if (!delivered) return undefined;
@@ -2878,6 +3106,7 @@ async function runFullPipeline(
     policyNumber,
     premium,
     inceptionDaysAgo,
+    insuranceLine,
   };
 }
 
@@ -2910,10 +3139,19 @@ async function maybeInvoicePolicy(
 /**
  * 🔴 THE MONEY ACTUALLY ARRIVES ON A SHARE OF INVOICES — message 46 §2.5.
  *
- * The seed invoiced and never collected, so every invoice sat at `INVOICED` for ever, the client
- * funds ledger held no `in` entry at all, and the commission-income figure on four dashboards
- * read zero. Not because the computation is wrong — ⛔ nothing about how commission is computed
- * is touched here — but because nothing had ever been paid.
+ * The seed invoiced and never collected, so every invoice sat at `INVOICED` for ever and the
+ * client funds ledger held no `in` entry at all.
+ *
+ * ⚠️ AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG, CORRECTED 2026-11-25 AFTER A WALK FROM
+ * AN EMPTY DATABASE. It said this step was why «the commission-income figure on four dashboards
+ * read zero», which made collecting an invoice sound like what puts commission on a screen. It
+ * is not. A `CommissionLedgerEntry` is written by `POST /commission/entries` and by nothing
+ * else — see `recordCommission` below, which this seed did not call until message 53 — so the
+ * executive and financial dashboards read **JOD 0.000** through every run that exited green.
+ * ⟶ The two are independent: this one fills the client funds ledger and the ageing report, and
+ *   that one fills the commission tiles.
+ *
+ * ⛔ Nothing about how commission is computed is touched by either.
  *
  * Through `POST /invoices/:id/receipt`, the product's own route, as the FINANCE actor, who is the
  * only seeded role holding `receipt.record`. The full invoiced total in one instalment, so the
@@ -2947,11 +3185,393 @@ async function collectInvoice(
   return true;
 }
 
+/**
+ * 🔴 MESSAGE 53 §2 ITEM 8 — THE OFFICE'S LICENSED LINES, WHICH MESSAGE 52 §3-A PROMISED AND DID
+ * NOT BUILD.
+ *
+ * The walk read «أنواع التأمين: —» and «لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من
+ * فروعه.» on `/regulatory-compliance` — so the office was placing business on lines its own
+ * licence scope did not list, which is the state art. 3 and art. 4/a exist to describe.
+ *
+ * ## IT DEPENDS ON A STEP THAT ALREADY EXISTS, AND THE ORDER IS A GUARD
+ *
+ * `BrokerLicenseScopeService.addBranch` REFUSES the branch that would give an office BOTH
+ * insurance types unless the office records at least two CURRENT CBJ approvals. The demo offices
+ * sell both (motor and property are GENERAL, group medical and life are LIFE), so without the
+ * approvals the second type is refused and the scope lists one — a different defect wearing the
+ * same «—». ⛔ The service's rule is not touched: what changes is that the demo office satisfies
+ * it, the way a real office would.
+ *
+ * 🔴 AND THE FIRST VERSION OF THIS FUNCTION RECORDED THOSE APPROVALS ITSELF, WHICH WAS A SECOND
+ * HOME FOR SOMETHING THE SEED ALREADY DID. `seedCbjApprovals` — called at the tail of
+ * `seedEmployees`, which runs before this — already approves THREE people per office and gives
+ * the second a LIFE branch, with its own docblock explaining why three and not ten. Measured on
+ * the from-empty run of 2026-11-25: FIVE employees per office came back `CURRENT`, three from
+ * that step and two from mine, which is how the duplication was found.
+ *
+ * ⟶ So this function records no approval. It depends on `seedEmployees` having run first, and
+ *   says so by CHECKING rather than by assuming: a count below two is recorded and named, which
+ *   is the only thing that distinguishes «the order changed» from «the branch was refused».
+ *
+ * ⚠️ AND A SOLE ESTABLISHMENT STILL CANNOT HOLD BOTH (art. 3/a). Measured: both demo offices are
+ * created as corporate brokers, so the rule does not bite here — and if an office's `brokerKind`
+ * is ever changed, the refusal is recorded by `attempt` with the service's own sentence rather
+ * than swallowed.
+ *
+ * ⛔ AND THE LINES COME FROM WHAT THE OFFICE'S INSURERS ACTUALLY WRITE, read back from
+ * `InsurerOfferedLine` — never a hand-written list. A list here would drift from
+ * `LOCAL_INSURER_SEEDS` and `DEMO_INSURER_LINES` the first time either moved, and the drift would
+ * look exactly like the defect it replaced.
+ */
+async function recordLicensedScope(
+  app: INestApplication<App>,
+  actors: Actors,
+  orgId: string,
+  tally: Tally,
+): Promise<number> {
+  if (!actors.compliance) return 0;
+
+  // ---- 1. the precondition `seedEmployees` is responsible for ----------------------------
+  const approved = await rawPrisma.employee.count({
+    where: {
+      organizationId: orgId,
+      cbjApprovalStatus: 'CURRENT',
+      terminationDate: null,
+    },
+  });
+  if (approved < 2) {
+    tally.errors.push(
+      `[licensedScope] ${orgId} records ${approved} CURRENT CBJ approval(s). ` +
+        '`addBranch` refuses the branch that would licence an office for BOTH insurance types ' +
+        'below two, so the scope will list ONE type — check that `seedEmployees` (which calls ' +
+        '`seedCbjApprovals`) ran before this.',
+    );
+  }
+
+  // ---- 2. one licensed branch per catalogue line this office's insurers write -------------
+  const offered = await rawPrisma.insurerOfferedLine.findMany({
+    where: { organizationId: orgId },
+    select: { insuranceLineId: true },
+    distinct: ['insuranceLineId'],
+  });
+  let added = 0;
+  for (const { insuranceLineId } of offered) {
+    const branch = await attempt(tally, 'licensedBranch', () =>
+      postAs(app, actors.compliance.token, '/broker-license/scope', {
+        insuranceLineId,
+      }),
+    );
+    if (branch) added += 1;
+  }
+  return added;
+}
+
+/**
+ * 🔴 MESSAGE 53 §2 ITEM 9 — THE OBLIGATIONS CALENDAR, AND MOST OF IT IS AN EMPTY ARABIC CELL.
+ *
+ * `/regulatory-compliance` read «لا توجد بنود في تقويم الالتزامات.» in both offices. Decision 158
+ * §2 asked for this and said «seed a few obligations if a route exists, report if none does».
+ *
+ * ⟶ A ROUTE EXISTS: `POST /compliance-calendar`, on `compliance-calendar.manage`, held by
+ *   `COMPLIANCE_OFFICER` alone — measured, and nothing was granted.
+ *
+ * ## ⛔ AND THE OBLIGATION NAMES ARE WHAT IS MISSING, NOT THE ROUTE
+ *
+ * `obligationName` is free Arabic text an office types. No decision ratifies one — decision 158's
+ * ten tables carry none — and inventing «التقرير الربعي للبنك المركزي» or anything like it would
+ * be writing Arabic the owner has not seen, onto a screen an inspector reads.
+ *
+ * ⟶ SO ONLY THE TWO THIS PRODUCT CAN ALREADY NAME ARE SEEDED, each sliced from a span that ships
+ *   for exactly that thing:
+ *
+ *     «تجديد الترخيص»            `rcRenewButton`  — the licence renewal, and its due date is the
+ *                                                   one art. 11 fixes, so the figure is the
+ *                                                   product's own rather than a day I chose.
+ *     «إعادة اعتماد الصلاحيات»   `acrHeading`     — the periodic access recertification, which is
+ *                                                   a real recurring obligation with its own
+ *                                                   screen in this product.
+ *
+ * ⚠️ TWO IS NOT «a few», AND THAT IS REPORTED RATHER THAN PADDED. A third name is the owner's to
+ * give; the gap is in `docs/design-pass-register.md`.
+ *
+ * ⚠️ AND «one near its due date» IS SATISFIED BY THE LICENCE ROW RATHER THAN BY AN OFFSET I
+ * PICKED: for office A the renewal falls 45 days before a term expiring this year or next, and
+ * for office B — whose term is already past expiry — it is in the past, which is exactly the
+ * overdue row the calendar exists to show.
+ */
+async function seedComplianceObligations(
+  app: INestApplication<App>,
+  actors: Actors,
+  orgId: string,
+  tally: Tally,
+): Promise<number> {
+  if (!actors.compliance) return 0;
+
+  /*
+   * ⛔ THE DUE DATE IS READ OFF THE PRODUCT, NOT COMPUTED HERE, and that is the point rather than
+   * convenience: art. 11's span is a `LegalValue` row (decision 123 moved it out of source), and
+   * `GET /broker-license` already answers `renewalDueBy` for the current term by passing that row
+   * to `renewalApplicationDueBy`. A `- 45 days` in this script would be the figure's second home
+   * and would disagree with the screen the day the row moved.
+   */
+  const licence = await request(app.getHttpServer())
+    .get('/broker-license')
+    .set(bearer(actors.compliance.token));
+  // `BrokerLicenseSeriesView.current` — the term `pickCurrentTerm` chose, which is the one every
+  // screen and the issuance gate both read.
+  const renewalDueBy = (
+    licence.body as { current?: { renewalDueBy?: string } | null }
+  )?.current?.renewalDueBy;
+  if (!renewalDueBy) {
+    tally.errors.push(
+      `[complianceCalendar] ${orgId}: GET /broker-license answered ${licence.status} with no ` +
+        'current term, so the renewal obligation has no due date to take and the calendar stays ' +
+        'empty.',
+    );
+    return 0;
+  }
+  const renewalDue = new Date(renewalDueBy);
+
+  const items: { obligationName: string; dueDate: Date }[] = [
+    // ⛔ SLICED, never retyped: see the docblock for which shipping key each comes from.
+    { obligationName: 'تجديد الترخيص', dueDate: renewalDue },
+    {
+      obligationName: 'إعادة اعتماد الصلاحيات',
+      // The recertification cycle's own quarter, counted forward from today rather than from a
+      // licence date: the two obligations are unrelated and sharing a date would imply they are.
+      dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  let created = 0;
+  for (const item of items) {
+    const row = await attempt(tally, 'complianceObligation', () =>
+      postAs(app, actors.compliance.token, '/compliance-calendar', {
+        obligationName: item.obligationName,
+        // The compliance officer owns both: they are the person the screen's own
+        // «الجهة المسؤولة» column names, and the only actor holding the code that reads it.
+        ownerUserId: actors.compliance.id,
+        dueDate: item.dueDate.toISOString().slice(0, 10),
+      }),
+    );
+    if (row) created += 1;
+  }
+  return created;
+}
+
+/**
+ * 🔴 MESSAGE 53 §2 ITEM 2 — KYC, WHICH DECISION 158 §3 ASKED FOR AND MESSAGE 52 DID NOT BUILD.
+ *
+ * The walk from an empty database found **all 256 customers reading «بانتظار اعرف عميلك»** and
+ * the sales account's bell at **258** — two more than the customer count, because every customer
+ * is a notification and nothing had ever cleared one. Measured on `main` at `7f7c6a66`:
+ * `seed-demo.script.ts` contained the string `kyc` nowhere at all.
+ *
+ * ## THE FOUR ACTS, EACH THROUGH THE PRODUCT'S OWN ROUTE
+ *
+ *   POST /customers/:id/kyc              `kyc.capture`   — SALES, who must also OWN the customer
+ *   POST /kyc-records/:id/submit         `kyc.capture`   — SALES
+ *   POST /kyc-records/:id/run-screening  `screening.run` — COMPLIANCE
+ *   POST /kyc-records/:id/approve        `kyc.approve`   — COMPLIANCE
+ *
+ * ⛔ MEASURED ACROSS THE TWELVE SEEDED ROLES, AND NOTHING WAS GRANTED: `kyc.capture` is
+ * `SALES_RELATIONSHIP_OFFICER` alone and `kyc.approve` / `screening.run` are
+ * `COMPLIANCE_OFFICER` alone. That split is also what satisfies
+ * `KYCRecord_maker_checker_distinct` for free — the capturer and the approver are two different
+ * people because they have to be two different ROLES.
+ *
+ * ⚠️ AND `start` REFUSES ANYONE BUT THE CUSTOMER'S OWNER (`customer.ownerUserId !== actorUserId`
+ * is a 404, not a 403). Every demo customer is created through `/customers` as `actors.sales`,
+ * so sales is the owner — which is why this cannot be moved to another actor without the
+ * customers moving with it.
+ *
+ * ## 🔴 AND THE SCREENING HOLD IS NOT WAIVED, WHICH IS THE ONE DECISION IN THIS FUNCTION
+ *
+ * `decide('APPROVED')` runs `ScreeningHoldService.assertClearToProceed`. Three outcomes:
+ * `NO_HOLD` proceeds, `BLOCKED` refuses outright, and `REVIEW_REQUIRED` proceeds ONLY against a
+ * written acceptance stored as a `ScreeningHoldRelease` row with the accepter's name on it.
+ *
+ * ⛔ SO NO `screeningHoldReason` IS SENT. A seed that supplies one would write «accepted in
+ * writing» into a register an inspector reads, attributed to an account nobody was sitting at,
+ * for a sanctions or PEP finding no human ever looked at. That is the exact silent override the
+ * whole mechanism exists to make impossible, and it is worse than a short figure on a demo
+ * screen.
+ *
+ * ⟶ A held file is COUNTED AND NAMED instead. `attempt` records the refusal with the server's
+ *   own sentence, so the run's own tally says how many files stopped and why — a measurement the
+ *   next reader can act on rather than a number I chose.
+ *
+ * ⚠️ MEASURED FROM EMPTY, 2026-11-25, WITH THE WATCHLIST SYNC AHEAD OF IT: `kycStart 363 ·
+ * kycApprove 359 · failed.kycApprove 4`, and all four refusals are the SAME 422 —
+ *
+ *   «a high-risk result must go through the EDD path first
+ *    (POST /kyc-records/:id/trigger-edd) before a decision can be recorded»
+ *
+ * ⟶ Four customers screened HIGH RISK, and the product routed them to Enhanced Due Diligence
+ *   rather than letting them be approved. ⛔ NOT chased: those four files sitting at the EDD gate
+ *   are real work for the compliance account and the EDD path has its own screen, so they are
+ *   better demo data than four more approvals would be. Reported, not fixed.
+ *
+ * ## AND IT IS A SHARE, NOT ALL OF THEM
+ *
+ * The owner's words are «جزء من العملاء مكتمل «اعرف عميلك»». A list where every row reads
+ * «نشِط» has no KYC queue to show, and `/customers/kyc-queue` is a screen in the scenario — so
+ * the rest stay `PENDING_KYC` deliberately, which is also what leaves the bell a real number
+ * rather than zero.
+ */
+async function approveKycForShare(
+  app: INestApplication<App>,
+  actors: Actors,
+  customers: { id: string; legalName: string }[],
+  share: number,
+  tally: Tally,
+): Promise<{ started: number; approved: number }> {
+  let started = 0;
+  let approved = 0;
+  if (!actors.compliance) return { started, approved };
+  for (const customer of customers) {
+    if (Math.random() >= share) continue;
+    const record = await attempt(tally, 'kycStart', () =>
+      postAs<{ id: string }>(
+        app,
+        actors.sales.token,
+        `/customers/${customer.id}/kyc`,
+        {},
+      ),
+    );
+    if (!record) continue;
+    started += 1;
+    const submitted = await attempt(tally, 'kycSubmit', () =>
+      postAs(app, actors.sales.token, `/kyc-records/${record.id}/submit`, {}),
+    );
+    if (!submitted) continue;
+    const screened = await attempt(tally, 'kycScreening', () =>
+      postAs(
+        app,
+        actors.compliance.token,
+        `/kyc-records/${record.id}/run-screening`,
+        {},
+      ),
+    );
+    if (!screened) continue;
+    // ⛔ NO `screeningHoldReason` — see the docblock. A 400 here is the hold doing its job and
+    // is recorded as such.
+    const decided = await attempt(tally, 'kycApprove', () =>
+      postAs(
+        app,
+        actors.compliance.token,
+        `/kyc-records/${record.id}/approve`,
+        {},
+      ),
+    );
+    if (decided) approved += 1;
+  }
+  return { started, approved };
+}
+
+/**
+ * 🔴 MESSAGE 53 §2 ITEM 1 — THE COMMISSION LEDGER ENTRY, WHICH NOTHING HAD EVER WRITTEN.
+ *
+ * Decision 158 §3 asked for this and message 52 reported nothing declined; the walk from an
+ * empty database then found **JOD 0.000** on the executive dashboard, the financial dashboard
+ * and every profitability table. Measured on `main` at `7f7c6a66`: `seed-demo.script.ts`
+ * contained no call to `POST /commission/entries` at all.
+ *
+ * ⛔ THROUGH THE PRODUCT'S OWN ROUTE, as the actor who holds `commission.calculate`. Measured
+ * across the twelve seeded roles, that is `FINANCE_COLLECTIONS_OFFICER` — `actors.finance`, the
+ * same actor that invoices and collects. ⛔ No role was granted anything and no code was minted.
+ *
+ * ⛔ AND NOTHING ABOUT THE COMPUTATION IS TOUCHED. The service resolves the governed rate from
+ * the `CommissionAgreement` in force for the policy's (insurer, line) AT INCEPTION and derives
+ * the amount itself; this step supplies a policy id and nothing else. `CalculateCommissionDto`
+ * has exactly one field, which is what makes that guarantee structural rather than a promise.
+ *
+ * ## WHY IT IS NOT CONDITIONAL, WHERE THE INVOICE AND THE CLAIM ARE
+ *
+ * An invoice is raised on about three quarters of policies and a claim on about two fifths,
+ * because a book where every policy is invoiced and claimed shows neither an ageing report nor
+ * an open-claims queue. Commission is different: an office earns it on EVERY placement, so a
+ * policy with no ledger entry is not a demonstration of anything — it is a gap in the figure
+ * the brokers are being shown.
+ *
+ * ⚠️ AND A 422 HERE IS EXPECTED ON SOME POLICIES RATHER THAN A DEFECT. The service refuses when
+ * no agreement is in force for that (insurer, line) pair at that date, and
+ * `ensureCommissionAgreements` skips a SECOND open agreement where two line strings resolve to
+ * one managed line — correctly, since the constraint permits one. So the refusals are counted
+ * and named by `attempt` rather than suppressed, and the run prints how many entries landed.
+ *
+ * The route is WRITE-ONCE by policy (`findLedgerEntryByPolicyId` resolves an existing entry
+ * before any input check), so a re-run cannot double the figure.
+ */
+async function recordCommission(
+  app: INestApplication<App>,
+  actors: Actors,
+  policyId: string,
+  tally: Tally,
+): Promise<boolean> {
+  const entry = await attempt(tally, 'commissionEntry', () =>
+    postAs(app, actors.finance.token, '/commission/entries', { policyId }),
+  );
+  return Boolean(entry);
+}
+
+/**
+ * 🔴 MESSAGE 53 §2 ITEM 7 — THE CAUSE OF LOSS MATCHES THE COVER, AND THE PER-LINE MATRIX WAS
+ * RIGHT ALL ALONG.
+ *
+ * The walk saw a claim described «تصادم مركبة أثناء التوصيل.» whose mandatory-document list
+ * demanded «تقرير طبي». The owner asked which of the two was wrong. **MEASURED: the seed.**
+ *
+ *   `mandatoryDocTypesFor` reads the POLICY's `insuranceLine`, never the description, and
+ *   `classifyInsuranceLine` sends a medical/health/life/GPA line to the `medical` family, which
+ *   requires `medical_report` and `invoice`. ⟶ For a claim on a GROUP MEDICAL policy, asking for
+ *   a medical report is exactly correct.
+ *
+ *   `maybeClaimPolicy` picked one of decision 158 table و's five descriptions with `pick(...)`
+ *   and never looked at the line. ⟶ A vehicle-collision description landed on a medical policy
+ *   about a fifth of the time, and the checklist beside it then read as nonsense.
+ *
+ * ⛔ SO NOTHING IN `claim.config.ts` IS TOUCHED — the matrix, the classifier and the medical
+ * report's HIGHLY_CONFIDENTIAL rule all stand. What changed is which of her five sentences this
+ * seed puts on which policy.
+ *
+ * ⛔ AND THE CLASSIFIER IS IMPORTED, NEVER RE-IMPLEMENTED. A second copy of «which family is
+ * this line» in a seed script would disagree with the product the first time a line was renamed,
+ * and the disagreement would show up as exactly the defect this is fixing.
+ *
+ * ⚠️ AND THE FIVE SENTENCES ARE HERS, so the families they can cover are limited by what she
+ * wrote: her table has a storm, a collision, a burst pipe, a theft and a fire. ⟶ `medical`,
+ * `liability` and `marine` have NO sentence of hers that fits, and for those the choice falls
+ * back to her whole set rather than inventing one. ⟶ REPORTED as an empty cell: a line where the
+ * cover and the cause still disagree is one of those three, and the words for them are hers.
+ */
+function causeOfLossFor(insuranceLine: string): string {
+  const STORM = 'ضرر في سقف المستودع بسبب عاصفة.';
+  const COLLISION = 'تصادم مركبة أثناء التوصيل.';
+  const WATER = 'ضرر مياه بسبب انفجار ماسورة.';
+  const THEFT = 'سرقة بضاعة من المخزن.';
+  const FIRE = 'ضرر حريق في معدّات المكتب.';
+  const ALL = [STORM, COLLISION, WATER, THEFT, FIRE];
+  switch (classifyInsuranceLine(insuranceLine)) {
+    case 'motor':
+      // The one sentence of hers about a vehicle.
+      return COLLISION;
+    case 'property':
+      // Everything but the collision: a storm, a burst pipe, a theft and a fire are all losses
+      // to premises or contents.
+      return pick([STORM, WATER, THEFT, FIRE]);
+    default:
+      // `medical`, `liability`, `marine` and `other` — see the docblock's empty cell.
+      return pick(ALL);
+  }
+}
+
 async function maybeClaimPolicy(
   app: INestApplication<App>,
   actors: Actors,
   policyId: string,
   inceptionDaysAgo: number,
+  insuranceLine: string,
   tally: Tally,
 ): Promise<{ id: string; estimatedLoss: number } | undefined> {
   const estimatedLoss = randomInt(500, 30_000);
@@ -2960,13 +3580,7 @@ async function maybeClaimPolicy(
       policyId,
       // Strictly inside cover: after inception, and never in the future.
       lossDate: isoDateDaysAgo(randomInt(1, Math.max(1, inceptionDaysAgo - 1))),
-      causeOfLoss: pick([
-        'ضرر في سقف المستودع بسبب عاصفة.',
-        'تصادم مركبة أثناء التوصيل.',
-        'ضرر مياه بسبب انفجار ماسورة.',
-        'سرقة بضاعة من المخزن.',
-        'ضرر حريق في معدّات المكتب.',
-      ]),
+      causeOfLoss: causeOfLossFor(insuranceLine),
       lossLocation: pick(CITIES),
       estimatedLoss: money(estimatedLoss),
     }),
@@ -3231,7 +3845,14 @@ async function seedVendors(
   for (let i = 0; i < count; i += 1) {
     await attempt(tally, 'vendor', () =>
       postAs(app, actors.compliance.token, '/vendors', {
-        name: `${names[i % names.length]} #${nextSeq()}`,
+        /*
+         * ⚠️ THE SAME «#NN» ON A SECOND SCREEN, FOUND RATHER THAN NAMED. Message 53 §2 item 3
+         * names the customer cards; `/vendors` carried it too. Measured: there are six names
+         * and `NUM.vendorsPerOrg` is six, so `i % names.length` hands each out exactly once per
+         * office, and `Vendor.name` carries no unique constraint — the suffix was distinguishing
+         * nothing.
+         */
+        name: names[i % names.length],
         vendorType: types[i % types.length],
       }),
     );
@@ -3280,6 +3901,9 @@ interface OrgSeedSummary {
   /** Message 46 §2.5 — how many of each were taken the rest of the way. */
   receiptsRecorded: number;
   claimsSettled: number;
+  /** Message 53 §2 item 1 — how many policies got a commission ledger entry. The figure the
+   *  executive and financial dashboards read, which was zero through every run before this. */
+  commissionRecorded: number;
 }
 
 async function seedOrganization(
@@ -3350,6 +3974,59 @@ async function seedOrganization(
   const allCustomers = [...standaloneCustomers, ...leadFunnelCustomers];
 
   /*
+   * MESSAGE 53 §2 ITEM 2 — KYC BEFORE THE PIPELINES, so the rest of the run and every screen
+   * after it sees customers in the state a real office's would be in. Measured: nothing outside
+   * the KYC module reads `Customer.status`, so the order is about what the screens show rather
+   * than about a gate.
+   */
+  /*
+   * 🔴 MEASURED ON A FRESH DATABASE, 2026-11-25 — AND WITHOUT THIS STEP THE KYC ONE APPROVES
+   * NOTHING AT ALL.
+   *
+   * The first run of `approveKycForShare` against an empty database logged, 58 times:
+   *
+   *   UNABLE_TO_SCREEN via Built-in watchlist cache (OFAC SDN + UN Consolidated). The local
+   *   sanctions cache is empty — the watchlist sync has never completed. Run
+   *   POST /watchlist-sync/run. This is NOT a clear result — the KYC file is escalated for
+   *   compliance review.
+   *
+   * ⟶ `UNRESOLVED_SCREENING` is a REVIEW_REQUIRED hold, and this seeder does not waive one (see
+   *   `approveKycForShare`) — so every file would stop there and the customer list would stay
+   *   uniformly «بانتظار اعرف عميلك», which is the defect message 53 §2 item 2 exists to fix.
+   *
+   * ⛔ THE REMEDY IS THE ROUTE THE ERROR ITSELF NAMES, as the actor holding
+   * `sanctions-pep.screen` — `COMPLIANCE_OFFICER` alone, measured, and nothing was granted. The
+   * sweep is otherwise nightly, so a database minutes old has never had one.
+   *
+   * ⚠️ IT REACHES THE NETWORK, so on a machine with no route to the OFAC and UN lists it fails —
+   * and that is recorded by `attempt` and said out loud rather than swallowed, because the
+   * consequence (no KYC approvals) would otherwise look like a defect in the KYC step.
+   */
+  if (actors.compliance) {
+    const synced = await attempt(tally, 'watchlistSync', () =>
+      postAs(app, actors.compliance.token, '/watchlist-sync/run', {}),
+    );
+    console.log(
+      synced
+        ? '- watchlist sync run (the sanctions cache is empty on a fresh database)'
+        : '- watchlist sync FAILED — screening will answer UNABLE_TO_SCREEN and NO KYC file can ' +
+            'be approved without waiving a hold, which this seeder does not do',
+    );
+  }
+
+  console.log(`- KYC on a share of ${allCustomers.length} customers...`);
+  const kyc = await approveKycForShare(
+    app,
+    actors,
+    allCustomers,
+    NUM.kycShare,
+    tally,
+  );
+  console.log(
+    `  ...${kyc.started} files opened, ${kyc.approved} approved (the rest stay «بانتظار اعرف عميلك», which is what the KYC queue is for)`,
+  );
+
+  /*
    * THE LICENCE TERM COMES BEFORE THE PIPELINES, and the order is the whole point.
    *
    * An office with no term on record may not place new business (art. 21/a/9), so recording the term
@@ -3363,6 +4040,22 @@ async function seedOrganization(
       orgSlug,
       actors.compliance.token,
       tally,
+    );
+    /*
+     * MESSAGE 53 §2 ITEMS 8 AND 9 — the licence SCOPE and the obligations calendar, both of
+     * which hang off the term just recorded and so cannot run before it. The scope is also
+     * before the pipelines, which is where a real office's would be: an office places business
+     * on lines its licence lists.
+     */
+    const branches = await recordLicensedScope(app, actors, orgId, tally);
+    const obligations = await seedComplianceObligations(
+      app,
+      actors,
+      orgId,
+      tally,
+    );
+    console.log(
+      `- licence scope: ${branches} licensed branch(es); compliance calendar: ${obligations} obligation(s)`,
     );
   }
 
@@ -3441,7 +4134,14 @@ async function seedOrganization(
   let claimsCreated = 0;
   let receiptsRecorded = 0;
   let claimsSettled = 0;
+  let commissionRecorded = 0;
   for (let i = 0; i < policies.length; i += 1) {
+    // MESSAGE 53 §2 ITEM 1 — on EVERY issued policy, not a share: an office earns commission on
+    // every placement, so a policy without an entry is a hole in the figure rather than a state
+    // worth demonstrating. See `recordCommission`.
+    if (await recordCommission(app, actors, policies[i].policyId, tally)) {
+      commissionRecorded += 1;
+    }
     if (Math.random() < 0.75) {
       const invoice = await maybeInvoicePolicy(
         app,
@@ -3470,6 +4170,8 @@ async function seedOrganization(
         actors,
         policies[i].policyId,
         policies[i].inceptionDaysAgo,
+        // Message 53 §2 item 7 — the line the cover is on, so the cause of loss can match it.
+        policies[i].insuranceLine,
         tally,
       );
       claimsCreated += 1;
@@ -3486,6 +4188,32 @@ async function seedOrganization(
       }
     }
   }
+
+  /*
+   * 🔴 MESSAGE 53 §2 — THE FOLLOW-UP ALERT, WHICH DECISION 158 §3 ASKED FOR AND NOTHING RAN.
+   *
+   * Process 27's sweep raises an alert on every REGISTERED claim the insurer has not answered
+   * within the configured business days. It is otherwise NIGHTLY, so a presenter running the
+   * seed in the morning opened `/claims` and the SLA screens with no alert on any of them — the
+   * scheduler had never fired on a database that was minutes old.
+   *
+   * ⛔ Through `POST /claims/follow-up-sweep`, the route the screen's own control calls, as the
+   * CLAIMS actor who holds `claim.followup.manage` — measured, `CLAIMS_OFFICER` alone, and
+   * nothing was granted.
+   *
+   * ⛔ ONCE, AT THE END, AND AFTER THE CLAIMS: a sweep run before them has nothing to scan, which
+   * is the ordering failure `ensureBrokerLicenseTermForOffice` records from the other direction.
+   * It is idempotent by its own design (an alert already raised is not raised twice), so a
+   * re-run costs nothing.
+   */
+  const sweep = await attempt(tally, 'claimFollowUpSweep', () =>
+    postAs(app, actors.claims.token, '/claims/follow-up-sweep', {}),
+  );
+  console.log(
+    sweep
+      ? '- claim follow-up sweep run once (otherwise nightly, so a fresh database has no alerts)'
+      : '- claim follow-up sweep FAILED — see the error tally; the SLA screens will show no alerts',
+  );
 
   console.log(
     `- ${NUM.complaintsPerOrg} complaints, ${NUM.incidentsPerOrg} incidents, ${NUM.vendorsPerOrg} vendors...`,
@@ -3528,6 +4256,7 @@ async function seedOrganization(
     haltedChains,
     receiptsRecorded,
     claimsSettled,
+    commissionRecorded,
   };
 }
 
@@ -3654,6 +4383,12 @@ it(
           `  invoices: ${summary.invoicesCreated} (${summary.receiptsRecorded} collected), ` +
             `claims: ${summary.claimsCreated} (${summary.claimsSettled} settled)`,
         );
+        // Message 53 §2 item 1 — printed against the policy count, because what matters is
+        // whether EVERY placement earned one: a short figure names how many were refused.
+        console.log(
+          `  commission ledger entries: ${summary.commissionRecorded} of ` +
+            `${summary.fullPipelinesCompleted} issued policies`,
+        );
         /*
          * 🔴 WHICH CUSTOMER SITS AT WHICH STAGE — message 46 §2.1 asks for this by name.
          *
@@ -3728,6 +4463,7 @@ it(
               claimsCreated: s.claimsCreated,
               receiptsRecorded: s.receiptsRecorded,
               claimsSettled: s.claimsSettled,
+              commissionRecorded: s.commissionRecorded,
               /*
                * 🔴 THE STAGE TABLE GOES IN THE FILE, NOT ONLY IN THE CONSOLE — message 46 §2.1
                * asks for the run to name which customer sits at which stage.

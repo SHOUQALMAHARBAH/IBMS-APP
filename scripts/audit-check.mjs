@@ -63,69 +63,64 @@ import { execFileSync } from 'node:child_process';
 
 /** @type {{name: string, why: string, reviewBy: string}[]} */
 const ACKNOWLEDGED = [
-  {
-    name: 'multer',
-    why: `GHSA-q7qp-rjg7-q26m / CVE-2026-113872, published 2026-10-23 — DoS via a pending
-ASYNCHRONOUS fileFilter after request teardown.
-
-OWNER DECISION 52, 2026-10-24: THIS IS RECORDED AS *THE VULNERABLE CODE PATH DOES NOT
-EXIST IN THIS PRODUCT*, NOT AS *A KNOWN VULNERABILITY ACCEPTED*. Those are different
-claims and the second one is not ours to make: this system goes in front of a regulator.
-The distinction is the whole of her ruling, so do not reword this entry into the
-language of accepted risk.
-
-THE CLAIM IS THE ADVISORY'S OWN SENTENCE, not our reading of it: any application using
-multer with an ASYNCHRONOUS fileFilter is affected, and uploads using a SYNCHRONOUS
-fileFilter are not affected. Measured: the string fileFilter appears ZERO times in
-apps/api/src; the api's single multipart route
-(modules/customer/legacy-import.controller.ts) passes only limits { fileSize, files: 1 };
-and @nestjs/platform-express injects none — the string occurs once in its whole tree, in
-a .d.ts DECLARING the option as optional. files: 1 also means there can never be a
-second file sitting with a filter pending while another is rejected, which IS the
-mechanism the advisory describes.
-
-AND THE PREMISE IS PINNED BY A TEST, WHICH IS HER CONDITION AND IS NOT OPTIONAL:
-apps/api/src/common/multipart-upload-exposure.inventory.spec.ts asserts both facts BY
-NAME over the whole api source — no upload route passes a fileFilter, and none accepts
-more than one file — so the PREMISE fails rather than the feature, and it fails for a
-SECOND upload route somebody adds rather than only for a change to the existing one. It
-carries a non-vacuity floor, because every assertion in it is a loop and an empty loop
-passes. Three committed plants cover both premises and the floor.
-
-THE 2026-09 HISTORY IS WHY THAT TEST EXISTS RATHER THAN A COMMENT. Four multer
-advisories were accepted here on these same two grounds and the reachability half had
-ALREADY BEEN FALSE for sixteen days, because a FileInterceptor route landed four days
-after the acknowledgement was written (docs/findings-register.md section 1.82). A record whose
-premise nothing checks is a record that goes quietly false.
-
-RULE 1, NO UPGRADE PATH, AND THIS IS A WAIT WITH A DATE RATHER THAN AN EXEMPTION. The
-fix EXISTS upstream in multer 2.5.0; what is being waited for is Nest moving its exact
-pin. @nestjs/platform-express pins multer at an EXACT 2.4.0, and EVERY published version
-through 12.2.0 still pins 2.4.0 — checked one at a time rather than off the latest
-major, which is rule 1's own instruction. That sentence is what makes the review date
-honest.
-
-AND THE THREE MECHANISMS THAT FORCE 2.5.0 WERE EACH TRIED AND EACH BROKE SOMETHING,
-PROVEN BY RUNNING THE UPLOAD ROUTE. A root override of ^2.5.0 alone made npm DROP multer
-from the tree entirely (node_modules/multer ABSENT) — and this gate then went GREEN
-BECAUSE THE PACKAGE HAD VANISHED, which would have shipped a latent crash on the one
-route that uses it. An exact 2.5.0 override did the same. Declaring multer ^2.5.0
-directly in apps/api PLUS the override did install 2.5.0 deduped onto one copy — and
-legacy-import.e2e-spec.ts + legacy-import-report.e2e-spec.ts went from 8/8 to FIVE
-FAILED, every multipart request answering 400. Isolated afterwards by single variable:
-body-parser 2.4.0 alone is 8/8, multer 2.4.0 UNDER the override is 5 failed, and HEAD is
-8/8 — so it is the OVERRIDE MECHANISM against an exact pin, which is this file's own
-recorded finding met for the second time.
-
-THE OBVIOUS REMEDY IS WITHDRAWN, AND THE MEASUREMENT IS WHY: removing our upload route
-would NOT clear this advisory. multer is NOT OUR DEPENDENCY — it appears exactly ONCE in
-the lockfile, as a dependency of @nestjs/platform-express, and is declared in no
-package.json of ours. So dropping the one multipart route would leave the package
-installed and the advisory standing, while costing the customer-import feature. If the
-owner declines this record, the answer is to carry the red until Nest moves its pin,
-never to override it.`,
-    reviewBy: '2026-11-24',
-  },
+  /*
+   * 🔴 THE multer ENTRY IS GONE, 2026-11-25, BECAUSE RULE 1 STOPPED HOLDING — AND IT WAS A DATE
+   * THAT MOVED, NOT A TREE.
+   *
+   * `GHSA-q7qp-rjg7-q26m` / `CVE-2026-113872` (DoS via a pending ASYNCHRONOUS `fileFilter`) was
+   * recorded here under OWNER DECISION 52 as *the vulnerable code path does not exist in this
+   * product*, with `reviewBy: '2026-11-24'`. The entry's own closing sentence named what it was
+   * waiting for: *"what is being waited for is Nest moving its exact pin"*, and
+   * *"@nestjs/platform-express pins multer at an EXACT 2.4.0, and EVERY published version through
+   * 12.2.0 still pins 2.4.0"*.
+   *
+   * ## NEST MOVED ITS PIN, AND THE DATE LAPSING IS HOW WE FOUND OUT
+   *
+   * CI went red on 2026-11-25 with `EXPIRED high multer — acknowledgement lapsed on 2026-11-24`
+   * and **0 unacknowledged** advisories: nothing new had shipped, the tree was byte-for-byte what
+   * had passed, and `main` was red for the identical reason. ⟶ A fourth thing can move a green
+   * run to red, beside the tree, the runner and an external feed: **the clock on our own
+   * acknowledgement**. That is the mechanism this file's `reviewBy` exists to produce, working.
+   *
+   * Re-checked the PATCH line one version at a time — rule 1's own instruction, not off the
+   * latest major — across every published `11.x` and `12.x`:
+   *
+   *     platform-express 11.2.6 .. 11.2.8   multer 2.4.0   (vulnerable)
+   *     platform-express 11.2.9 .. 12.6.1   multer 2.5.0   (fixed)
+   *
+   * So `11.2.9` is the FIRST version carrying the fix: a PATCH bump inside the 11.x line, no Nest
+   * major involved. `apps/api/package.json` states `^11.2.9` as a FLOOR, so the fixed multer is a
+   * requirement rather than a lucky resolution — which is exactly how the PREVIOUS multer entry
+   * (four `GHSA-wc9g-mqfw-jrwm` siblings) was retired, one version earlier.
+   *
+   * ## ⚠️ AND `npm install` DID NOT APPLY THE FLOOR
+   *
+   * It left `platform-express` at 11.2.6 and multer at 2.4.0 against a declared `^11.2.9`, with
+   * `npm ls` showing its own tree carrying both — the recorded behaviour from the `effect`
+   * override (message 50): npm will not move an already-resolved tree for a new constraint.
+   * **`npm update @nestjs/platform-express` is what applies it**, and it resolved 11.2.12 with
+   * `multer@2.5.0` as the single copy in the lockfile.
+   *
+   * ## AND THE 2.5.0 UPGRADE WAS RUN, NOT ASSUMED — THE OVERRIDE'S FAILURE DID NOT REPEAT
+   *
+   * The deleted entry recorded that forcing 2.5.0 through an `overrides` entry took
+   * `legacy-import.e2e-spec.ts` + `legacy-import-report.e2e-spec.ts` from 8/8 to FIVE FAILED,
+   * every multipart request answering 400, and isolated it to the OVERRIDE MECHANISM against an
+   * exact pin rather than to the version. A FLOOR RAISE is the other mechanism, and it holds:
+   * both specs are **9/9** on `multer@2.5.0` (nine now, not eight — a test landed since), and
+   * `node_modules/multer` is PRESENT at 2.5.0 rather than having vanished, which is the other
+   * failure mode that entry recorded and which made this gate go green by deletion.
+   *
+   * ⛔ `multipart-upload-exposure.inventory.spec.ts` STAYS. It was decision 52's condition and it
+   * is not what the fix retires: it asserts no upload route passes a `fileFilter` and none accepts
+   * more than one file, over the whole api source, and it is what catches a SECOND upload route
+   * somebody adds. A premise test outlives the advisory that prompted it.
+   *
+   * ## WHAT IS LEFT HERE, AND IT IS EMPTY ON PURPOSE
+   *
+   * Every advisory at `high` or above in what SHIPS fails this gate. `ACKNOWLEDGED` being empty is
+   * the intended steady state, and the history below is why an entry was ever added.
+   */
   /*
    * EMPTY, and that is the intended steady state — every advisory at `high` or above fails this gate.
    *

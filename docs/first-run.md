@@ -58,14 +58,31 @@
 > البرامج التي ثُبِّتت بعد فتحها، فستقول لكِ `command not found` عن برنامج مثبَّت فعلاً. هذا أكثر
 > سؤال يُطرح في هذه الخطوة.
 
-### ب. الأوامر الخمسة، بهذا الترتيب
+### ب-٠. وإن كان قد سُلِّم إليكِ رقمُ نسخةٍ مثبَّتة (علامة)
+
+إن قيل لكِ «اعملي على نسخة العرض» ومعها اسمُ علامةٍ مثل `demo-rehearsal-2026-11-25`، فالأمران
+اثنان لا واحد:
+
+```powershell
+git checkout demo-rehearsal-2026-11-25
+git submodule update --init --recursive
+```
+
+🔴 **والثاني ليس تزيّداً.** مجلّد `ibms-brain` مُثبَّتٌ على commit بعينه (submodule)، و`git
+checkout` يحرّك المستودعَ الرئيسيَّ وحده ويترك المجلَّدَ الفرعيَّ على ما كان — أو **فارغاً تماماً
+على نسخةٍ جديدة**. وبوّابةُ `npm run check:docs` تقرأ منه، فتفشل بأن ملفّاً غيرُ موجود، وهو
+موجودٌ في العلامة.
+
+### ب. الأوامر السبعة، بهذا الترتيب
 
 افتحي PowerShell على مجلد المشروع `C:\Users\user\Downloads\ibms-app` ونفّذي:
 
 ```powershell
 npm install
 Copy-Item .env.example .env
+npm run build --workspace=@ibms/db
 docker compose up -d db
+npm run db:provision-app-role
 npm run db:migrate:deploy
 npm run db:seed
 ```
@@ -76,10 +93,36 @@ npm run db:seed
 |---|---|---|---|
 | `npm install` | ينزّل مكتبات المشروع. **يستغرق دقائق عدة في المرة الأولى** | سطر أخير مثل `added 1500 packages` | `EPERM` أو ملف مقفل: أغلقي أي محرر أو نافذة أخرى تعمل على المجلد وأعيدي المحاولة |
 | `Copy-Item .env.example .env` | ينسخ ملف الإعدادات. **لا يطبع شيئاً عند النجاح** — الصمت هو النجاح | لا رسالة | `already exists`: الملف موجود، تخطّي الأمر |
+| `npm run build --workspace=@ibms/db` | **يبني عميل قاعدة البيانات.** على نسخة نظيفة لم يُبنَ بعد، وكلُّ أمرِ قاعدةِ بياناتٍ تحته يحتاجه | `tsc` ينتهي بلا خطأ (الصمت هو النجاح) | `Cannot find module '@prisma/client'` من أمرٍ تحته: هذه الخطوة لم تُنفَّذ |
 | `docker compose up -d db` | يشغّل قاعدة البيانات داخل Docker | `Started` أو `Running` | `error during connect`: Docker Desktop غير مفتوح |
+| `npm run db:provision-app-role` | **ينشئ دور `ibms_app`** الذي يتّصل به النظام. الحاوية تُنشئ دورَ `ibms` وحده، و`ibms_app` ليس داخل أي ترحيل: الأدوار على مستوى العنقود لا قاعدة البيانات | `Created role "ibms_app".` ثم `"ibms_app" is a plain login role: no superuser, no BYPASSRLS, owns nothing.` | `APP_DB_PASSWORD is not set` — انظري الملاحظة تحت الجدول |
 | `npm run db:migrate:deploy` | **ينشئ جداول قاعدة البيانات.** بدونه القاعدة فارغة تماماً ولن يعمل أي شيء | `All migrations have been successfully applied` | `Can't reach database server`: القاعدة لم تجهز بعد — انتظري عشر ثوانٍ وأعيدي الأمر |
 | `npm run db:seed` | يضع الأدوار والصلاحيات. بدونه تدخلين ولا تستطيعين فتح أي شاشة | آخر سطر: `Seeded 16 fixed-date Jordanian public holiday(s) ...` — وقبله `Seeded 234 permissions.` (القياس في ١٨/١١/٢٠٢٦؛ لإعادة القياس: `bash scripts/from-empty.sh` — يطبع الرقمين موسومَين باسم هذا الملف) | **لا تحكمي على النجاح بالرقم.** الرقم يكبر مع كل صلاحية تُضاف، فاختلافه عن ٢٣٤ يعني غالباً أن هذا المستند قديم لا أن التجهيز فشل. الفشل يُعلن عن نفسه: الأمر يتوقف ويطبع الخطأ، ولا يصل إلى سطره الأخير. وإن دخلتِ ورُفضت كل شاشة فالمؤشّر الوحيد هو **الإسنادات = صفر** (انظري جدول المشكلات) |
 
+> 🔴 **و`db:provision-app-role` تسبق الترحيلات، وبدونها تتوقّف** (قياس 2026-11-25). الترحيل
+> `20260928100000_row_level_security` يرفض بنفسه ويقول: `Role "ibms_app" does not exist` — فإن
+> رأيتِ هذا السطر فالناقص هو هذه الخطوة لا شيء آخر. (ولهذا الترتيب سبب: الدورُ على مستوى
+> العنقود، وأمنُ الصفوف لا يعمل إن اتّصل النظام بالدور المالك للجداول، لأن Postgres يُعفي
+> المالكَ من سياساته.)
+>
+> **و`APP_DB_PASSWORD` هي كلمةُ مرورِ الدورِ `ibms_app` نفسها، وهي مكتوبةٌ داخل
+> `APP_DATABASE_URL` في ملف `.env`.** الرابط بهذه الصورة:
+>
+> ```
+> APP_DATABASE_URL=postgresql://ibms_app:<كلمة-المرور>@localhost:5433/ibms?schema=public
+> ```
+>
+> فالجزء الذي بين `ibms_app:` و`@` هو ما تضعينه في `APP_DB_PASSWORD`. اقرئيه بعينك من الملف
+> ومرّريه في نفس النافذة:
+>
+> ```powershell
+> $env:APP_DB_PASSWORD = (Read-Host "كلمة مرور الدور ibms_app كما في APP_DATABASE_URL")
+> ```
+>
+> ⛔ **ولا تطبعي هذه الكلمة ولا تنسخيها في رسالة ولا في ملف ثانٍ.** `Read-Host` لا تحفظها في
+> سجلّ الأوامر، وهذا سببُ كتابتها بهذه الطريقة لا غير. وإن كان الملف `.env` منسوخاً من
+> `.env.example` بلا تعديل فالكلمة هي كلمةُ المثال، وهي صالحةٌ للتطوير وحده.
+>
 > **استخدمي `db:migrate:deploy` وليس `db:migrate:dev`.** الأول يطبّق الترحيلات الموجودة ولا شيء غير ذلك.
 > الثاني يقارن بعدها ملف المخطط بقاعدة البيانات، وفي هذا المشروع الملف يحتوي أقل مما تحتويه القاعدة
 > عن قصد، فقد يعرض عليكِ إنشاء ترحيل جديد لا تريدينه. إن رأيتِ سؤالاً عن إنشاء ترحيل فاضغطي إلغاء
@@ -89,7 +132,7 @@ npm run db:seed
 > يضع فيها الأدوار والصلاحيات. تخطّي الثاني وستنجح كلمة المرور ثم تُرفض كل شاشة — وهي أكثر حالة
 > محيّرة في هذا النظام، لأن الخطأ يبدو كمشكلة في حسابك وهو ليس كذلك.
 
-بعد هذه الخمسة انتقلي إلى القسم ١. لن تحتاجي القسم ٠ مرة أخرى على هذا الجهاز.
+بعد هذه السبعة انتقلي إلى القسم ١. لن تحتاجي القسم ٠ مرة أخرى على هذا الجهاز.
 
 ## ١. قبل أن تبدئي
 
@@ -161,12 +204,22 @@ npm run dev
 `1 Insight`. هي أداةُ مطوِّرين، وليست من المنتج، ولا تختفي بإغلاقها. ونسخةُ الإنتاج لا تحملها
 أصلاً، وهي كذلك **أسرعُ في فتح الشاشات** لأنّ الصفحات مترجَمةٌ سلفاً لا عند أوّل زيارة.
 
-شغّلي الخدمة الخلفية كالمعتاد في نافذة، ثمّ في **نافذةٍ ثانية**:
+🔴 **والخدمةُ الخلفيّةُ وحدَها، لا `npm run dev`.** الأمرُ من المجلّدِ الرئيسيِّ يشغّل
+`turbo run dev`، أي **الخدمةَ والواجهةَ معاً** — فتأخذ الواجهةُ التطويريّةُ المنفذَ `3000`،
+و`npm run start -w web` بعدها يجد المنفذَ مشغولاً. الأمرُ الصحيح:
 
 ```powershell
+# نافذةٌ أولى — الخدمةُ الخلفيّةُ وحدها
+npm run dev -w api
+
+# نافذةٌ ثانية — نسخةُ الإنتاج للواجهة
 npm run build -w web
 npm run start -w web
 ```
+
+قياس ٢٥/١١/٢٠٢٦: `npm run dev -w api` يطبع `Nest application successfully started`،
+و`http://localhost:4000/health/db` يجيب `{"status":"ok"}`، **والمنفذُ `3000` يبقى فارغاً** — وهذا
+هو المقيس لا المفترض.
 
 - `build` يأخذ **دقائق**، ويطبع في آخره قائمةَ الصفحات. شغّليه مرّةً بعد كلِّ تغييرٍ في الكود،
   ولا حاجة لإعادته قبل كلِّ عرض.
@@ -181,8 +234,8 @@ npm run start -w web
 > ولا `public`، فتُطلَب ملفّاتُ التنسيق ويُجاب عنها بـ`404`. أي أنّ اتّباع التحذير يعطيك
 > الشاشةَ المكسورةَ التي تحاولين تفاديها.
 
-**ولا تنسي الخدمة الخلفية.** نسخةُ الإنتاج للواجهة وحدها؛ الـ API يبقى على `npm run dev`
-في نافذته، وإلّا فلن تجيب أيُّ شاشة.
+**ولا تنسي الخدمة الخلفية.** نسخةُ الإنتاج للواجهة وحدها؛ الـ API يبقى على
+`npm run dev -w api` في نافذته، وإلّا فلن تجيب أيُّ شاشة.
 
 ## ٤. الخطوة الثالثة: جهّزي البيانات
 
@@ -246,14 +299,22 @@ docker compose down -v
 # ٣ — شغّليها من جديد، فارغة.
 docker compose up -d db
 
-# ٤ — ابني الجداول. يطبع في آخره: "All migrations have been successfully applied."
-npm run db:migrate:dev
+# ٤ — أنشئي دور `ibms_app`. الحاوية الجديدة لا تحمله (قياس 2026-11-25)، والترحيل التالي يرفض بدونه
+#     ويقول: Role "ibms_app" does not exist
+$env:APP_DB_PASSWORD = (Read-Host "كلمة مرور الدور ibms_app كما في APP_DATABASE_URL")
+npm run db:provision-app-role
 
-# ٥ — ازرعي الأدوار وكتالوج الصلاحيات. بلا هذه الخطوة لا يدخل أحد.
+# ٥ — ابني الجداول. يطبع في آخره: "All migrations have been successfully applied."
+npm run db:migrate:deploy
+
+# ٦ — ازرعي الأدوار وكتالوج الصلاحيات. بلا هذه الخطوة لا يدخل أحد.
 npm run db:seed
 
-# ٦ — شغّلي النظام في نافذة، وابني بيانات العرض في نافذة ثانية.
-npm run dev
+# ٧ — شغّلي الخدمة الخلفية في نافذة، والواجهة في نافذة ثانية.
+npm run dev -w api
+npm run dev -w web
+
+# ٨ — ابني بيانات العرض في نافذة ثالثة.
 $env:DEMO_PASSWORD = (Read-Host "اختاري كلمة مرور العرض")
 npm run seed:demo -w api
 ```
@@ -263,8 +324,9 @@ npm run seed:demo -w api
 | الأمر | السطر الذي يؤكّد نجاحه |
 |---|---|
 | `docker compose up -d db` | اسم الحاوية ومعه `Started` أو `Running` |
-| `npm run db:migrate:dev` | `All migrations have been successfully applied.` |
-| `npm run db:seed` | سطر يذكر عدد الصلاحيات والأدوار المزروعة |
+| `npm run db:provision-app-role` | `Created role "ibms_app".` then `"ibms_app" is a plain login role: no superuser, no BYPASSRLS, owns nothing.` |
+| `npm run db:migrate:deploy` | `All migrations have been successfully applied.` |
+| `npm run db:seed` | `Seeded 234 permissions.` و`Seeded 12 roles for the default organization` |
 | `npm run seed:demo -w api` | `All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.` |
 
 ⚠️ **والخطوة ٢ تمحو كلَّ شيء**، لا بيانات العرض وحدها: أي حساب أنشأتِه بيدك، وأي دور عرّفتِه،
@@ -412,10 +474,22 @@ http://localhost:3000
 
 **`operator@ibms.local`** — الدور `PLATFORM_OPERATOR`.
 
-**لا يحتاج تجهيزاً، وقد استُعمل فعلاً.** قياس ٢٦/١٠/٢٠٢٦: أمرُ التجهيز يُنشئ هذا الحساب
-أصلاً — بكلمةٍ عشوائيّةٍ لا يعرفها أحد، تُتلَف في اللحظة نفسها — ثمّ **ضُبِطت له كلمةُ
-مرورٍ في ١٦/١٠/٢٠٢٦، ورُبِط تطبيقُ مصادقةٍ في اليوم نفسه، وقُبِل منه رمزٌ في
-١٩/١٠/٢٠٢٦** — والجلساتُ الخمس كلّها من هذا الجهاز نفسه.
+🔴 **وعلى قاعدةِ بياناتٍ جديدةٍ هذا الحسابُ بلا كلمةِ مرورٍ صالحة، وطريقُه
+`/forgot-password` بعد كلِّ زرعٍ جديد.** قياس ٢٥/١١/٢٠٢٦ على قاعدةٍ فارغة: أمرُ الزرع
+يطبع بنفسه
+
+> `Seeded the provider operator operator@ibms.local with NO usable password. Sign in by
+> requesting a password reset for that address — nothing here knows a password, and MFA is
+> forced by the PLATFORM_OPERATOR role.`
+
+فالكلمةُ **عشوائيّةٌ لا يعرفها أحدٌ وتُتلَف في اللحظة نفسها** — وهذا مقصود، لا نقص: كلمةُ مرورٍ
+يعرفها ملفُّ زرعٍ ليست سرًّا. فالطريقُ الوحيد هو `/forgot-password` بالعنوان أعلاه، **ويُعاد
+بعد كلِّ إفراغٍ وزرعٍ جديد**، لأنّ الحسابَ الجديدَ لا يحمل كلمةَ الحسابِ القديم.
+
+⚠️ **وما تحت هذا السطر قياسٌ لقاعدةِ بياناتِ التطويرِ القائمة، لا لقاعدةٍ جديدة.** قياس
+٢٦/١٠/٢٠٢٦: **ضُبِطت كلمةُ مرورٍ في ١٦/١٠/٢٠٢٦، ورُبِط تطبيقُ مصادقةٍ في اليوم نفسه، وقُبِل منه
+رمزٌ في ١٩/١٠/٢٠٢٦** — والجلساتُ الخمس كلّها من هذا الجهاز نفسه. فإن لم تُفرَّغ القاعدةُ فهذا
+قائمٌ كما هو.
 
 فـ**الربط قائمٌ وسرُّه عند من ربطه، ولا خطوةَ ربطٍ جديدةً هنا إن كان ذلك أنتِ.** وما
 قِيس هو أنّ أحداً على هذا الجهاز يملك السرَّ، لا أنّه أنتِ — والاختبارُ ثانيةٌ واحدة:
@@ -642,14 +716,31 @@ This section is for the first time on a new machine. If you have done it before,
 > cannot see a program installed after it opened, so it will tell you `command not found` about
 > something that is genuinely installed. This is the most common question at this step.
 
-### b. The five commands, in this order
+### b-0. If you were handed a pinned version (a tag)
+
+If you were told to work on the demo version and given a tag name such as
+`demo-rehearsal-2026-11-25`, that is TWO commands and not one:
+
+```powershell
+git checkout demo-rehearsal-2026-11-25
+git submodule update --init --recursive
+```
+
+🔴 **The second is not optional.** `ibms-brain` is pinned to a specific commit (a git submodule),
+and `git checkout` moves the main repository only — it leaves the submodule folder on whatever it
+was, or **completely empty on a fresh clone**. `npm run check:docs` reads from it, so it fails
+saying a file does not exist when that file is in the tag.
+
+### b. The seven commands, in this order
 
 Open PowerShell in the project folder `C:\Users\user\Downloads\ibms-app` and run:
 
 ```powershell
 npm install
 Copy-Item .env.example .env
+npm run build --workspace=@ibms/db
 docker compose up -d db
+npm run db:provision-app-role
 npm run db:migrate:deploy
 npm run db:seed
 ```
@@ -738,12 +829,22 @@ an `N` in it and `1 Insight` beside it. It is a developer tool, it is not part o
 and closing it does not keep it away. The production build does not carry it at all, and it also
 **opens screens faster**, because pages are compiled ahead of time rather than on first visit.
 
-Start the API as usual in one window, then in a **second window**:
+🔴 **The API ALONE, not `npm run dev`.** From the project folder that command runs
+`turbo run dev`, which starts **both the API and the web app** — the development web app takes
+port `3000`, and `npm run start -w web` afterwards finds it occupied. The right commands are:
 
 ```powershell
+# First window — the API on its own
+npm run dev -w api
+
+# Second window — the production web build
 npm run build -w web
 npm run start -w web
 ```
+
+Measured 2026-11-25: `npm run dev -w api` prints `Nest application successfully started`,
+`http://localhost:4000/health/db` answers `{"status":"ok"}`, and **port 3000 stays free** — which
+is measured rather than assumed.
 
 - `build` takes **minutes** and ends by printing the list of pages. Run it once after a code
   change; you do not need to repeat it before every demonstration.
@@ -760,7 +861,7 @@ npm run start -w web
 > `404`. Following the warning hands you the broken-looking screen you are trying to avoid.
 
 **And do not forget the API.** The production build is the website only; the API stays on
-`npm run dev` in its own window, or no screen will answer.
+`npm run dev -w api` in its own window, or no screen will answer.
 
 ## 4. Step three: build the data
 
@@ -828,14 +929,23 @@ docker compose down -v
 # 3 — Start it again, empty.
 docker compose up -d db
 
-# 4 — Build the tables. It ends with "All migrations have been successfully applied."
-npm run db:migrate:dev
+# 4 — Create the `ibms_app` role. A fresh container does not have it (measured 2026-11-25),
+#     and the next
+#     command refuses without it: Role "ibms_app" does not exist
+$env:APP_DB_PASSWORD = (Read-Host "The ibms_app password, as written inside APP_DATABASE_URL")
+npm run db:provision-app-role
 
-# 5 — Seed the roles and the permission catalogue. Without this nobody can sign in.
+# 5 — Build the tables. It ends with "All migrations have been successfully applied."
+npm run db:migrate:deploy
+
+# 6 — Seed the roles and the permission catalogue. Without this nobody can sign in.
 npm run db:seed
 
-# 6 — Run the system in one window and build the demo data in a second.
-npm run dev
+# 7 — Run the API in one window and the web app in a second.
+npm run dev -w api
+npm run dev -w web
+
+# 8 — Build the demo data in a third.
 $env:DEMO_PASSWORD = (Read-Host "Choose a demo password")
 npm run seed:demo -w api
 ```
@@ -845,9 +955,34 @@ npm run seed:demo -w api
 | Command | The line that confirms it |
 |---|---|
 | `docker compose up -d db` | the container name followed by `Started` or `Running` |
-| `npm run db:migrate:dev` | `All migrations have been successfully applied.` |
-| `npm run db:seed` | a line naming how many permissions and roles were seeded |
+| `npm run db:provision-app-role` | `Created role "ibms_app".` then `"ibms_app" is a plain login role: no superuser, no BYPASSRLS, owns nothing.` |
+| `npm run db:migrate:deploy` | `All migrations have been successfully applied.` |
+| `npm run db:seed` | `Seeded 234 permissions.` and `Seeded 12 roles for the default organization` |
 | `npm run seed:demo -w api` | `All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.` |
+
+🔴 **Step 4 is new and the route does not work without it** (measured 2026-11-25).
+`docker compose down -v` destroys
+the cluster, and a Postgres ROLE is cluster-level — so `ibms_app` goes with it. The migration
+`20260928100000_row_level_security` then refuses by name: `Role "ibms_app" does not exist`. That
+line means this one step is missing and nothing else is wrong.
+
+**`APP_DB_PASSWORD` is the `ibms_app` role's own password, and it is written inside
+`APP_DATABASE_URL` in `.env`:**
+
+```
+APP_DATABASE_URL=postgresql://ibms_app:<the-password>@localhost:5433/ibms?schema=public
+```
+
+The part between `ibms_app:` and `@` is what goes into `APP_DB_PASSWORD`. Read it from the file
+with your own eyes and pass it in the same window — ⛔ **do not print it, copy it into a message,
+or write it into a second file.** `Read-Host` keeps it out of the command history, which is the
+only reason it is written that way. If `.env` is an unedited copy of `.env.example`, the password
+is the example's, which is fit for development and nothing else.
+
+⚠️ **And step 5 is `db:migrate:deploy`, not `db:migrate:dev`** — which is what this section's own
+confirming-line table always said it printed. `migrate dev` additionally compares the schema file
+with the database, and in this project the file deliberately holds less than the database does, so
+it can offer to create a migration nobody wants. §0-b's note says the same thing at more length.
 
 ⚠️ **Step 2 erases everything**, not only the demo data: every account you made by hand, every
 role you defined, every experiment you wrote. Read it twice before you run it.
@@ -1001,10 +1136,23 @@ not in the office: they belong to the **provider** organization, whose account i
 
 **`operator@ibms.local`** — role `PLATFORM_OPERATOR`.
 
-**It needs no seeding, and it has been used.** Measured 2026-10-26: the seed creates this
-account itself — with a random password nobody knows, discarded in the same expression —
-and then **a password was set on 2026-10-16, an authenticator was paired the same day, and
-a code from it was accepted on 2026-10-19**, all five sessions from this machine.
+🔴 **On a FRESH database this account has no usable password, and its route is
+`/forgot-password` after every new seed.** Measured 2026-11-25 against an empty database: the
+seed prints this itself —
+
+> `Seeded the provider operator operator@ibms.local with NO usable password. Sign in by
+> requesting a password reset for that address — nothing here knows a password, and MFA is
+> forced by the PLATFORM_OPERATOR role.`
+
+The password is **random, known to nobody, and discarded in the same expression**. That is the
+intent rather than a shortfall: a password a seed file knows is not a secret. So
+`/forgot-password` with the address above is the only route, and **it has to be repeated after
+every empty-and-reseed**, because the new account does not carry the old one's password.
+
+⚠️ **What follows was measured on the EXISTING development database, not on a fresh one.**
+Measured 2026-10-26: **a password was set on 2026-10-16, an authenticator was paired the same
+day, and a code from it was accepted on 2026-10-19**, all five sessions from this machine. If the
+database has not been emptied, that pairing still stands.
 
 So **the pairing stands and whoever paired it holds the secret, and there is no new pairing
 step here if that was you.** What was measured is that somebody on this machine holds it,

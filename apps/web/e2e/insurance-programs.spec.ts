@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { permissionsForRoles } from './fixtures/role-permissions';
+import {
+  expectLayoutOnlyControl,
+  useTheme,
+  type BaseTheme,
+} from './fixtures/base-style';
 
 const ME_BASE = {
   id: 'user-1',
@@ -68,6 +73,8 @@ const PROGRAM_DETAIL = {
     recommendedCoverageLines: ['Property All Risks (Fire)', 'Public Liability'],
     riskProfileId: 'rp-1',
     customerId: 'cust-1',
+    // 🔴 OWNER DECISION 163 RULING 1 — «برنامج التأمين — {اسم البرنامج} — {اسم العميل}».
+    customerLegalName: 'Acme Trading Co',
     siteLabel: 'Head office',
     sumInsured: {
       propertySumInsured: '500000.000',
@@ -147,7 +154,11 @@ test("lists a customer's programs and opens one", async ({ page }) => {
 
   await expect(page).toHaveURL('/insurance-programs/prog-1');
   await expect(
-    page.getByRole('heading', { name: 'Insurance program — Head office' }),
+    // 🔴 OWNER DECISION 163 RULING 1 — the customer's name joined the title. CORRECTED to the
+    // ruled three-part shape rather than loosened to a prefix match.
+    page.getByRole('heading', {
+      name: 'Insurance program — Head office — Acme Trading Co',
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole('cell', { name: 'Property All Risks' }),
@@ -298,3 +309,31 @@ test('the finalize control is reachable via keyboard', async ({ page }) => {
   await finalize.focus();
   await expect(finalize).toBeFocused();
 });
+
+/*
+ * 🔴 MESSAGE 53 §1 ITEM 1 — THE CONTROL(S) ON THIS SCREEN THAT THE BASE SHAPE USED TO SKIP.
+ *
+ * Decision 161 ruling 2's first selector asked only WHETHER a control had an inline style, so a
+ * control whose style names a margin, a width or a cursor and nothing else was left to the
+ * browser's own default. The rule now reads the property NAMES; see `globals.css`.
+ *
+ * ⚠️ RUN HERE rather than in `base-style.spec.ts`, on this file's own PROVEN fixtures — message
+ * 44 lost a session to an invented fixture that rendered «This page couldn't load» and read
+ * exactly like a product defect. ⚠️ And in BOTH themes, because ruling 4 says the presenter
+ * shows the LIGHT one, which is why nobody will be looking at the dark one on the day.
+ */
+for (const theme of ['light', 'dark'] as BaseTheme[]) {
+  test(`decision 163 §1 — the programme back button takes the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
+    await mockPrograms(page);
+    await page.goto('/insurance-programs/prog-1');
+    await expectLayoutOnlyControl(
+      page.getByRole('button', { name: '← All insurance programs' }),
+      theme,
+      '/insurance-programs/[id] back button',
+    );
+  });
+}

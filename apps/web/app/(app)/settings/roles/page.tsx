@@ -25,6 +25,7 @@ import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { PermissionMatrix } from '../../../../components/admin/PermissionMatrix';
 import { permissionDisplayName } from '../../../../lib/admin/permission-names';
+import { dutyRowName } from '../../../../lib/admin/duty-segregation-rows';
 import {
   createMatrixStyle,
   generatedNameStyle,
@@ -416,6 +417,27 @@ export default function RoleAdminPage() {
       setNewNameAr('');
       setNewDescription('');
       setNewCodes(new Set());
+      /*
+       * ⚠️ OWNER DECISION 163 RULING 5 — NO SUCCESS MESSAGE IS SHOWN HERE, DELIBERATELY, AND
+       * THIS IS THE REPORT THE RULING ASKED FOR.
+       *
+       * Her ruling: «المهندس بيدوّر على جملة نجاح موجودة وبيعرضها، وما بتنحطّ قبل ما تشوفها
+       * الإدارة. وإذا ما في، ما بينبني إشي.» ⟶ So the dictionary was searched and the answer is
+       * reported rather than acted on.
+       *
+       * MEASURED: no shipped Arabic string says a ROLE WAS CREATED. The three nearest are
+       *
+       *     `roleDeleted`      «تم حذف الدور.»          this screen, same object, the opposite act
+       *     `roleMatrixSaved`  «تم حفظ الصلاحيات.»      this screen, and it names the PERMISSIONS
+       *     `empCreatedPerson` «تم تسجيل الشخص.»        another screen, another object
+       *
+       * ⛔ AND «تم إنشاء الدور.» IS NOT BUILT, because it does not ship: it would be «تم إنشاء»
+       * taken from `empdLoginCreated` joined to «الدور» taken from `roleDeleted`, which is two
+       * shipped words made into a third — the composition decision 125 forbids by name.
+       *
+       * ⚠️ The machinery is already here and wiring it is ONE LINE: `setSavedMessage(t(<key>))`,
+       * exactly as `onSavePermissions` below does. It waits for her word.
+       */
       await load();
     } catch (err) {
       setActionError(
@@ -751,12 +773,10 @@ export default function RoleAdminPage() {
                           style={matrixNameStyle}
                           data-permission-name={row.checkerPermission}
                         >
-                          {permissionDisplayName(row.checkerPermission, language)}
+                          {dutyRowName(row, readiness, language, t)}
                         </span>
                       ) : (
-                        <code>
-                          {permissionDisplayName(row.checkerPermission, language)}
-                        </code>
+                        <code>{dutyRowName(row, readiness, language, t)}</code>
                       )}
                     </Td>
                     <Td>{row.holderCount}</Td>

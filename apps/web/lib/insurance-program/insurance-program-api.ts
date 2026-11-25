@@ -39,6 +39,8 @@ export interface InsuranceProgramContext {
   recommendedCoverageLines: string[];
   riskProfileId: string;
   customerId: string | null;
+  /** 🔴 OWNER DECISION 163 RULING 1 — the title's customer name, carried with the record. */
+  customerLegalName: string | null;
   siteLabel: string | null;
   sumInsured: SumInsuredSummary;
   surveyComplete: boolean;

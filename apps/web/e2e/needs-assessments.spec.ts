@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectAbsentWithin } from './support/anchored';
+import {
+  expectLayoutOnlyControl,
+  useTheme,
+  type BaseTheme,
+} from './fixtures/base-style';
 import AxeBuilder from '@axe-core/playwright';
 import { permissionsForRoles } from './fixtures/role-permissions';
 
@@ -611,5 +616,69 @@ test('§P2 — and with NO programme yet, the assemble button is what stands', a
   await page.goto('/needs-assessments/na-1');
   await expect(
     page.getByRole('button', { name: 'Assemble insurance program →' }),
+  ).toBeVisible();
+});
+
+/*
+ * 🔴 MESSAGE 53 §1 ITEM 1 — THE CONTROL(S) ON THIS SCREEN THAT THE BASE SHAPE USED TO SKIP.
+ *
+ * Decision 161 ruling 2's first selector asked only WHETHER a control had an inline style, so a
+ * control whose style names a margin, a width or a cursor and nothing else was left to the
+ * browser's own default. The rule now reads the property NAMES; see `globals.css`.
+ *
+ * ⚠️ RUN HERE rather than in `base-style.spec.ts`, on this file's own PROVEN fixtures — message
+ * 44 lost a session to an invented fixture that rendered «This page couldn't load» and read
+ * exactly like a product defect. ⚠️ And in BOTH themes, because ruling 4 says the presenter
+ * shows the LIGHT one, which is why nobody will be looking at the dark one on the day.
+ */
+for (const theme of ['light', 'dark'] as BaseTheme[]) {
+  test(`decision 163 §1 — the needs-assessment back button takes the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ['SALES_RELATIONSHIP_OFFICER']);
+    await mockQuestionnaire(page);
+    await page.route('http://localhost:4000/needs-assessments/na-1', (route) =>
+      route.fulfill({ status: 200, json: DRAFT_ASSESSMENT }),
+    );
+    await page.route('http://localhost:4000/consent-records**', (route) =>
+      route.fulfill({ status: 200, json: [] }),
+    );
+    await page.route(
+      'http://localhost:4000/privacy-notices/current**',
+      (route) => route.fulfill({ status: 200, json: { notice: null } }),
+    );
+    await page.goto('/needs-assessments/na-1');
+    await expectLayoutOnlyControl(
+      page.getByRole('button', { name: '← All needs assessments' }),
+      theme,
+      '/needs-assessments/[id] back button',
+    );
+  });
+}
+
+/*
+ * 🔴 OWNER DECISION 163 RULING 1 — «تقييم الاحتياجات — {اسم العميل}».
+ *
+ * ⛔ No query changed for this: the wire has carried the customer since message 45 §4, resolved
+ * off the parent risk profile and flattened. What was missing was the title reading it.
+ */
+test('decision 163 ruling 1 — the needs-assessment title names its customer', async ({
+  page,
+}) => {
+  await mockAuth(page, ['SALES_RELATIONSHIP_OFFICER']);
+  await mockQuestionnaire(page);
+  await page.route('http://localhost:4000/needs-assessments/na-1', (route) =>
+    route.fulfill({ status: 200, json: DRAFT_ASSESSMENT }),
+  );
+  await page.route('http://localhost:4000/consent-records**', (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route('http://localhost:4000/privacy-notices/current**', (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
+  await page.goto('/needs-assessments/na-1');
+  await expect(
+    page.getByRole('heading', { name: 'Needs assessment — Acme Trading Co' }),
   ).toBeVisible();
 });

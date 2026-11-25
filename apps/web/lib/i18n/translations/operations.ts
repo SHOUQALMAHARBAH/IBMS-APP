@@ -704,6 +704,14 @@ export const OPERATIONS = {
     dutySegIntro:
       'ستّ عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
     dutySegColPermission: 'صلاحية المعتمِد',
+    /* 🔴 OWNER DECISION 163 RULING 4 — «يعتمد تقييم حاجات العميل (راجعه)» and «… (اعتمده)».
+       `NeedsAssessment` carries TWO maker/checker pairs and both name one permission, so this
+       table printed the same row name twice with no way to tell which operation was which.
+       ⛔ THIS VALUE IS A FORMAT AND CARRIES NO WORD: the name comes from decision 127's table
+       and the qualifier from `nadReviewedBy` / `nadApprovedBy`, which are the words the
+       needs-assessment screen itself shows beside the two people. Her ruling says so by name:
+       «الكلمتان موجودتان بصفحة التقييم». */
+    dutySegPermissionQualified: '{name} ({qualifier})',
     dutySegColHolders: 'عدد من يملكها',
     dutySegColStatus: 'الحالة',
     dutySegStatusNobody: 'لا يمكن إتمامها — لا أحد يملك الصلاحية',
@@ -1392,6 +1400,7 @@ export const OPERATIONS = {
     dutySegIntro:
       'Fifteen operations in this system cannot be done by one person: whoever records the action cannot be the one who approves it. This is the list, with whether your office has a second person for each of them today.',
     dutySegColPermission: "Approver's permission",
+    dutySegPermissionQualified: '{name} ({qualifier})',
     dutySegColHolders: 'People who hold it',
     dutySegColStatus: 'Status',
     dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',

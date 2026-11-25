@@ -2,6 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { anchoredCount, expectAbsentWithin } from "./support/anchored";
+import {
+  expectLayoutOnlyControl,
+  useTheme,
+  type BaseTheme,
+} from "./fixtures/base-style";
 
 const ME_BASE = {
   id: "user-1",
@@ -57,7 +62,14 @@ const OPPORTUNITY = {
   createdByUserId: "user-1",
   createdAt: "2026-03-01T00:00:00.000Z",
   updatedAt: "2026-03-01T00:00:00.000Z",
-  context: { insuranceProgramId: "prog-1", customerId: "cust-1" },
+  context: {
+    insuranceProgramId: "prog-1",
+    customerId: "cust-1",
+    // 🔴 OWNER DECISION 163 RULING 1 — the two names the title is made of. A fixture
+    // without them renders «Opportunity — undefined», so they are not optional.
+    customerLegalName: "Acme Trading",
+    insuranceProgramName: "Head office",
+  },
 };
 
 /*
@@ -1775,7 +1787,9 @@ test("opens an opportunity and lists its RFQs", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "RFQ / market" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /Opportunity opp-1/ }).click();
+  // 🔴 OWNER DECISION 163 RULING 1 — this card used to be named «Opportunity opp-1», eight
+  // characters of a uuid. CORRECTED to the ruled title rather than deleted.
+  await page.getByRole("button", { name: /Opportunity — Acme Trading/ }).click();
 
   await expect(page).toHaveURL("/opportunities/opp-1");
   await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
@@ -1815,7 +1829,9 @@ test("OWNER DECISION 150 ruling 1 — the opportunities list opens from the side
     scope.getByText("No customer selected"),
   );
 
-  await page.getByRole("button", { name: /Opportunity opp-1/ }).click();
+  // 🔴 OWNER DECISION 163 RULING 1 — this card used to be named «Opportunity opp-1», eight
+  // characters of a uuid. CORRECTED to the ruled title rather than deleted.
+  await page.getByRole("button", { name: /Opportunity — Acme Trading/ }).click();
   await expect(page).toHaveURL("/opportunities/opp-1");
   await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
 });
@@ -1857,7 +1873,12 @@ test("creates an RFQ with an insurer shortlist", async ({ page }) => {
   await page
     .getByLabel("Insurance line")
     .selectOption({ value: "Property All Risks" });
-  await page.getByLabel("Jordan Insurance Co · A-").check();
+  // 🔴 THE RATING LEFT THIS LABEL (message 53 §1). It read «Jordan Insurance Co · A-», and
+  // on the demo database three of these labels carried the stored English «A- (sample
+  // rating)». What settled it is the DATE: `SelectableInsurer` carries the rating and not
+  // `financialStrengthRatingAsOf`, so this label showed the one half
+  // `Insurer_rating_carries_its_date` refuses to let stand alone. CORRECTED, not deleted.
+  await page.getByLabel("Jordan Insurance Co").check();
   await page.getByRole("button", { name: "Create RFQ" }).click();
 
   await expect.poll(() => created).toBe(true);
@@ -3280,7 +3301,7 @@ test("RFQ screens have no serious/critical accessibility violations @a11y", asyn
 
   await page.goto("/opportunities/opp-1");
   await expect(
-    page.getByRole("heading", { name: /Opportunity opp-1/ }),
+    page.getByRole("heading", { name: /Opportunity — Acme Trading/ }),
   ).toBeVisible();
   const oppResults = await new AxeBuilder({ page }).analyze();
   expect(
@@ -3892,7 +3913,7 @@ for (const [status, label] of [
       .selectOption({ value: "Property All Risks" });
     // The insurer row goes through `insurerDisplayName`, so in Arabic ins-1 renders its
     // ARABIC name — which is the fix message 45 §2 shipped and this flow has to respect.
-    await page.getByLabel("وادي رم التعاونية · A-").check();
+    await page.getByLabel("وادي رم التعاونية").check();
     const submit = page.getByRole("button", {
       name: "إنشاء طلب عرض الأسعار",
     });
@@ -3972,7 +3993,7 @@ test("the art. 15/d question is in view the moment the shortlist raises it", asy
   // the assertion below observes is the appearance and not a section that was always there.
   await expect(question).toHaveCount(0);
 
-  await page.getByLabel("وادي رم التعاونية · A-").check();
+  await page.getByLabel("وادي رم التعاونية").check();
 
   await expect(question).toBeVisible();
   // ⛔ IN THE VIEWPORT, not merely in the DOM. `toBeVisible` passes on an element below the
@@ -4114,4 +4135,148 @@ test("THE FINAL WALK §ب-٢ — the claims section refuses in Arabic, not in th
   // And the refusal is the decided Arabic shape: the act, then who can grant it.
   await expect(main).toContainText("عرض المطالبات");
   await expect(main).toContainText("من يدير الصلاحيات في مكتبك");
+});
+
+/*
+ * 🔴 MESSAGE 53 §1 ITEM 1 — THE FIVE CONTROLS ON THESE SCREENS THAT THE BASE SHAPE USED TO SKIP.
+ *
+ * Decision 161 ruling 2 put one base shape in `globals.css` for the controls nobody styled, and
+ * its first selector asked only WHETHER a control had an inline style. Five of the controls the
+ * owner's walk named are on this spec's screens, and every one of them names a layout property
+ * and nothing else:
+ *
+ *   /rfqs/new        the insurance-line select  `{ minWidth: '20rem', marginTop: '0.35rem' }`
+ *   /opportunities   the «بحث» submit button    `listSearchButtonStyle` (margin + align)
+ *   /rfqs            the «بحث» submit button    the same
+ *   /opportunities/[id]  the «← كل الفرص …» back button  `{ cursor: 'pointer' }`
+ *   /rfqs/[id]           the «← كل طلبات …» back button  `{ cursor: 'pointer' }`
+ *
+ * ⚠️ THESE RUN HERE RATHER THAN IN `base-style.spec.ts` ON PURPOSE: the fixtures these screens
+ * need are `mockRfqApi`'s, already proven by forty other tests in this file. Message 44 lost a
+ * session to an invented fixture that rendered «This page couldn't load» and looked like a
+ * product defect.
+ *
+ * ⚠️ AND BOTH THEMES, because ruling 4 says the presenter shows the LIGHT one — which is exactly
+ * why the dark one needs a test: nobody will be looking at it on the day.
+ */
+for (const theme of ["light", "dark"] as BaseTheme[]) {
+  test(`decision 163 §1 — the line select takes the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+    await mockRfqApi(page);
+    await page.goto("/rfqs/new?opportunityId=opp-1");
+    await expect(page.getByRole("heading", { name: "New RFQ" })).toBeVisible();
+    await expectLayoutOnlyControl(
+      page.getByLabel("Insurance line"),
+      theme,
+      "/rfqs/new line select",
+    );
+  });
+
+  test(`decision 163 §1 — the two list search buttons take the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+    await mockRfqApi(page);
+
+    await page.goto("/opportunities");
+    await expect(
+      page.getByRole("heading", { name: "RFQ / market" }),
+    ).toBeVisible();
+    await expectLayoutOnlyControl(
+      page.locator("form").getByRole("button", { name: "Search" }),
+      theme,
+      "/opportunities search button",
+    );
+
+    await page.goto("/rfqs");
+    await expect(page.getByRole("heading", { name: "RFQs" })).toBeVisible();
+    await expectLayoutOnlyControl(
+      page.locator("form").getByRole("button", { name: "Search" }),
+      theme,
+      "/rfqs search button",
+    );
+  });
+
+  test(`decision 163 §1 — the two back buttons take the base shape in ${theme}`, async ({
+    page,
+  }) => {
+    await useTheme(page, theme);
+    await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+    await mockRfqApi(page);
+
+    await page.goto("/opportunities/opp-1");
+    await expectLayoutOnlyControl(
+      page.getByRole("button", { name: "← All opportunities" }),
+      theme,
+      "/opportunities/[id] back button",
+    );
+
+    await page.goto("/rfqs/rfq-1");
+    await expectLayoutOnlyControl(
+      page.getByRole("button", { name: "← Back to the opportunity" }),
+      theme,
+      "/rfqs/[id] back button",
+    );
+  });
+}
+
+/*
+ * 🔴 OWNER DECISION 163 RULING 1 — THE OPPORTUNITY'S TWO NAMES, WHERE TWO uuid SLICES WERE.
+ *
+ * The title was «فرصة تجارية 78684085» and the programme link «من برنامج التأمين 7c0b5103»;
+ * both now carry a name the reader can act on. ⛔ Asserted with the fixture's own customer and
+ * programme names AND with the absence of the id fragments, because a title that gained a name
+ * while keeping the id would satisfy a presence check alone.
+ */
+test("decision 163 ruling 1 — the opportunity title and programme link carry names", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+  await page.goto("/opportunities/opp-1");
+
+  await expect(
+    page.getByRole("heading", { name: "Opportunity — Acme Trading" }),
+  ).toBeVisible();
+  // The programme link reads the programme's own name, not eight characters of its id.
+  await expect(
+    page.getByRole("button", { name: "Head office" }),
+  ).toBeVisible();
+
+  const main = page.locator("main");
+  // ⛔ AND NO id FRAGMENT SURVIVES. `opp-1` and `prog-1` are this fixture's ids; a real one is a
+  // uuid, and `.slice(0, 8)` of either is what the walk read off the screen.
+  await expectAbsentWithin(main, (scope) => scope.getByText("Opportunity opp-1"));
+  await expectAbsentWithin(main, (scope) =>
+    scope.getByText("From insurance program prog-1"),
+  );
+});
+
+/*
+ * 🔴 OWNER DECISION 163 RULING 1 — THE LIST CARD, AND THE ROW IT REPLACES.
+ *
+ * The card's heading was «فرصة تجارية {8 of uuid}» with a separate «العميل: X» row beneath it.
+ * The heading names the customer now, and that row is gone rather than printing the same fact
+ * twice — a stated judgement, recorded at the call site.
+ */
+test("decision 163 ruling 1 — the opportunity card names its customer once", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+  await page.goto("/opportunities");
+  await expect(
+    page.getByRole("heading", { name: "RFQ / market" }),
+  ).toBeVisible();
+
+  const card = page.getByRole("button", { name: /Opportunity — Acme Trading/ });
+  await expect(card).toBeVisible();
+  // ONCE, not twice: the labelled meta row that repeated it is gone.
+  expect(
+    await anchoredCount(card.getByText("Acme Trading"), card),
+  ).toBe(1);
 });

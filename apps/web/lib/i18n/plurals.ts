@@ -82,16 +82,55 @@ const AR: PluralDictionary = {
    * «مطالبات مفتوحة» from `execOpenClaims` verbatim — a contiguous shipping run, a slice
    * rather than a construction.
    *
-   * `zero`, `one` and `two` ARE DELIBERATELY ABSENT and fall back to `other`. «مطالبتان»
-   * ships nowhere in this product and constructing a dual is the morphology refused by name
-   * once already (the «محاولتان» case); «مطالبة واحدة» and «لا مطالبات» are constructions
-   * too. Three forms are owed and are in `docs/design-pass-register.md`. Do not fill them in
-   * by composing shipping words — that is the decision this omission is protecting.
+   * `zero`, `one` and `two` ARE STILL ABSENT and fall back to `other`, and the reason has
+   * CHANGED — corrected 2026-11-25 rather than deleted, because the sentence it used to give
+   * is no longer true and that is worth reading.
+   *
+   * It said «مطالبتان» ships nowhere and constructing a dual is refused morphology. 🔴 OWNER
+   * DECISION 163 RULING 3 AUTHORISED EXACTLY THAT DUAL — «مطالبة واحدة / مطالبتان / N
+   * مطالبات» — so «مطالبتان» ships in this file now, in `claimsQueueCount` above.
+   *
+   * ⟶ What is still owed here is NOT the noun. This caption is «{count} مطالبة مفتوحة من
+   *   {total}», so its dual needs «مطالبتان مفتوحتان» — a dual ADJECTIVE, which her ruling
+   *   does not give and which composing would invent. ⛔ So the three forms stay absent and
+   *   stay in `docs/design-pass-register.md`: a ruling on a noun is not a ruling on what
+   *   agrees with it.
    */
   dclmOpenClaimsOfTotal: {
     few: '{count} مطالبات مفتوحة من {total}',
     many: '{count} مطالبة مفتوحة من {total}',
     other: '{count} مطالبة مفتوحة من {total}',
+  },
+  /*
+   * 🔴 OWNER DECISION 163 RULING 3 — «الإدارة أذنت بالتصريف», and these two nouns are what she
+   * ruled: «مطالبة واحدة / مطالبتان / N مطالبات» and «مؤمِّن واحد / مؤمِّنان / N مؤمِّنين».
+   *
+   * The screens read «6 مطالبة» (`/claims`) and «2 مؤمِّن» / «4 مؤمِّن» (`/rfqs`,
+   * `/opportunities/[id]`) — flat dictionary keys with no forms at all, which is the shape this
+   * file's own header calls «a wrong answer for four of its six cases».
+   *
+   * ⚠️ AND `few`, `many` AND `other` ALL TAKE HER PLURAL, WHICH DEPARTS FROM EVERY OTHER ENTRY
+   * HERE. The house pattern puts the accusative singular in `many` (11–99: «{count} مطالبةً»),
+   * and her ruling says «مع 3–10 وما فوق» — the broken plural from three upward, which is 11–99
+   * and 100+ as well. ⛔ Her words win over the pattern; the pattern is not a rule she made.
+   *
+   * ⚠️ `zero` IS ABSENT IN BOTH AND FALLS BACK TO `other`, which she did not rule. `/claims`
+   * cannot reach it (the empty branch renders a sentence instead of a count) and an RFQ with no
+   * shortlist renders «0 مؤمِّنين», which is the genitive plural Arabic takes after zero anyway.
+   */
+  claimsQueueCount: {
+    one: 'مطالبة واحدة',
+    two: 'مطالبتان',
+    few: '{count} مطالبات',
+    many: '{count} مطالبات',
+    other: '{count} مطالبات',
+  },
+  rfqInsurerCount: {
+    one: 'مؤمِّن واحد',
+    two: 'مؤمِّنان',
+    few: '{count} مؤمِّنين',
+    many: '{count} مؤمِّنين',
+    other: '{count} مؤمِّنين',
   },
   dcmpBreachesOpen: {
     zero: 'لا شيء مفتوح',
@@ -257,6 +296,11 @@ const EN: PluralDictionary = {
     one: '{count} open claim of {total}',
     other: '{count} open claims of {total}',
   },
+  /* Decision 163 ruling 3 covers the Arabic morphology. The English halves are the two forms
+     the flat keys they replace already carried — «{count} insurer» / «{count} insurers» — with
+     the singular now actually reachable, which a flat `{count} claims` never was. */
+  claimsQueueCount: { one: '{count} claim', other: '{count} claims' },
+  rfqInsurerCount: { one: '{count} insurer', other: '{count} insurers' },
   dcmpBreachesOpen: { other: '{count} open' },
   dpolRenewalWindowDays: {
     one: 'Renewal window: {count} day.',

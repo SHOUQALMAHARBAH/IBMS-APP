@@ -525,16 +525,58 @@ h4 { font-size: var(--text-md); }
  * (`auth-form.styles.ts:99-130`) read the dark-theme tokens correctly. So there was nothing to
  * correct — there was something missing.
  *
- * ## HOW IT YIELDS TO AN ELEMENT'S OWN LOOK: `:not([style]):not([class])`
+ * ## HOW IT YIELDS TO AN ELEMENT'S OWN LOOK
  *
  * Her ruling: «والعنصر الذي له شكل خاصّ يبقى كما هو» — an element with its own look keeps it.
- * This selector is the MEASUREMENT'S OWN DEFINITION of «بلا شكل», so the rule matches exactly
- * the 582 bare controls and CANNOT reach a styled one at all — which is stronger than losing a
- * cascade to one. An inline `style` already beats any stylesheet; a `className` does NOT beat a
- * rule it does not mention, so a class setting only `background` would otherwise have taken
- * this rule's padding, border and radius with it, and that is not «keeping» anything.
+ * A `className` does NOT beat a rule it does not mention, so a class setting only `background`
+ * would otherwise have taken this rule's padding, border and radius with it, and that is not
+ * «keeping» anything — hence `:not([class])`, unchanged.
  *
  * ⛔ NO `!important` ANYWHERE, which is the same decision read from the other side.
+ *
+ * ## 🔴 AND THE STYLE TEST READ A LAYOUT INSTRUCTION AS A LOOK — CORRECTED 2026-11-25
+ *
+ * The first version asked only WHETHER a control had an inline style (`:not([style])`).
+ * `/rfqs/new`'s line select carries `style={{ minWidth: '20rem', marginTop: '0.35rem' }}` — two
+ * words about where the control sits and not one about how it looks — and it was drawn by
+ * Chromium's own default beside fields that had taken the token shape. The same for the five
+ * «← كل …» back buttons (`style={{ cursor: 'pointer' }}`), the three «بحث» buttons,
+ * «+ تهيئة عميل جديد» and the role-revoke «إلغاء» buttons: every one of them names a margin, a
+ * width or a cursor and nothing else.
+ *
+ * ⟶ THE TEST IS NOW THE PROPERTY NAMES INSIDE THE ATTRIBUTE, not its presence: an inline style
+ *   that mentions `background`, `color` or `border` is a look and keeps it; one that does not is
+ *   layout, and this rule completes it. ⛔ There is no marker attribute and nothing for a
+ *   developer to remember — `[style*='background' i]` substring-matches the SERIALISED
+ *   attribute, so the question is asked of the DOM at match time rather than of the source.
+ *
+ * AND THE THREE SUBSTRINGS COVER MORE THAN THEIR THREE WORDS, WHICH IS WHY THEY ARE ENOUGH:
+ * `color` is inside `background-color`, `border-color`, `caret-color`, `accent-color` and
+ * `outline-color`; `border` is inside `border-radius`, `border-width` and every side of it;
+ * `background` is inside `background-image` and `background-clip`. React serialises a camelCase
+ * key as its kebab-case property name, so `backgroundColor` arrives as `background-color`, and
+ * a SPREAD (`{...buttonStyle, width: 'auto'}`) is serialised into the same attribute — so the
+ * 84 sites that spread `buttonStyle` and the 98 that reference `inputStyle`/`buttonStyle`
+ * directly are skipped by the words those objects set, without naming one of them here.
+ *
+ * ⛔ AND AN INLINE DECLARATION STILL WINS WHERE IT SPEAKS. This rule sets no `width`, no
+ * `margin` and no `min-width`, so a layout-only inline style is not overridden by being
+ * reached — it is completed.
+ *
+ * ⚠️ MEASURED, `scripts/measurements/bare-control-shape.py`, 2026-11-25: of 909 controls, 587
+ * carry no `style` and no `class` (reached before and after), 322 carry a `style` and no
+ * `class`, and of those 85 are LAYOUT-ONLY AND NEWLY REACHED and 237 keep their own look.
+ * ⚠️ AND THAT MEASUREMENT SAID 318 AND THEN 222 BEFORE IT SAID 85, both over-stating the work,
+ * because a spread and then a bare `{inputStyle}` reference each name a colour the SOURCE at
+ * the call site does not spell. The selector was right under all three readings; what had to
+ * learn to follow a reference was the measurement.
+ *
+ * ⚠️ AND ONE SITE IS REPORTED RATHER THAN EXEMPTED: `/rfqs/new:401` is a button that underlines
+ * itself inside an alert sentence, so it was reaching for a link. It names none of the three
+ * words, so it is reached, and it now reads as a token-shaped button — which is what an
+ * unstyled `<button>` already read as, border and all. ⛔ `text-decoration` was NOT added as a
+ * fourth look word: the owner's three are colour, background and border, and a fourth is a
+ * ruling rather than a build.
  *
  * 🔴 AND IT IS NOT WRAPPED IN `:where()`, WHICH IS A MEASUREMENT RATHER THAN A PREFERENCE.
  *
@@ -576,10 +618,10 @@ h4 { font-size: var(--text-md); }
  * `type="range"` and `type="color"` are not excluded because, measured, this product renders
  * neither.
  */
-button:not([style]):not([class]),
-input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]),
-select:not([style]):not([class]),
-textarea:not([style]):not([class]) {
+button:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]),
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]),
+select:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]),
+textarea:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]) {
   font-family: inherit;
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -593,7 +635,7 @@ textarea:not([style]):not([class]) {
   box-sizing: border-box;
 }
 
-button:not([style]):not([class]) {
+button:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]) {
   /* Enough to read as a control rather than as a word, without competing with the brand fill a
      real primary action carries. */
   font-weight: var(--weight-medium);
@@ -604,32 +646,32 @@ button:not([style]):not([class]) {
   align-self: flex-start;
 }
 
-input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]),
-select:not([style]):not([class]),
-textarea:not([style]):not([class]) {
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]),
+select:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]),
+textarea:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]) {
   min-height: 2.25rem;
 }
 
 /* A select is a control, and a browser default `textarea` resizes in both directions, which
    breaks a form's column the moment somebody drags it sideways. */
-select:not([style]):not([class]) {
+select:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]) {
   cursor: pointer;
 }
 
-textarea:not([style]):not([class]) {
+textarea:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]) {
   resize: vertical;
 }
 
-button:not([style]):not([class]):hover:not(:disabled) {
+button:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]):hover:not(:disabled) {
   background: var(--surface-sunken);
   border-color: var(--border-strong);
 }
 
 /* THE DISABLED STATE, in both themes, on tokens this file already proves. */
-button:not([style]):not([class]):disabled,
-input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style]):not([class]):disabled,
-select:not([style]):not([class]):disabled,
-textarea:not([style]):not([class]):disabled {
+button:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]):disabled,
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]):disabled,
+select:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]):disabled,
+textarea:not([style*='background' i], [style*='color' i], [style*='border' i]):not([class]):disabled {
   color: var(--ink-muted);
   background: var(--surface-sunken);
   border-color: var(--border-subtle);

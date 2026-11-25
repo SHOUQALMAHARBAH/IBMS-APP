@@ -314,11 +314,32 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
                   checked={selected.has(insurer.id)}
                   onChange={() => toggle(insurer.id)}
                 />
+                {/*
+                  🔴 THE RATING LEAVES THIS LABEL, AND THE ENGLISH «(sample rating)» GOES WITH IT.
+
+                  The owner's walk saw «(sample rating)» beside three companies here. It is a
+                  STORED value — `SAMPLE_INSURERS` in `packages/db/prisma/seed-data/insurers.ts`
+                  writes «A- (sample rating)» — and ⛔ that seed is what a REAL install runs, so
+                  it is not edited to tidy a demo screen.
+
+                  ⟶ WHAT SETTLED IT IS NOT THE ENGLISH WORD BUT THE DATE. A rating with no date
+                    is «دعوى لا سجلّ عناية» — the dictionary's correction 5, which the database
+                    enforces as `Insurer_rating_carries_its_date` (neither half may stand alone)
+                    and which `/insurers/[id]` renders accordingly, rating AND as-of together.
+                    `SelectableInsurer` carries `financialStrengthRating` and NOT
+                    `financialStrengthRatingAsOf`, so this label was showing the one half the
+                    constraint refuses to let stand alone, on a picker.
+
+                  ⛔ AND THE PAYLOAD IS NOT WIDENED TO ADD THE DATE: that would put a free-text
+                  rating plus a date inside a checkbox label, which is longer and still renders
+                  an office's own free text as part of a control's name.
+
+                  ⚠️ The rating is unchanged on `/insurers/[id]`, with its date, which is where a
+                  due-diligence record belongs. REPORTED: the owner's other option was to keep
+                  the grade and drop the English word, which is a one-line change here.
+                */}
                 <span>
                   <bdi>{insurerDisplayName(insurer, language)}</bdi>
-                  {insurer.financialStrengthRating
-                    ? ` · ${insurer.financialStrengthRating}`
-                    : ''}
                 </span>
               </label>
             ))

@@ -328,6 +328,9 @@ export const DETAIL_PAGES = {
     nanAdding: 'جارٍ الإضافة…',
     nanAddButton: 'إضافة ملف مخاطر',
     nadHeading: 'تقييم الاحتياجات',
+    /* 🔴 OWNER DECISION 163 RULING 1 — «تقييم الاحتياجات — {اسم العميل}». ⛔ No new word:
+       the noun is the key above's and the « — » join is `rfqDetailHeading`'s. */
+    nadHeadingWithCustomer: 'تقييم الاحتياجات — {customer}',
     nadRecommendedCoverage: 'التغطية الموصى بها',
     nadApprovedPlacementNote:
       'معتمد — يمكن لمسؤول التسويق/الفني الآن تجميع برنامج التأمين.',
@@ -513,6 +516,12 @@ export const DETAIL_PAGES = {
     iprogdBackToList: '→ كل برامج التأمين',
     iprogdHeading: 'برنامج التأمين',
     iprogdHeadingWithSite: 'برنامج التأمين — {site}',
+    /* 🔴 OWNER DECISION 163 RULING 1 — «برنامج التأمين — {اسم البرنامج} — {اسم العميل}».
+       ⛔ NOT ONE NEW WORD: «برنامج التأمين» and the « — » join are the key above's own, and
+       the second « — » is the same separator `rfqDetailHeading` («طلب عرض أسعار — {line}»)
+       already ships. A programme with no site label takes the customer alone. */
+    iprogdHeadingWithSiteAndCustomer: 'برنامج التأمين — {site} — {customer}',
+    iprogdHeadingWithCustomer: 'برنامج التأمين — {customer}',
     iprogdStatus: 'الحالة: {status}',
     iprogdProperty: 'الممتلكات',
     iprogdBusinessInterruption: 'توقُّف الأعمال',
@@ -852,6 +861,7 @@ export const DETAIL_PAGES = {
     nanAdding: 'Adding…',
     nanAddButton: 'Add risk profile',
     nadHeading: 'Needs assessment',
+    nadHeadingWithCustomer: 'Needs assessment — {customer}',
     nadRecommendedCoverage: 'Recommended coverage',
     nadApprovedPlacementNote:
       'Approved — a Placement/Technical Officer can now assemble the insurance program.',
@@ -1029,6 +1039,8 @@ export const DETAIL_PAGES = {
     iprogdBackToList: '← All insurance programs',
     iprogdHeading: 'Insurance program',
     iprogdHeadingWithSite: 'Insurance program — {site}',
+    iprogdHeadingWithSiteAndCustomer: 'Insurance program — {site} — {customer}',
+    iprogdHeadingWithCustomer: 'Insurance program — {customer}',
     iprogdStatus: 'Status: {status}',
     iprogdProperty: 'Property',
     iprogdBusinessInterruption: 'Business Interruption',
