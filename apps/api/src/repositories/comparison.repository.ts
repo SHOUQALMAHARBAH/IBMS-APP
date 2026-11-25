@@ -3,9 +3,25 @@ import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ComparisonRowPlan } from '../modules/comparison/comparison.config';
 import { INSURER_IDENTITY_SELECT } from './insurer-identity';
+import { INSURANCE_LINE_NAME_INCLUDE } from './insurance-line-names';
 
 const COMPARISON_INCLUDE = {
-  rfq: { select: { id: true, insuranceLine: true, opportunityId: true } },
+  rfq: {
+    select: {
+      id: true,
+      insuranceLine: true,
+      opportunityId: true,
+      // Contents §أ row ١١ -- the two catalogue relations, so the comparison can print the
+      // line's Arabic name. The RFQ's two line FK ids were already on the row; what was
+      // missing is the rows they point at, which is the SAME two-relations-wide debt message
+      // 52 §10 paid for `RECOMMENDATION_INCLUDE`.
+      //
+      // ⚠️ Named INSIDE this `select` rather than added as an `include` -- Prisma refuses both
+      // keys on one argument, so a shared relation constant written as an include is spread by
+      // its own keys here.
+      ...INSURANCE_LINE_NAME_INCLUDE,
+    },
+  },
   rows: {
     include: {
       quotation: {

@@ -11,6 +11,7 @@ function policy(
   return {
     policyId: 'pol-1',
     insuranceLine: 'Motor',
+    insuranceLineAr: 'تأمين المركبات',
     customerType: 'CORPORATE',
     premium: d('10000.000'),
     claimNetSettlements: [],

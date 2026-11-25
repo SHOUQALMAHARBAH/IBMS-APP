@@ -13,6 +13,7 @@ import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import type { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
 import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import type { CountryRepository } from '../../repositories/country.repository';
 import type { ScreeningService } from './screening.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
@@ -123,6 +124,13 @@ function makeDeps() {
   const screening = {
     run: screeningRun,
   } as unknown as ScreeningService;
+  /* Contents §ج row ٢٠ — the nationality's Arabic country name. Returns a REAL name by default
+     (not null), so an assertion that the view carries it is non-vacuous; the measured-empty case
+     has its own test, which points this at null. */
+  const countryNameAr = vi.fn().mockResolvedValue('الأردن');
+  const countries = {
+    nameArForCode: countryNameAr,
+  } as unknown as CountryRepository;
 
   return {
     service: new CustomerService(
@@ -134,11 +142,13 @@ function makeDeps() {
       duplicateWarnings,
       kycRecords,
       screening,
+      countries,
     ),
     mocks: {
       findLatestKyc,
       findScreeningResults,
       screeningRun,
+      countryNameAr,
       create,
       findById,
       findMany,
@@ -287,6 +297,56 @@ describe('CustomerService', () => {
   });
 
   describe('get', () => {
+    /**
+     * 🔴 CONTENTS §ج ROW ٢٠ — THE NATIONALITY'S ARABIC COUNTRY NAME TRAVELS WITH THE RECORD.
+     *
+     * The customer file printed «JO» on a screen whose other half is Arabic. The screen cannot
+     * resolve it: `GET /reference-data` is gated on `provider.office.register`, a PROVIDER
+     * capability that no customer-file reader holds, and ⛔ widening that gate to make a screen
+     * work is not available.
+     */
+    it('contents §ج row ٢٠ — resolves the nationality to its Arabic country name', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-1',
+        customerType: 'INDIVIDUAL',
+        nationality: 'JO',
+      });
+
+      const view = await service.get('cust-1', makeUser({ id: 'sales-1' }));
+
+      expect(mocks.countryNameAr).toHaveBeenCalledWith('JO');
+      expect(view.nationalityNameAr).toBe('الأردن');
+      // ⛔ And the stored CODE is still sent beside it: the screen falls back to it, and an edit
+      // form has to seed its input from the code rather than from a translated name.
+      expect(view.nationality).toBe('JO');
+    });
+
+    /**
+     * ⚠️ AND A CODE THE REFERENCE TABLE DOES NOT CARRY IS AN EMPTY CELL, NOT A BLANK FIELD.
+     *
+     * Measured 2026-11-25: the provider's `Country` table holds ONE row (`JO`), while
+     * `nationality` is a free two-letter code typed into a text input with no picker. So this is
+     * the COMMON case rather than an edge, and `null` is what makes the screen show the stored
+     * code — ⛔ an empty string would render as nothing at all, which is decision 148's defect.
+     */
+    it('contents §ج row ٢٠ — sends null for a code the reference table does not carry', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.countryNameAr.mockResolvedValue(null);
+      mocks.findById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-1',
+        customerType: 'INDIVIDUAL',
+        nationality: 'FR',
+      });
+
+      const view = await service.get('cust-1', makeUser({ id: 'sales-1' }));
+
+      expect(view.nationalityNameAr).toBeNull();
+      expect(view.nationality).toBe('FR');
+    });
+
     it("hides another officer's customer behind NotFoundException", async () => {
       const { service, mocks } = makeDeps();
       mocks.findById.mockResolvedValue({

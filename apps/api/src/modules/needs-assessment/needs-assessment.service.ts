@@ -14,6 +14,7 @@ import {
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { UserRepository } from '../../repositories/user.repository';
+import { CoverageLineNamesRepository } from '../../repositories/coverage-line-names.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
@@ -73,6 +74,9 @@ export class NeedsAssessmentService {
     private readonly workflow: WorkflowTransitionService,
     private readonly dutySegregation: DutySegregationService,
     private readonly users: UserRepository,
+    /** Contents §ج row ٢١ — the recommended cover's Arabic names, which the screen cannot
+     *  resolve: `GET /insurance-lines` does not admit `needs-assessment.read`. */
+    private readonly coverageLineNames: CoverageLineNamesRepository,
   ) {}
 
   private canViewAll(actor: AuthenticatedUser): boolean {
@@ -135,6 +139,18 @@ export class NeedsAssessmentService {
     const names = await this.users.displayNamesForUserIds(
       rows.flatMap((r) => [r.reviewedByUserId, r.approvedByUserId]),
     );
+    /*
+     * Contents §ج row ٢١ — the recommended cover in Arabic, resolved HERE because this is the one
+     * place that builds the wire shape, and ONE QUERY for every row on the page: the same rule
+     * the reviewer/approver names above follow. A per-row lookup would be one query per
+     * assessment on a register.
+     *
+     * ⛔ The screen cannot resolve these itself — `GET /insurance-lines` is gated on five
+     * permissions and `needs-assessment.read` is not one of them (measured, message 45 §2).
+     */
+    const coverageNamesAr = await this.coverageLineNames.namesArFor(
+      rows.flatMap((r) => r.recommendedCoverageLines),
+    );
     return rows.map((r) => {
       /*
        * §W4 — the customer is FLATTENED here and the join is stripped.
@@ -158,6 +174,13 @@ export class NeedsAssessmentService {
         approvedByName: r.approvedByUserId
           ? (names.get(r.approvedByUserId) ?? null)
           : null,
+        /* Narrowed to THIS row's lines, so a caller cannot read a name for a line the row does
+         * not recommend. A line with no known Arabic name is absent, never an empty string. */
+        recommendedCoverageLineNamesAr: Object.fromEntries(
+          r.recommendedCoverageLines
+            .filter((line) => coverageNamesAr[line])
+            .map((line) => [line, coverageNamesAr[line]]),
+        ),
       };
     });
   }

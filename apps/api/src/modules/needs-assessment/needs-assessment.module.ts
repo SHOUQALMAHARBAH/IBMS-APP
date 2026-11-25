@@ -3,6 +3,7 @@ import { NeedsAssessmentController } from './needs-assessment.controller';
 import { NeedsAssessmentService } from './needs-assessment.service';
 import { NeedsAssessmentRepository } from '../../repositories/needs-assessment.repository';
 import { UserRepository } from '../../repositories/user.repository';
+import { CoverageLineNamesRepository } from '../../repositories/coverage-line-names.repository';
 import { AuditModule } from '../audit/audit.module';
 import { CustomerModule } from '../customer/customer.module';
 import { RiskProfileModule } from '../risk-profile/risk-profile.module';
@@ -28,6 +29,7 @@ import { RiskProfileModule } from '../risk-profile/risk-profile.module';
     NeedsAssessmentService,
     NeedsAssessmentRepository,
     UserRepository,
+    CoverageLineNamesRepository,
   ],
   // Exported so InsuranceProgramModule (Part C #7) can resolve the APPROVED
   // Needs Assessment whose recommendedCoverageLines drive program assembly —

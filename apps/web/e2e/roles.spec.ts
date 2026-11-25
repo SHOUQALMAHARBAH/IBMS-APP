@@ -733,6 +733,95 @@ test('creation carries the permissions with it, in ONE request', async ({
   expect(body.permissionCodes.length).toBeGreaterThan(0);
 });
 
+/**
+ * 🔴 OWNER DECISION 164 RULING 1 — THE ROLE-CREATED CONFIRMATION, SEEN.
+ *
+ * Her walk found that pressing «إنشاء الدور» said nothing at all, and decision 163 ruling 5 asked
+ * for a shipped sentence or nothing. There was none; decision 164 gives «تم إنشاء الدور بنجاح».
+ *
+ * Driven in ARABIC, because the Arabic is the ratified half — the English comes from her paper's
+ * engineer section and is the weaker provenance.
+ *
+ * Every assertion here is a property of her ruling rather than of the implementation:
+ *
+ *   - the sentence is on screen after the act, and NOT before it (non-vacuity);
+ *   - it is announced — `role="status"`, so a screen reader reaches it politely;
+ *   - it does NOT block: the form's own controls stay usable while it shows.
+ */
+test('decision 164 — creating a role shows «تم إنشاء الدور بنجاح», announced and non-blocking', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR'], 'AR');
+  await mockRoles(page);
+
+  await page.route('http://localhost:4000/rbac/roles', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fulfill({ status: 200, json: [CUSTOM_ROLE, SYSTEM_ROLE] });
+    }
+    return route.fulfill({
+      status: 201,
+      json: { ...CUSTOM_ROLE, id: 'role-new' },
+    });
+  });
+
+  await page.goto('/settings/roles');
+
+  const toast = page.locator('[data-testid="role-created-toast"]');
+
+  /*
+   * NON-VACUITY FIRST — and ⚠️ THROUGH `expectNone`, WHICH A GUARD INSISTED ON AND WAS RIGHT.
+   *
+   * The first version wrote `await expect(toast).toHaveCount(0)` straight after `goto()`, and
+   * `test/e2e-anchored-reads.test.ts` failed it by name: an absence satisfied by a page that has
+   * not rendered cannot tell «the toast is correctly absent» from «the screen never loaded». The
+   * anchor is the creation form's own English-name field, which is OUTSIDE the set under test —
+   * an empty set cannot vouch for itself.
+   */
+  const nameEn = page.locator('[data-create-name-en]');
+  await expectNone(toast, nameEn);
+
+  await nameEn.fill('Claims Triage Desk');
+  await page.locator('[data-create-name-ar]').fill('مكتب فرز المطالبات');
+
+  const create = page.getByRole('button', {
+    name: /Create role|إنشاء الدور/,
+  });
+  await create.click();
+
+  // HER SENTENCE, byte-for-byte. `decision-164.strings.test.ts` is what pins it to her paper;
+  // this is what proves a person sees it.
+  await expect(toast).toContainText('تم إنشاء الدور بنجاح');
+
+  // ⛔ AND NO FULL STOP. `roleDeleted` on this same screen carries one and hers does not, so a
+  // «tidied» sentence would be caught here as well as in the unit pin.
+  await expect(toast).not.toContainText('تم إنشاء الدور بنجاح.');
+
+  // ANNOUNCED. `ActionStatus` owns the role, and the toast composes it rather than declaring a
+  // second one — a nested `role="status"` would read the sentence twice.
+  await expect(
+    page.locator('[data-testid="role-created-toast-outcome"]'),
+  ).toHaveAttribute('role', 'status');
+
+  /*
+   * ⛔ NOT BLOCKING — «لا تمنع الشاشة ولا تحتاج كبسة».
+   *
+   * 🔴 AND THE FIRST VERSION ASSERTED THIS WRONG, which the full suite caught. It read
+   * `await expect(create).toBeEnabled()` — and the create button is legitimately DISABLED after
+   * a successful create, because the form CLEARS and an empty English name generates no machine
+   * name. So that assertion was about the form's own post-create state and not about the toast
+   * at all; it would have failed on a perfectly non-blocking toast and passed on a modal one.
+   *
+   * ⟶ What «not blocking» actually means here is that the page BEHIND the toast is still usable
+   *   and that the confirmation needs no press. Both are asserted: the name field is editable
+   *   (so nothing traps focus or overlays the form), and the toast carries no control.
+   *
+   * The anchor for that absence is the toast ITSELF, which is the right one — the set under test
+   * is the buttons INSIDE it, so the toast is outside that set and its visibility is proven above.
+   */
+  await expect(nameEn).toBeEditable();
+  await expectNone(toast.getByRole('button'), toast);
+});
+
 test('shows the generated machine name before saving, and refuses an unreadable one', async ({
   page,
 }) => {

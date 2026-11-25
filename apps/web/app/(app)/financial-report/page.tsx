@@ -22,6 +22,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { groupLabelDisplayName, insurerDisplayName } from '../../../lib/i18n/names';
 import { formatMoney } from '../../../lib/i18n/format';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -182,7 +183,16 @@ export default function FinancialReportPage() {
                     {data.commission.byInsurer.map((r) => (
                       <Tr key={r.insurerId}>
                         <Td>
-                          <bdi>{r.insurerName}</bdi>
+                          {/* Contents §أ row ١١ — the insurer in the reader's language. This
+                              printed «Middle East Insurance Company (demo)» to an Arabic
+                              reader. `insurerNameAr` comes from `resolveInsurerNamePair`, so
+                              it is the SAME source the Latin name came from. */}
+                          <bdi>
+                            {insurerDisplayName(
+                              { name: r.insurerName, nameAr: r.insurerNameAr },
+                              language,
+                            )}
+                          </bdi>
                         </Td>
                         <Td>{formatMoney(r.earned, language)}</Td>
                         <Td>{formatMoney(r.paid, language)}</Td>
@@ -207,10 +217,13 @@ export default function FinancialReportPage() {
                 as text. `ENUM_LABEL.CustomerType` already ships both words — the onboarding
                 wizard has rendered them since it was built — so this cost no Arabic.
 
-                ⛔ `byLine` ABOVE IS NOT GIVEN A MAP, and that is measured rather than skipped:
-                its label is the stored ENGLISH line name and this payload sends no
-                `insuranceLineAr`, so a map would have nothing to map. That is the `LINE_DECLARED`
-                api debt (message 47 §3), and it is reported, not papered over. */}
+                ⛔ `byLine` ABOVE IS STILL NOT GIVEN A MAP, AND THE REASON HAS CHANGED.
+                It used to be that the payload sent no `insuranceLineAr`, so a map would have
+                had nothing to map — the `LINE_DECLARED` api debt of message 47 §3. That debt
+                is PAID (contents §أ row ١١): the line's Arabic name travels with the group
+                now, from the line FK. So `byLine` takes `labelAr` inside `ProfitTable` rather
+                than a map here, because the name is DATA and not a vocabulary — which is the
+                whole difference between the two tables. */}
             <ProfitTable
               rows={data.profitability.bySegment}
               labelOf={(key) =>
@@ -236,8 +249,12 @@ export default function FinancialReportPage() {
 
 function ProfitTable({
   rows,
-  /** How a row's `key` becomes the word in the first column. Omitted means «render the label
-   *  the api sent», which is what the by-line table needs until its payload carries Arabic. */
+  /** How a row's `key` becomes the word in the first column — for a label that is a fixed
+   *  VOCABULARY the screen owns (`bySegment`'s `customerType`).
+   *
+   *  Omitted means «the api sent the name», and the name is then read BY LANGUAGE through
+   *  `labelAr` — which is what `byLine` needs now that the line's Arabic name travels with the
+   *  group (contents §أ row ١١). This used to say «until its payload carries Arabic»; it does. */
   labelOf,
 }: {
   rows: FinancialReportSummary['profitability']['byLine'];
@@ -262,7 +279,9 @@ function ProfitTable({
         {rows.map((r) => (
           <Tr key={r.key}>
             <Td>
-              <bdi>{labelOf ? labelOf(r.key) : r.label}</bdi>
+              <bdi>
+                {labelOf ? labelOf(r.key) : groupLabelDisplayName(r, language)}
+              </bdi>
             </Td>
             <Td>{formatMoney(r.premiumWritten, language)}</Td>
             <Td>{formatMoney(r.claimsPaid, language)}</Td>

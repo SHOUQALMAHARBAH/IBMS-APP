@@ -62,6 +62,7 @@ export class QuotationComparisonDocumentService {
     const html = buildQuotationComparisonHtml(
       {
         insuranceLine: view.insuranceLine,
+        insuranceLineAr: view.insuranceLineAr,
         customerLegalName: customer.legalName,
         builtAt: view.builtAt,
         rows: view.rows.map((r) => ({

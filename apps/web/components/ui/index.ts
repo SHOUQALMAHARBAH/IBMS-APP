@@ -20,6 +20,7 @@ export { ReportProvenance } from './ReportProvenance';
 export { SelectedValueDescription } from './SelectedValueDescription';
 export { Skeleton, SkeletonList } from './Skeleton';
 export { Table, Td, Th, Tr } from './Table';
+export { Toast, TOAST_DISMISS_MS } from './Toast';
 
 /* --- the design batch's composition layer ------------------------------------------------- */
 export { AuthFrame } from './AuthFrame';

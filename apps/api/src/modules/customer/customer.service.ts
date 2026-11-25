@@ -26,6 +26,7 @@ import { EncryptionService } from '../security/encryption.service';
 import { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import { CountryRepository } from '../../repositories/country.repository';
 import { ScreeningService } from './screening.service';
 import { duplicatePersonConflict } from '../../common/duplicate-person-conflict';
 import {
@@ -108,6 +109,15 @@ export interface MaskedCustomer extends Omit<
   nationalId: string | null;
   contactPhone: string | null;
   contactEmail: string | null;
+  /**
+   * The nationality code's Arabic country name, or null when the provider's `Country` table does
+   * not carry it — contents §ج row ٢٠.
+   *
+   * ⚠️ NULL IS THE COMMON CASE AND NOT AN ERROR: that table holds ONE row on dev (`JO`), while
+   * `nationality` is a free two-letter code with no picker. The screen then shows the code it
+   * stored, which is honest — no Arabic name is KNOWN for it. See `CountryRepository`.
+   */
+  nationalityNameAr: string | null;
 }
 
 /** Process 3-4 (Customer Acquisition/Onboarding, Domain A). Every Customer
@@ -139,6 +149,9 @@ export class CustomerService {
      */
     private readonly kycRecords: KycRecordRepository,
     private readonly screening: ScreeningService,
+    /** Contents §ج row ٢٠ — the nationality's Arabic country name, which the screen cannot
+     *  resolve for itself: `GET /reference-data` is gated on `provider.office.register`. */
+    private readonly countries: CountryRepository,
   ) {}
 
   /** Decrypts and masks the three `-- ENCRYPT` fields for API responses —
@@ -206,6 +219,18 @@ export class CustomerService {
       contactEmail: decrypted.contactEmailEnc
         ? this.reveal.mask(decrypted.contactEmailEnc)
         : null,
+      /*
+       * Contents §ج row ٢٠ — resolved HERE, in the one place that builds this view, so the detail
+       * route and `create()` cannot answer differently about one customer's nationality.
+       *
+       * ⛔ NOT added to `list()`'s own view, which is measured rather than skipped: no screen
+       * renders a nationality from the list, and a per-row country lookup over a page of
+       * customers is the N+1 shape message 51 §5 recorded for `displayNameForUserId`. If a list
+       * ever needs it, it needs a BULK resolver, not this call in a loop.
+       */
+      nationalityNameAr: await this.countries.nameArForCode(
+        customer.nationality,
+      ),
     };
   }
 

@@ -99,6 +99,39 @@ export function lineDisplayName(
   return row.insuranceLine;
 }
 
+/**
+ * THE LABEL OF AN AGGREGATE'S GROUP, in the reader's language — contents §أ row ١١.
+ *
+ * ⚠️ WHY THIS IS A FIFTH FUNCTION AND NOT A REUSE OF ONE ABOVE. The breakdown rows on the
+ * claims dashboard, the financial dashboard and the financial report carry their display text
+ * as `label`, and ONE field there holds FOUR vocabularies: a customer legal name, a policy
+ * reference, an insurer name or an insurance line, depending on how the aggregate was grouped.
+ * So the pair cannot be typed as an insurer or as a line — it is whichever the grouping chose,
+ * and `/dashboards/financial`'s own header records that shape.
+ *
+ * Renaming `label` to `name` to fit `insurerDisplayName` would move a field every consumer and
+ * every assertion is written against, to buy nothing.
+ *
+ * `labelAr` is populated by the server for the INSURER and LINE groupings only — the owner's
+ * row names those two. `null` means render `label`, which is the stored English and the one
+ * string true of every row in the group by construction. ⛔ No Arabic is invented here.
+ */
+export interface BilingualGroupLabel {
+  label: string;
+  labelAr?: string | null;
+}
+
+export function groupLabelDisplayName(
+  row: BilingualGroupLabel,
+  language: Language,
+): string {
+  if (language === 'AR') {
+    const ar = row.labelAr?.trim();
+    if (ar) return ar;
+  }
+  return row.label;
+}
+
 /** And for a row that has not been through `insurerIdentity()` — the global `InsurerMaster`
  *  catalogue, which the «register an insurer» picker reads directly and which carries its names
  *  under their database column names. Same rule, same one-way fallback. */

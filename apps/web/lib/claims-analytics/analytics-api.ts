@@ -11,6 +11,9 @@ export type LossRatioGroupBy = (typeof LOSS_RATIO_GROUP_BY)[number];
 export interface LossRatioBreakdownRow {
   key: string;
   label: string;
+  /** The same label in Arabic, or null — contents §أ row ١١. Populated for the insurer and line
+   *  groupings only; `null` means render `label`, the English the record stored. */
+  labelAr: string | null;
   periodClaims: string;
   periodPremium: string;
   ratio: string;
@@ -22,7 +25,7 @@ export interface LossRatioBreakdownRow {
 export interface LossRatioBreakdown {
   groupBy: LossRatioGroupBy;
   rows: LossRatioBreakdownRow[];
-  totals: Omit<LossRatioBreakdownRow, 'key' | 'label'>;
+  totals: Omit<LossRatioBreakdownRow, 'key' | 'label' | 'labelAr'>;
 }
 
 export interface LossRatioBreakdownFilters {

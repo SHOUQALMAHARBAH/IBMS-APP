@@ -184,6 +184,28 @@ export function lineCodeForProgrammeLine(insuranceLine: string): string | null {
   return null;
 }
 
+/**
+ * The catalogue CODE for a COVERAGE-LINE string — the needs assessment's own vocabulary, not the
+ * programme's. Contents §ج row ٢١.
+ *
+ * ⚠️ THE TWO VOCABULARIES ARE NOT THE SAME LIST AND MUST NOT BE MADE ONE. `lineCodeForProgrammeLine`
+ * above matches `mapping.insuranceLine` — the PROGRAMME side — and 7 of the 13 differ from the
+ * coverage-line key deliberately («Property All Risks (Fire)» against «Property All Risks»). This
+ * function keys on the MAP ITSELF, so it cannot drift from the pairing that already exists; the
+ * owner cancelled the rename that would have collapsed the two, and this file's header records why.
+ *
+ * Exported so the needs-assessment screen can print its recommended cover in Arabic without a
+ * second copy of the pairing. ⛔ Nothing about the mapping moves: this is one more reader of it.
+ */
+export function catalogueLineCodeForCoverageLine(
+  coverageLine: string,
+): string | null {
+  const mapping = (
+    COVERAGE_LINE_MAPPINGS as Record<string, CoverageLineMapping | undefined>
+  )[coverageLine];
+  return mapping ? mapping.lineCode : null;
+}
+
 export const COVERAGE_LINE_CODES: readonly string[] = [
   ...new Set(Object.values(COVERAGE_LINE_MAPPINGS).map((m) => m.lineCode)),
 ];

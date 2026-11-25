@@ -9,6 +9,7 @@ import {
   subtractMoney,
   sumMoney,
 } from '../../common/money.util';
+import { unanimousGroupName } from '../../common/group-name.util';
 import type { ProfitabilityPolicyRow } from '../../repositories/profitability-policy.repository';
 
 /**
@@ -972,6 +973,9 @@ export interface InsurerObligationRow {
   invoiceId: string;
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. From `resolveInsurerNamePair`, so
+   *  it comes from the SAME chosen source as `insurerName` beside it. */
+  insurerNameAr: string | null;
   /** carried from the policy's premium / commission — the net owed is derived
    * here (`premiumAmount − commissionDeducted`), never re-typed. */
   premiumAmount: Prisma.Decimal | string;
@@ -987,6 +991,9 @@ export interface InsurerRemittanceRow {
   remittanceId: string;
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. From `resolveInsurerNamePair`, so
+   *  it comes from the SAME chosen source as `insurerName` beside it. */
+  insurerNameAr: string | null;
   amount: Prisma.Decimal | string;
   remittedAt: Date;
 }
@@ -994,6 +1001,9 @@ export interface InsurerRemittanceRow {
 export interface InsurerPayableRow {
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. From `resolveInsurerNamePair`, so
+   *  it comes from the SAME chosen source as `insurerName` beside it. */
+  insurerNameAr: string | null;
   /** Σ (`premiumAmount − commissionDeducted`) over this insurer's
    * collected-but-unremitted invoices — what the broker currently owes it. */
   outstandingAmount: string;
@@ -1033,6 +1043,10 @@ export interface InsurerPayablesReport {
 
 interface InsurerPayableAcc {
   insurerName: string;
+  /** Every Arabic name the group's rows carried. The row's own name is `unanimousGroupName` over
+   *  these — see `group-name.util.ts`. ⚠️ It cannot disagree here (the key IS `insurerId`), and
+   *  one rule over both groupings leaves no branch to get wrong. */
+  insurerNamesAr: (string | null)[];
   outstanding: Prisma.Decimal[];
   outstandingCount: number;
   oldestCollectedMs: number | null;
@@ -1057,11 +1071,16 @@ export function buildInsurerPayables(input: {
 }): InsurerPayablesReport {
   const byInsurer = new Map<string, InsurerPayableAcc>();
 
-  const accFor = (id: string, name: string): InsurerPayableAcc => {
+  const accFor = (
+    id: string,
+    name: string,
+    nameAr: string | null,
+  ): InsurerPayableAcc => {
     let acc = byInsurer.get(id);
     if (!acc) {
       acc = {
         insurerName: name,
+        insurerNamesAr: [],
         outstanding: [],
         outstandingCount: 0,
         oldestCollectedMs: null,
@@ -1071,11 +1090,12 @@ export function buildInsurerPayables(input: {
       };
       byInsurer.set(id, acc);
     }
+    acc.insurerNamesAr.push(nameAr);
     return acc;
   };
 
   for (const o of input.obligations) {
-    const acc = accFor(o.insurerId, o.insurerName);
+    const acc = accFor(o.insurerId, o.insurerName, o.insurerNameAr);
     acc.outstanding.push(
       computeRemittanceAmount(o.premiumAmount, o.commissionDeducted),
     );
@@ -1089,7 +1109,7 @@ export function buildInsurerPayables(input: {
   }
 
   for (const r of input.remittances) {
-    const acc = accFor(r.insurerId, r.insurerName);
+    const acc = accFor(r.insurerId, r.insurerName, r.insurerNameAr);
     acc.remitted.push(quantizeMoney(r.amount));
     acc.remittedCount += 1;
   }
@@ -1098,6 +1118,7 @@ export function buildInsurerPayables(input: {
     .map(([insurerId, acc]) => ({
       insurerId,
       insurerName: acc.insurerName,
+      insurerNameAr: unanimousGroupName(acc.insurerNamesAr),
       outstandingAmount: formatMoney(sumMoney(acc.outstanding)),
       outstandingCount: acc.outstandingCount,
       oldestCollectedAt:
@@ -1161,6 +1182,9 @@ export interface CommissionRollupEntryRow {
   entryId: string;
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. From `resolveInsurerNamePair`, so
+   *  it comes from the SAME chosen source as `insurerName` beside it. */
+  insurerNameAr: string | null;
   /** governed / effective commission earned on this policy. */
   amount: Prisma.Decimal | string;
   vatAmount: Prisma.Decimal | string;
@@ -1201,6 +1225,9 @@ export interface CommissionRollupFigures {
 export interface CommissionRollupInsurerRow extends CommissionRollupFigures {
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. From `resolveInsurerNamePair`, so
+   *  it comes from the SAME chosen source as `insurerName` beside it. */
+  insurerNameAr: string | null;
 }
 
 export interface CommissionRollup extends CommissionRollupFigures {
@@ -1211,6 +1238,9 @@ export interface CommissionRollup extends CommissionRollupFigures {
 
 interface CommissionRollupAcc {
   insurerName: string;
+  /** Every Arabic name the group's entries carried — `unanimousGroupName` over these is the
+   *  row's name. EMPTY on the book accumulator, which renders no insurer name at all. */
+  insurerNamesAr: (string | null)[];
   earned: Prisma.Decimal[];
   vat: Prisma.Decimal[];
   paid: Prisma.Decimal[];
@@ -1257,6 +1287,7 @@ export function buildCommissionRollup(
   const byInsurer = new Map<string, CommissionRollupAcc>();
   const book: CommissionRollupAcc = {
     insurerName: '',
+    insurerNamesAr: [],
     earned: [],
     vat: [],
     paid: [],
@@ -1270,6 +1301,7 @@ export function buildCommissionRollup(
     if (!acc) {
       acc = {
         insurerName: e.insurerName,
+        insurerNamesAr: [],
         earned: [],
         vat: [],
         paid: [],
@@ -1279,6 +1311,7 @@ export function buildCommissionRollup(
       };
       byInsurer.set(e.insurerId, acc);
     }
+    acc.insurerNamesAr.push(e.insurerNameAr);
     const amount = quantizeMoney(e.amount);
     const vat = quantizeMoney(e.vatAmount);
     const paid = e.paidAmount == null ? zero : quantizeMoney(e.paidAmount);
@@ -1301,6 +1334,7 @@ export function buildCommissionRollup(
     .map(([insurerId, acc]) => ({
       insurerId,
       insurerName: acc.insurerName,
+      insurerNameAr: unanimousGroupName(acc.insurerNamesAr),
       ...rollupFigures(acc),
     }))
     .sort(
@@ -1329,6 +1363,17 @@ export interface ProfitabilityRow {
   /** the group key — the line string, or `'CORPORATE'` / `'INDIVIDUAL'`. */
   key: string;
   label: string;
+  /**
+   * The same label in Arabic, or null — contents §أ row ١١.
+   *
+   * POPULATED FOR `byLine` ONLY. ⛔ `bySegment` is NULL because its label is `customerType`, a
+   * fixed English enum the SCREEN already maps through `ENUM_LABEL.CustomerType` — sending an
+   * Arabic name for it would be a second home for one vocabulary, and `/dashboards/financial`'s
+   * own header records that the map belongs on the screen.
+   *
+   * `null` means the screen renders `label`, which is the English the record stored.
+   */
+  labelAr: string | null;
   /** Σ written premium. */
   premiumWritten: string;
   /** Σ net settlement of SETTLED / CLOSED claims on the group's policies. */
@@ -1351,12 +1396,12 @@ export interface ProfitabilitySection {
   /** worst-first (smallest / most-negative `netPosition`), then label A→Z. */
   byLine: ProfitabilityRow[];
   bySegment: ProfitabilityRow[];
-  totals: Omit<ProfitabilityRow, 'key' | 'label'>;
+  totals: Omit<ProfitabilityRow, 'key' | 'label' | 'labelAr'>;
 }
 
 function profitabilityRowFor(
   policies: ProfitabilityPolicyRow[],
-): Omit<ProfitabilityRow, 'key' | 'label'> {
+): Omit<ProfitabilityRow, 'key' | 'label' | 'labelAr'> {
   const zero = new Prisma.Decimal(0);
   const premiumWritten = sumMoney(policies.map((p) => p.premium));
   const nets = policies.flatMap((p) => p.claimNetSettlements);
@@ -1391,6 +1436,16 @@ function profitabilityRowFor(
 function groupProfitability(
   policies: ProfitabilityPolicyRow[],
   keyOf: (p: ProfitabilityPolicyRow) => string,
+  /**
+   * The ARABIC name this row contributes to its group's label — contents §أ row ١١. Omitted for
+   * `bySegment`, whose label is an enum the screen maps; see `ProfitabilityRow.labelAr`.
+   *
+   * ⚠️ The group's name is `unanimousGroupName` over these rather than the first row's, and that
+   * matters here: the `byLine` key is the STORED ENGLISH STRING while the Arabic name comes from
+   * the line FK, so one group can in principle hold rows pointing at different catalogue rows.
+   * See `group-name.util.ts` for the measurement and the rule.
+   */
+  nameArOf?: (p: ProfitabilityPolicyRow) => string | null,
 ): ProfitabilityRow[] {
   const groups = new Map<string, ProfitabilityPolicyRow[]>();
   for (const p of policies) {
@@ -1400,7 +1455,12 @@ function groupProfitability(
     groups.set(key, g);
   }
   return [...groups.entries()]
-    .map(([key, g]) => ({ key, label: key, ...profitabilityRowFor(g) }))
+    .map(([key, g]) => ({
+      key,
+      label: key,
+      labelAr: nameArOf ? unanimousGroupName(g.map(nameArOf)) : null,
+      ...profitabilityRowFor(g),
+    }))
     .sort(
       (a, b) =>
         compareMoney(a.netPosition, b.netPosition) ||
@@ -1423,7 +1483,11 @@ export function buildProfitability(
   policies: ProfitabilityPolicyRow[],
 ): ProfitabilitySection {
   return {
-    byLine: groupProfitability(policies, (p) => p.insuranceLine),
+    byLine: groupProfitability(
+      policies,
+      (p) => p.insuranceLine,
+      (p) => p.insuranceLineAr,
+    ),
     bySegment: groupProfitability(policies, (p) => p.customerType),
     totals: profitabilityRowFor(policies),
   };

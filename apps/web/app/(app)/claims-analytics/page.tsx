@@ -23,6 +23,7 @@ import {
 } from '../../../components/ui';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { groupLabelDisplayName } from '../../../lib/i18n/names';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import { formatLossRatio, formatMoney } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -123,7 +124,13 @@ export default function ClaimsAnalyticsPage() {
                 {data.rows.map((r) => (
                   <Tr key={r.key}>
                     <Td>
-                      <bdi>{r.label}</bdi>
+                      {/* Contents §أ row ١١ — the SAME breakdown `/dashboards/claims` reads, so
+                          `labelAr` arrives here too. ⚠️ FIXED HERE RATHER THAN LEFT: the message
+                          names the dashboard, but this screen groups by the same key and the
+                          Arabic name was already on its wire — sent and unrendered is the
+                          half-converted state, and «a screen with some names and some codes is
+                          worse than either». */}
+                      <bdi>{groupLabelDisplayName(r, language)}</bdi>
                     </Td>
                     <Td>
                       {formatLossRatio(r.ratio)}

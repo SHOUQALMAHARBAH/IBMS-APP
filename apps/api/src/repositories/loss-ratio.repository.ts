@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import type { LossRatio, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
+import {
+  INSURER_IDENTITY_SELECT,
+  insurerName,
+  resolveInsurerNamePair,
+} from './insurer-identity';
+import {
+  INSURANCE_LINE_NAME_INCLUDE,
+  insuranceLineNameAr,
+} from './insurance-line-names';
 
 export interface PolicyLossRatioInputs {
   id: string;
@@ -21,8 +29,14 @@ export interface AnalyticsPolicyRow {
   customerId: string;
   customerLegalName: string;
   insuranceLine: string;
+  /** The line's Arabic name, or null when none is known for this row — contents §أ row ١١.
+   *  Resolved from the line FK through `insuranceLineNameAr`, never from the string above. */
+  insuranceLineAr: string | null;
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null. From `resolveInsurerNamePair`, so it comes from the
+   *  SAME chosen source as `insurerName` beside it — never coalesced field by field. */
+  insurerNameAr: string | null;
   /** the human-readable policy reference (falls back to the id). */
   policyRef: string;
   /** `issuedPremium ?? requestedPremium`. */
@@ -128,6 +142,10 @@ export class LossRatioRepository {
         requestedPremium: true,
         customer: { select: { legalName: true } },
         insurer: { select: INSURER_IDENTITY_SELECT },
+        // ⚠️ SPREAD INSIDE THE `select`, NOT ADDED AS AN `include`. Prisma refuses both keys on
+        // one argument, so a shared relation constant written as an include is named here by its
+        // own keys -- the shape message 52 §10 recorded for `RECOMMENDATION_INCLUDE`.
+        ...INSURANCE_LINE_NAME_INCLUDE,
         claims: {
           where: { status: { in: ['SETTLED', 'CLOSED'] } },
           select: { settlement: { select: { netSettlement: true } } },
@@ -141,8 +159,10 @@ export class LossRatioRepository {
       customerId: p.customerId,
       customerLegalName: p.customer.legalName,
       insuranceLine: p.insuranceLine,
+      insuranceLineAr: insuranceLineNameAr(p),
       insurerId: p.insurerId,
       insurerName: insurerName(p.insurer),
+      insurerNameAr: resolveInsurerNamePair(p.insurer).nameAr,
       policyRef: p.policyNumber ?? p.id,
       premium: p.issuedPremium ?? p.requestedPremium,
       claimNetSettlements: p.claims.map(

@@ -17,6 +17,20 @@ export const ENUM_LABEL = {
   /** Module 0-ب item (c) — the brokerage licence type. NOT the life/general split, which module 0
    *  derives from the licence's branches and never stores; merging the two axes would destroy that
    *  derivation. */
+  /**
+   * Contents §ج row ٢٠ — the customer's language preference, which the customer file printed as
+   * the stored token `AR`.
+   *
+   * ⛔ NOT ONE NEW WORD. Both are ENDONYMS already shipping for exactly this thing: «العربية» is
+   * `switchToArabic` and «English» is `switchToEnglish`, the two labels on the language switch in
+   * the header. A language named in its own script is the same string in both halves of the
+   * dictionary — which is why those two keys carry identical text in the AR and EN halves, and
+   * why reusing them here needs no second word.
+   */
+  LanguagePreference: {
+    AR: 'switchToArabic',
+    EN: 'switchToEnglish',
+  } satisfies Labels<'AR' | 'EN'>,
   BrokerageKind: {
     DIRECT: 'brokerageKindDirect',
     REINSURANCE: 'brokerageKindReinsurance',

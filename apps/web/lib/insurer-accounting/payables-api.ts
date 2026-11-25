@@ -9,6 +9,8 @@ import { apiGet } from '../auth/api-client';
 export interface InsurerPayableRow {
   insurerId: string;
   insurerName: string;
+  /** The insurer's Arabic name, or null — contents §أ row ١١. */
+  insurerNameAr: string | null;
   outstandingAmount: string;
   outstandingCount: number;
   oldestCollectedAt: string | null;

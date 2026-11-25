@@ -79,6 +79,25 @@ const DRAFT_ASSESSMENT = {
     'Property All Risks (Fire)',
     'Workers Compensation',
   ],
+  /*
+   * 🔴 CONTENTS §ج ROW ٢١ — AND THIS FIXTURE IS WHY THE WHOLE SUITE WAS OWED.
+   *
+   * The api sends this on EVERY needs-assessment route (`withNames` is the one place that builds
+   * the wire shape, and both `get` and `list` go through it). Without it here the Arabic render
+   * read `assessment.recommendedCoverageLineNamesAr[line]` off `undefined` and the detail page
+   * became «This page couldn't load» — which is the trap message 47 §33 already recorded for
+   * `/insurance-programs` under a catch-all fixture.
+   *
+   * ⛔ THE SCREEN IS NOT MADE DEFENSIVE. A `?? {}` there would hide a wire shape the api is
+   * asserted to send; the FIXTURE is what was wrong.
+   *
+   * ⚠️ DELIBERATELY PARTIAL — one of the two lines has an Arabic name and the other does not, so
+   * the Arabic render exercises BOTH the resolved name and the English fallback. A fixture that
+   * named both could not tell the fallback from a bug.
+   */
+  recommendedCoverageLineNamesAr: {
+    'Property All Risks (Fire)': 'تأمين جميع أخطار الممتلكات',
+  },
   status: 'DRAFT',
   createdByUserId: 'user-1',
   reviewedByUserId: null,

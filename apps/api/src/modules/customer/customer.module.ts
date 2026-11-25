@@ -18,6 +18,7 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegacyImportBatchRepository } from '../../repositories/legacy-import-batch.repository';
 import { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import { CountryRepository } from '../../repositories/country.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import { AuditModule } from '../audit/audit.module';
@@ -71,6 +72,7 @@ import { ProspectModule } from '../prospect/prospect.module';
     KycPeriodicReviewScheduler,
     CustomerRepository,
     KycRecordRepository,
+    CountryRepository,
     // Process 49 — ScreeningService's real (non-fixture) sanctions/PEP
     // check. A stateless PrismaService wrapper, also provided directly by
     // ComplianceRiskModule (which owns the sync writing these rows) —

@@ -17,6 +17,9 @@ export interface ClaimsAgeingBuckets {
 export interface LossRatioBreakdownRow {
   key: string;
   label: string;
+  /** The same label in Arabic, or null — contents §أ row ١١. Populated for the insurer and
+   *  line groupings only; `null` means render `label`, the English the record stored. */
+  labelAr: string | null;
   periodClaims: string;
   periodPremium: string;
   ratio: string;

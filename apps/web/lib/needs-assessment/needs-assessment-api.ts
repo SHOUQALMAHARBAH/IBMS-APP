@@ -36,6 +36,14 @@ export interface NeedsAssessment {
   riskProfileId: string;
   questionnaireAnswers: Record<string, boolean | number>;
   recommendedCoverageLines: string[];
+  /**
+   * The Arabic name of each recommended coverage line that has one — contents §ج row ٢١.
+   *
+   * ⚠️ A MAP, not a parallel array, so a name cannot be paired with the wrong line by index. A
+   * line ABSENT from it has no known Arabic name and renders as the English string it stored.
+   * ⛔ That is an empty cell, never a cue to invent a name on the screen.
+   */
+  recommendedCoverageLineNamesAr: Record<string, string>;
   status: NeedsAssessmentStatus;
   createdByUserId: string;
   reviewedByUserId: string | null;

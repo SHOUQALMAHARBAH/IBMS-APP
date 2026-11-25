@@ -86,6 +86,7 @@ const commissionEntry = (
   entryId: 'cle-1',
   insurerId: 'ins-1',
   insurerName: 'Alpha',
+  insurerNameAr: 'ألفا',
   amount: d('1000.000'),
   vatAmount: d('160.000'),
   paidAmount: null,
@@ -99,6 +100,7 @@ const profitPolicy = (
 ): ProfitabilityPolicyRow => ({
   policyId: 'pol-1',
   insuranceLine: 'Property All Risks',
+  insuranceLineAr: 'تأمين جميع أخطار الممتلكات',
   customerType: 'CORPORATE',
   premium: d('120000.000'),
   claimNetSettlements: [],

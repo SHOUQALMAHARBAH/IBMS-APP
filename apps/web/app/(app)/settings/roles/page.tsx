@@ -8,6 +8,7 @@ import {
   Table,
   Td,
   Th,
+  Toast,
   Tr,
 } from '../../../../components/ui';
 import {
@@ -147,6 +148,22 @@ export default function RoleAdminPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  /*
+   * OWNER DECISION 164 RULING 1 — the role-created confirmation, as a self-dismissing toast.
+   *
+   * ⚠️ SEPARATE STATE FROM `savedMessage`, deliberately. `savedMessage` is the inline line under
+   * the form that STAYS until the next act replaces it, and three other acts on this screen write
+   * it (`roleDeleted`, `roleMatrixSaved`, `roleNamesSaved`). Her ruling is about ONE act and asks
+   * for something that disappears by itself; routing it through the shared line would either make
+   * the other three vanish too or leave this one on screen, and neither is what she ruled.
+   *
+   * ⛔ And the two are never both set for one act — see `onCreate`.
+   *
+   * `toastToken` restarts the dismissal clock when the SAME sentence is shown twice, which is what
+   * two roles created in a row do. See `Toast`.
+   */
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastToken, setToastToken] = useState(0);
 
   // The role whose matrix is open, with the grants it currently holds.
   const [editing, setEditing] = useState<RoleWithGrants | null>(null);
@@ -418,8 +435,27 @@ export default function RoleAdminPage() {
       setNewDescription('');
       setNewCodes(new Set());
       /*
-       * ⚠️ OWNER DECISION 163 RULING 5 — NO SUCCESS MESSAGE IS SHOWN HERE, DELIBERATELY, AND
-       * THIS IS THE REPORT THE RULING ASKED FOR.
+       * ✅ OWNER DECISION 164 RULING 1 — THE SUCCESS MESSAGE IS SHOWN HERE NOW, AND IT IS HERS.
+       *
+       * «تم إنشاء الدور بنجاح», as a small self-dismissing toast with a green check — her words
+       * and her shape: «بتطلع زي بوب أب صغيرة شكلها متناسق مع الشاشة و فيها صح أخضر».
+       *
+       * ⛔ `setSavedMessage` IS NOT ALSO CALLED. One act, one confirmation: writing both would put
+       * the same sentence in two places on one screen, one of which never leaves.
+       *
+       * ## AND THE PARAGRAPH BELOW IS THE REPORT THAT ASKED FOR THIS WORD — KEPT, NOT DELETED
+       *
+       * Decision 163 ruling 5 said «المهندس بيدوّر على جملة نجاح موجودة وبيعرضها، وما بتنحطّ قبل
+       * ما تشوفها الإدارة. وإذا ما في، ما بينبني إشي» — find a shipped sentence, show it, and if
+       * there is none build nothing. The search below is what was reported back, and decision 164
+       * is her answer to it. It stays because it records WHY this word had to come from her and
+       * could not be assembled here.
+       */
+      setToast(t('roleCreatedToast'));
+      setToastToken((n) => n + 1);
+      /*
+       * ⚠️ OWNER DECISION 163 RULING 5 — THE SEARCH THAT FOUND NOTHING, AND THE REPORT IT
+       * PRODUCED. Answered by decision 164 above.
        *
        * Her ruling: «المهندس بيدوّر على جملة نجاح موجودة وبيعرضها، وما بتنحطّ قبل ما تشوفها
        * الإدارة. وإذا ما في، ما بينبني إشي.» ⟶ So the dictionary was searched and the answer is
@@ -431,12 +467,13 @@ export default function RoleAdminPage() {
        *     `roleMatrixSaved`  «تم حفظ الصلاحيات.»      this screen, and it names the PERMISSIONS
        *     `empCreatedPerson` «تم تسجيل الشخص.»        another screen, another object
        *
-       * ⛔ AND «تم إنشاء الدور.» IS NOT BUILT, because it does not ship: it would be «تم إنشاء»
-       * taken from `empdLoginCreated` joined to «الدور» taken from `roleDeleted`, which is two
-       * shipped words made into a third — the composition decision 125 forbids by name.
+       * ⛔ AND «تم إنشاء الدور.» WAS NOT BUILT, because it did not ship: it would have been «تم
+       * إنشاء» taken from `empdLoginCreated` joined to «الدور» taken from `roleDeleted`, which is
+       * two shipped words made into a third — the composition decision 125 forbids by name.
        *
-       * ⚠️ The machinery is already here and wiring it is ONE LINE: `setSavedMessage(t(<key>))`,
-       * exactly as `onSavePermissions` below does. It waits for her word.
+       * ⟶ AND THE WORD SHE GAVE IS NOT THAT COMPOSITION. «تم إنشاء الدور بنجاح» ends in «بنجاح»
+       *   and carries NO full stop, where `roleDeleted` beside it has one. Refusing to guess was
+       *   right: the sentence that shipped is not the one that would have been assembled.
        */
       await load();
     } catch (err) {
@@ -1136,6 +1173,17 @@ export default function RoleAdminPage() {
           </form>
         </section>
       ) : null}
+
+      {/* OWNER DECISION 164 RULING 1 — mounted LAST and `position: fixed`, so it floats over the
+          form without being inside any section's stacking context. ⛔ It is not blocking: nothing
+          here traps focus and no control is disabled while it shows, which is her «لا تمنع
+          الشاشة ولا تحتاج كبسة». */}
+      <Toast
+        message={toast}
+        token={toastToken}
+        onDismiss={() => setToast(null)}
+        testId="role-created-toast"
+      />
     </main>
   );
 }

@@ -21,12 +21,15 @@ import {
   reconExceptionAuditSnapshot,
   reconExceptionUpdateAuditSnapshot,
   type CommissionRollupEntryRow,
+  type CommissionRollupInsurerRow,
   type InsurerObligationRow,
+  type InsurerPayableRow,
   type InsurerRemittanceRow,
   type InvoiceRow,
   type OutstandingInvoiceRow,
   type PaymentChannelRow,
   type ProfitabilityPolicyRow,
+  type ProfitabilityRow,
   type ReconExceptionRow,
 } from './finance.config';
 
@@ -458,6 +461,7 @@ describe('buildInsurerPayables (Process 34)', () => {
       >,
   ): InsurerObligationRow => ({
     insurerName: `Insurer ${over.insurerId}`,
+    insurerNameAr: `شركة ${over.insurerId}`,
     ...over,
   });
 
@@ -469,6 +473,7 @@ describe('buildInsurerPayables (Process 34)', () => {
       >,
   ): InsurerRemittanceRow => ({
     insurerName: `Insurer ${over.insurerId}`,
+    insurerNameAr: `شركة ${over.insurerId}`,
     ...over,
   });
 
@@ -613,6 +618,93 @@ describe('buildInsurerPayables (Process 34)', () => {
       remittances: [],
     });
     expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
+  });
+  /**
+   * Contents §أ row ١١ — the insurer's Arabic name travels with the payables row.
+   *
+   * ⚠️ IT CANNOT DISAGREE HERE, and that is the point of asserting it: the group key IS
+   * `insurerId`, so every obligation and every remittance in a row is the same insurer. The
+   * `unanimousGroupName` rule is used anyway, uniformly with the by-line groupings, so there is
+   * no second branch to get wrong — and this test says what the uniform rule yields here.
+   */
+  it('§أ-١١ — each payables row carries the insurer Arabic name', () => {
+    const report = buildInsurerPayables({
+      asOf,
+      obligations: [
+        obl({
+          invoiceId: 'inv-1',
+          insurerId: 'ins-1',
+          premiumAmount: d('1000.000'),
+          commissionDeducted: d('100.000'),
+          collectedAt: collected(-10),
+        }),
+      ],
+      remittances: [
+        rem({
+          remittanceId: 'rem-1',
+          insurerId: 'ins-1',
+          amount: d('400.000'),
+          remittedAt: collected(-5),
+        }),
+      ],
+    });
+    expect(report.rows).toHaveLength(1);
+    expect(report.rows[0].insurerName).toBe('Insurer ins-1');
+    expect(report.rows[0].insurerNameAr).toBe('شركة ins-1');
+  });
+
+  /**
+   * 🔴 AND EVERY FIGURE READS EXACTLY AS BEFORE — asserted as an invariance over the whole
+   * function rather than as a snapshot of this fixture. Every field but `insurerNameAr` must be
+   * deeply equal with the Arabic names present and with them nulled, totals included.
+   */
+  it('§أ-١١ — the Arabic name cannot move any payables figure', () => {
+    const obligations = [
+      obl({
+        invoiceId: 'inv-1',
+        insurerId: 'ins-1',
+        premiumAmount: d('1000.000'),
+        commissionDeducted: d('100.000'),
+        collectedAt: collected(-10),
+      }),
+      obl({
+        invoiceId: 'inv-2',
+        insurerId: 'ins-2',
+        premiumAmount: d('5000.000'),
+        commissionDeducted: d('250.000'),
+        collectedAt: collected(-40),
+      }),
+    ];
+    const remittances = [
+      rem({
+        remittanceId: 'rem-1',
+        insurerId: 'ins-1',
+        amount: d('400.000'),
+        remittedAt: collected(-5),
+      }),
+    ];
+
+    const withAr = buildInsurerPayables({ asOf, obligations, remittances });
+    const withoutAr = buildInsurerPayables({
+      asOf,
+      obligations: obligations.map((o) => ({ ...o, insurerNameAr: null })),
+      remittances: remittances.map((r) => ({ ...r, insurerNameAr: null })),
+    });
+
+    expect(withAr.totals).toEqual(withoutAr.totals);
+    expect(withAr.asOf).toBe(withoutAr.asOf);
+    expect(withAr.currency).toBe(withoutAr.currency);
+    const figuresOnly = (r: InsurerPayableRow) => ({
+      ...r,
+      insurerNameAr: null,
+    });
+    expect(withAr.rows.map(figuresOnly)).toEqual(
+      withoutAr.rows.map(figuresOnly),
+    );
+    // Non-vacuity: the two runs really do differ, or the comparison above proves nothing.
+    expect(withAr.rows.map((r) => r.insurerNameAr)).not.toEqual(
+      withoutAr.rows.map((r) => r.insurerNameAr),
+    );
   });
 });
 
@@ -879,6 +971,7 @@ describe('buildCommissionRollup (Process 40)', () => {
     entryId: 'cle-1',
     insurerId: 'ins-1',
     insurerName: 'Alpha Insurance',
+    insurerNameAr: 'شركة ألفا للتأمين',
     amount: d('1000.000'),
     vatAmount: d('160.000'),
     paidAmount: null,
@@ -1010,6 +1103,50 @@ describe('buildCommissionRollup (Process 40)', () => {
       byInsurer: [],
     });
   });
+  /** Contents §أ row ١١ — the insurer's Arabic name on each commission roll-up row. */
+  it('§أ-١١ — each by-insurer roll-up row carries the insurer Arabic name', () => {
+    const r = buildCommissionRollup([entry()]);
+    expect(r.byInsurer).toHaveLength(1);
+    expect(r.byInsurer[0].insurerName).toBe('Alpha Insurance');
+    expect(r.byInsurer[0].insurerNameAr).toBe('شركة ألفا للتأمين');
+  });
+
+  /**
+   * 🔴 And no figure moves — the invariance, over the whole function rather than a snapshot.
+   *
+   * ⚠️ The book totals are compared too, and they are the half most worth checking: the book
+   * accumulator carries an EMPTY `insurerNamesAr` and an empty `insurerName`, so a change that
+   * made the Arabic name reach `rollupFigures` would show up here first.
+   */
+  it('§أ-١١ — the Arabic name cannot move any commission figure', () => {
+    const entries = [
+      entry({ entryId: 'cle-1', insurerId: 'ins-1', paidAmount: d('400.000') }),
+      entry({
+        entryId: 'cle-2',
+        insurerId: 'ins-2',
+        insurerName: 'Beta Insurance',
+        insurerNameAr: 'شركة بيتا للتأمين',
+        amount: d('2000.000'),
+        reversedAmount: d('500.000'),
+      }),
+    ];
+    const withAr = buildCommissionRollup(entries);
+    const withoutAr = buildCommissionRollup(
+      entries.map((e) => ({ ...e, insurerNameAr: null })),
+    );
+
+    const { byInsurer: a, ...aTotals } = withAr;
+    const { byInsurer: b, ...bTotals } = withoutAr;
+    const figuresOnly = (r: CommissionRollupInsurerRow) => ({
+      ...r,
+      insurerNameAr: null,
+    });
+    expect(aTotals).toEqual(bTotals);
+    expect(a.map(figuresOnly)).toEqual(b.map(figuresOnly));
+    expect(a.map((r) => r.insurerNameAr)).not.toEqual(
+      b.map((r) => r.insurerNameAr),
+    );
+  });
 });
 
 describe('buildProfitability (Process 40)', () => {
@@ -1018,6 +1155,7 @@ describe('buildProfitability (Process 40)', () => {
   ): ProfitabilityPolicyRow => ({
     policyId: 'pol-1',
     insuranceLine: 'Property All Risks',
+    insuranceLineAr: 'تأمين جميع أخطار الممتلكات',
     customerType: 'CORPORATE',
     premium: d('120000.000'),
     claimNetSettlements: [],
@@ -1090,5 +1228,65 @@ describe('buildProfitability (Process 40)', () => {
       policyCount: 0,
       claimCount: 0,
     });
+  });
+  /**
+   * Contents §أ row ١١ — the line's Arabic name on `byLine`, and ⛔ NONE on `bySegment`.
+   *
+   * `bySegment`'s label is `customerType`, a fixed English enum the SCREEN maps through
+   * `ENUM_LABEL.CustomerType`. Sending an Arabic name for it would be a second home for one
+   * vocabulary. Non-vacuous: the fixture carries an Arabic LINE name, so a build that passed the
+   * extractor to both groupings would fail the second assertion rather than pass over nothing.
+   */
+  it('§أ-١١ — byLine carries the line Arabic name and bySegment carries none', () => {
+    const s = buildProfitability([pol({})]);
+    expect(s.byLine).toHaveLength(1);
+    expect(s.byLine[0].label).toBe('Property All Risks');
+    expect(s.byLine[0].labelAr).toBe('تأمين جميع أخطار الممتلكات');
+    expect(s.bySegment).toHaveLength(1);
+    expect(s.bySegment[0].label).toBe('CORPORATE');
+    expect(s.bySegment[0].labelAr).toBeNull();
+  });
+
+  /**
+   * 🔴 ONE STORED LINE STRING, TWO ARABIC NAMES ⟶ THE ENGLISH. The `byLine` key is the stored
+   * string while the name comes from the line FK, so a group can hold rows that disagree.
+   */
+  it('§أ-١١ — a byLine group whose rows disagree about the Arabic name takes none', () => {
+    const s = buildProfitability([
+      pol({ policyId: 'pol-1', insuranceLineAr: 'تأمين المركبات الشامل' }),
+      pol({ policyId: 'pol-2', insuranceLineAr: 'تأمين الحياة الجماعي' }),
+    ]);
+    expect(s.byLine[0].label).toBe('Property All Risks');
+    expect(s.byLine[0].labelAr).toBeNull();
+  });
+
+  /** 🔴 And no figure moves — the invariance, over the whole function. */
+  it('§أ-١١ — the Arabic name cannot move any profitability figure', () => {
+    const policies = [
+      pol({ policyId: 'pol-1', claimNetSettlements: [d('30000.000')] }),
+      pol({
+        policyId: 'pol-2',
+        insuranceLine: 'Motor Fleet',
+        insuranceLineAr: 'تأمين المركبات الشامل',
+        customerType: 'INDIVIDUAL',
+        premium: d('8000.000'),
+        commissionAmount: d('900.000'),
+      }),
+    ];
+    const withAr = buildProfitability(policies);
+    const withoutAr = buildProfitability(
+      policies.map((p) => ({ ...p, insuranceLineAr: null })),
+    );
+
+    const figuresOnly = (r: ProfitabilityRow) => ({ ...r, labelAr: null });
+    expect(withAr.totals).toEqual(withoutAr.totals);
+    for (const key of ['byLine', 'bySegment'] as const) {
+      expect(withAr[key].map(figuresOnly)).toEqual(
+        withoutAr[key].map(figuresOnly),
+      );
+    }
+    expect(withAr.byLine.map((r) => r.labelAr)).not.toEqual(
+      withoutAr.byLine.map((r) => r.labelAr),
+    );
   });
 });

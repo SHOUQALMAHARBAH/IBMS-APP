@@ -20,6 +20,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { insurerDisplayName } from '../../../lib/i18n/names';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -120,7 +121,15 @@ export default function InsurerAccountingPage() {
               {data.rows.map((r) => (
                 <Tr key={r.insurerId}>
                   <Td>
-                    <bdi>{r.insurerName}</bdi>
+                    {/* Contents §أ row ١١ — the insurer in the reader's language. The
+                        Arabic name comes from the SAME chosen source as the Latin one
+                        (`resolveInsurerNamePair`), never coalesced field by field. */}
+                    <bdi>
+                      {insurerDisplayName(
+                        { name: r.insurerName, nameAr: r.insurerNameAr },
+                        language,
+                      )}
+                    </bdi>
                   </Td>
                   <Td>{formatMoney(r.outstandingAmount, language)}</Td>
                   <Td>{r.outstandingCount}</Td>
