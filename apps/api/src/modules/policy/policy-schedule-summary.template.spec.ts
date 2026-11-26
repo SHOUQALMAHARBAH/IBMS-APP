@@ -138,11 +138,47 @@ describe('buildPolicyScheduleSummaryHtml', () => {
     expect(html).not.toContain('undefined');
   });
 
-  it('shows "ongoing" for an open schedule (no effectiveTo) in each language', () => {
+  /*
+   * 🔴 CORRECTED, NOT DELETED — THIS TEST ASSERTED THE DEFECT DECISION 165 RULING 3 NAMES.
+   *
+   * It read `expect(htmlEn).toContain('ongoing')` over `BASE_DATA`, whose policy carries
+   * `expiryDate: 2027-10-01`. So it pinned a paper that told a customer their cover was ongoing
+   * two rows under its own «تاريخ الانتهاء» cell — and it would have passed for as long as
+   * nobody read the document, which is how the owner found it rather than the suite.
+   *
+   * Both directions are kept: an open schedule on a policy that EXPIRES shows the expiry date and
+   * must not say «ongoing»; an open schedule on a policy with NO expiry date still does, which is
+   * the only state that word is true of and the reason it is not deleted.
+   */
+  it('an open schedule on a policy that expires shows the policy expiry, not "ongoing"', () => {
     const htmlEn = buildPolicyScheduleSummaryHtml(BASE_DATA, 'EN');
-    expect(htmlEn).toContain('ongoing');
+    expect(htmlEn).not.toContain('ongoing');
+    // The formatted expiry occurs TWICE now — its own cell and the schedule range — where
+    // before it occurred once. A `toContain` alone would pass on the cell that always had it.
+    expect(htmlEn.split('1 October 2027').length - 1).toBe(2);
+
     const htmlAr = buildPolicyScheduleSummaryHtml(BASE_DATA, 'AR');
-    expect(htmlAr).toContain('مستمر');
+    expect(htmlAr).not.toContain('مستمر');
+    expect(htmlAr.split('1 تشرين الأول 2027').length - 1).toBe(2);
+  });
+
+  it('an open schedule on a policy with NO expiry date still reads "ongoing"', () => {
+    const open = { ...BASE_DATA, expiryDate: null };
+    expect(buildPolicyScheduleSummaryHtml(open, 'EN')).toContain('ongoing');
+    expect(buildPolicyScheduleSummaryHtml(open, 'AR')).toContain('مستمر');
+  });
+
+  it('a CLOSED schedule shows its own effectiveTo, never the policy expiry', () => {
+    const closed = {
+      ...BASE_DATA,
+      scheduleEffectiveTo: new Date('2027-04-01T00:00:00Z'),
+    };
+    const htmlEn = buildPolicyScheduleSummaryHtml(closed, 'EN');
+    expect(htmlEn).toContain('1 April 2027');
+    expect(htmlEn).not.toContain('ongoing');
+    // The policy expiry keeps its own cell and does NOT reach the range: a superseded version
+    // ended when it was superseded, which is the distinction `effectiveTo` exists to carry.
+    expect(htmlEn.split('1 October 2027').length - 1).toBe(1);
   });
 
   it('renders no coverage-figure table when limits/sumsInsured are both empty, without crashing', () => {

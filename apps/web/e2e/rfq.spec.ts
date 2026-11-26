@@ -2655,6 +2655,75 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
   ).toBeVisible();
 });
 
+/*
+ * 🔴 DECISION 165 RULING 3 — THE COVERAGE SCHEDULE AND THE POLICY ABOVE IT MUST AGREE ABOUT
+ * WHEN THE COVER ENDS.
+ *
+ * The walk read «بلا تاريخ انتهاء» on the schedule line with «تاريخ الانتهاء: …» a few lines
+ * above it. `effectiveTo === null` marks an UNSUPERSEDED version, not an open-ended cover — see
+ * `PolicySection.tsx`. Measured on dev: 32 of 32 schedules open, 32 of 32 of their policies
+ * carrying an expiry date, so this was every policy on the screen.
+ *
+ * ⚠️ THE EXPIRY DATE IS READ OFF THE PAGE RATHER THAN WRITTEN HERE, and that is deliberate.
+ * `formatDate` renders in the BROWSER's zone and the fixture's `expiryDate` is MIDNIGHT UTC, so a
+ * hard-coded «1 October 2027» would pass or fail on where the runner sits (message 50 §22's
+ * recorded repair). Asserting the two lines carry the SAME string is also the stronger claim: the
+ * defect was a disagreement between them, not a wrong date.
+ *
+ * Both fixtures are this file's own: `seedActivePolicy` carries an expiry date and
+ * `seedIssuedPolicy` carries `expiryDate: null`, which is the one state «ongoing» is true of.
+ */
+test("an open coverage schedule ends on the policy's own expiry date, not \"ongoing\"", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedActivePolicy: true,
+  });
+
+  await page.goto("/opportunities/opp-1");
+  // ⚠️ A `<p style={{fontWeight:600}}>`, not a heading — `PolicySection` writes every block
+  // caption that way, so `getByRole('heading')` finds nothing here.
+  await expect(page.getByText("Coverage schedule", { exact: true })).toBeVisible();
+
+  // The policy's own expiry line, as the reader sees it.
+  const policyDates = page.getByText(/^Inception .* · Expiry /);
+  await expect(policyDates).toBeVisible();
+  const expiry = ((await policyDates.innerText()).split("Expiry ")[1] ?? "").trim();
+  // Non-vacuity: if the fixture ever stops sending an expiry date this reads «—», and every
+  // assertion below would be about the wrong branch.
+  expect(expiry).not.toBe("—");
+  expect(expiry.length).toBeGreaterThan(5);
+
+  // The schedule line is the one carrying the perils label.
+  const scheduleLine = page.getByText(/^Effective .* perils:/);
+  await expect(scheduleLine).toContainText(expiry);
+  await expectAbsentWithin(scheduleLine, (s) =>
+    s.getByText("ongoing", { exact: false }),
+  );
+});
+
+test("a coverage schedule on a policy with NO expiry date still reads \"ongoing\"", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+  });
+
+  await page.goto("/opportunities/opp-1");
+  // ⚠️ A `<p style={{fontWeight:600}}>`, not a heading — `PolicySection` writes every block
+  // caption that way, so `getByRole('heading')` finds nothing here.
+  await expect(page.getByText("Coverage schedule", { exact: true })).toBeVisible();
+
+  // The branch that keeps the word: the policy itself has no end date, so the line has none to
+  // borrow. This is why `policySectionScheduleOngoing` was corrected in place and not deleted.
+  await expect(page.getByText(/^Inception .* · Expiry —/)).toBeVisible();
+  await expect(page.getByText(/^Effective .* perils:/)).toContainText("ongoing");
+});
+
 test("raises a premium invoice from the Billing block — commission netted, total computed", async ({
   page,
 }) => {

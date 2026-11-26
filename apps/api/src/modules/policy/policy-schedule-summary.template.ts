@@ -134,9 +134,27 @@ function renderSection(
             : ''
         }`;
 
+  /*
+   * 🔴 DECISION 165 RULING 3 — AN OPEN SCHEDULE IS AN UNSUPERSEDED VERSION, NOT AN
+   * OPEN-ENDED COVER, AND A PAPER A CUSTOMER RECEIVES SAID THE SECOND.
+   *
+   * `PolicySchedule.effectiveTo === null` is the version-chain terminator (the partial UNIQUE
+   * `PolicySchedule_one_open_per_policy`; `policy-checking.service.ts` resolves the issued cover
+   * by it; an endorsement CLOSES it before opening a successor). So null means «nothing has
+   * superseded this», and this document printed «مستمر» two rows under its own
+   * «تاريخ الانتهاء» cell.
+   *
+   * ⟶ The cover an unsuperseded schedule describes runs to the policy's expiry, and
+   * `data.expiryDate` is already on this payload — no query and no field was added. «مستمر» /
+   * «ongoing» keep their own words and still render where they are TRUE: a policy carrying no
+   * expiry date, which `Policy.expiryDate` being nullable permits.
+   *
+   * ⚠️ The screen's own copy of this line is in `PolicySection.tsx`; both move together.
+   */
+  const scheduleEnd = data.scheduleEffectiveTo ?? data.expiryDate;
   const scheduleRange = `${formatDocumentDate(data.scheduleEffectiveFrom, lang)} – ${
-    data.scheduleEffectiveTo
-      ? formatDocumentDate(data.scheduleEffectiveTo, lang)
+    scheduleEnd
+      ? formatDocumentDate(scheduleEnd, lang)
       : lang === 'ar'
         ? 'مستمر'
         : 'ongoing'

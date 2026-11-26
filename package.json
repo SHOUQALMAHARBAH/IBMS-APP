@@ -14,7 +14,8 @@
     "body-parser": "^2.4.0",
     "deepmerge-ts": "8.0.2",
     "effect": "^3.22.5",
-    "fast-uri": "3.1.8"
+    "fast-uri": "^3.1.9",
+    "vite": "^7.3.8"
   },
   "scripts": {
     "browsers:check": "node scripts/check-playwright-browsers.mjs",
