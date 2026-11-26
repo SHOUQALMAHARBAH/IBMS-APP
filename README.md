@@ -295,6 +295,34 @@ already give).
   book answers them nothing. ⛔ Never consult the anchor on the book-wide branch —
   an anchor is per customer, and a list it widened is the blanket key door four
   refused.
+* **🔴 A COVERAGE SCHEDULE WITH NO `effectiveTo` IS UNSUPERSEDED, NOT OPEN-ENDED
+  (2026-11-26, decision 165 ruling 3).** `PolicySchedule.effectiveTo === null` is this
+  model's version-chain terminator: the partial UNIQUE
+  `PolicySchedule_one_open_per_policy` keeps at most one open row per policy,
+  `policy-checking.service.ts`'s `currentSchedule` resolves what the insurer issued BY
+  it, and an endorsement CLOSES it — writing `effectiveTo` — before opening a successor,
+  with `assertEffectiveWithinCover` reading the open row's `effectiveFrom` as its floor.
+  So null means *nothing has superseded this*, and it never meant *this cover has no end
+  date*. The screen read it as the second and printed «بلا تاريخ انتهاء» a few lines under
+  the policy's own «تاريخ الانتهاء: …», and the schedule-summary DOCUMENT printed
+  «مستمر» / `ongoing` two rows under its own expiry cell — on a paper a customer
+  receives. **⟶ An unsuperseded schedule's cover runs to `policy.expiryDate`, so that is
+  the date both now show**, and `policySectionScheduleOngoing` keeps its own words where
+  they are TRUE: a policy carrying no expiry date, which `Policy.expiryDate` being
+  nullable permits. **⛔ THE SEED IS NOT WHERE THIS IS FIXED** — measured on dev, 32 of 32
+  schedules are open and 32 of 32 of their policies carry an expiry date, and writing
+  `effectiveTo` on the open row to fill the line would blind the policy check, remove the
+  endorsement floor, and record every current schedule as superseded by nothing. ⚠️ **Two
+  homes that name each other in their comments**: `PolicySection.tsx` and
+  `policy-schedule-summary.template.ts`. **⛔ And `ClaimCard` is a third site that is
+  already right** — `claimCoverageInForce` names the coverage VERSION and
+  `claimCoverageOpenEnd` «مفتوحة» says that version is open, which is a true statement
+  about the chain rather than a claim about the cover; its payload carries no expiry date
+  to borrow, so do not "finish the sweep" into it. ⚠️ **And the unit test that should have
+  caught this asserted the defect** — it pinned `ongoing` over a fixture whose policy
+  expires in 2027 — so it is corrected in both directions rather than deleted, and the
+  Playwright assertions read the expiry date OFF THE PAGE, because `formatDate` renders in
+  the browser's zone and the fixtures are midnight UTC.
 * **AND `check:bilingual-names` MATCHES THE INSURANCE LINE, NOT ONLY A NAME (2026-11-18).**
   It shipped covering `insurer.name` / `legalName`, and its own header already said the walk it
   came from was about the insurer *and the insurance line* — so `/rfqs/[id]`'s heading

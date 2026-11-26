@@ -533,9 +533,44 @@ export function PolicySection({
                   {t('policySectionScheduleEffective', {
                     date: formatDate(s.effectiveFrom, language),
                   })}
+                  {/* 🔴 DECISION 165 RULING 3 — AN OPEN SCHEDULE IS AN UNSUPERSEDED VERSION,
+                      NOT AN OPEN-ENDED COVER, AND THIS LINE WAS READING IT AS THE SECOND.
+
+                      `PolicySchedule.effectiveTo === null` is this model's version-chain
+                      terminator: the schema's partial UNIQUE `PolicySchedule_one_open_per_policy`
+                      keeps at most ONE open row per policy, `policy-checking.service.ts`'s
+                      `currentSchedule` finds the issued cover by it, and an endorsement CLOSES
+                      it (writing `effectiveTo`) before opening a successor. So null means
+                      «nothing has superseded this» — it does not mean the cover never ends.
+
+                      ⛔ WHICH IS WHY THE SEED IS NOT THE DEFECT, measured on dev: 32 of 32
+                      schedules are open and 32 of 32 of their policies carry an `expiryDate`.
+                      Writing `effectiveTo` on the open row to fill this line would blind
+                      `currentSchedule`, remove the floor `assertEffectiveWithinCover` reads,
+                      and record every current schedule as superseded by nothing.
+
+                      ⟶ The cover an unsuperseded schedule describes runs until the policy
+                      expires, so that is the date shown. `policySectionScheduleOngoing` keeps
+                      its own words and still renders where it is TRUE — a policy with no expiry
+                      date at all, which `Policy.expiryDate` being nullable permits and which
+                      0 of 32 demo policies are today.
+
+                      ⚠️ The same line is in `policy-schedule-summary.template.ts`, which prints
+                      «مستمر» / «ongoing» on a paper a customer receives; both move together.
+
+                      ⛔ AND `ClaimCard` IS A THIRD SITE THAT IS ALREADY RIGHT — do not «finish the
+                      sweep» into it. Its label is `claimCoverageInForce` «نسخة التغطية السارية:
+                      {from} ← {to}» with `claimCoverageOpenEnd` «مفتوحة», which names the coverage
+                      VERSION and says that version is open — a true statement about the chain,
+                      not a claim about when the cover ends. ⚠️ And its payload carries no expiry
+                      date to borrow (`claim-api.ts`'s `coverage` is `scheduleId` +
+                      `effectiveFrom` + `effectiveTo`), so changing it would widen a wire for a
+                      screen no ruling names. */}
                   {s.effectiveTo
                     ? ` – ${formatDate(s.effectiveTo, language)}`
-                    : ` – ${t('policySectionScheduleOngoing')}`}
+                    : policy.expiryDate
+                      ? ` – ${formatDate(policy.expiryDate, language)}`
+                      : ` – ${t('policySectionScheduleOngoing')}`}
                   {' · '}
                   {t('policySectionNamedPerils')}{' '}
                   {s.namedPerils.join(', ') || '—'}

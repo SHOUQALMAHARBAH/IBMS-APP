@@ -262,9 +262,41 @@ function uniqueEmail(local: string): string {
  * ⛔ NEITHER FIELD IS UNIQUE-CONSTRAINED and neither is validated as an email (both are
  * `@IsString()` with a length bound), so the timestamp and sequence were buying nothing. Both
  * carry the record's own id instead, which is short, stable across a re-run, and traceable.
+ *
+ * ⚠️ AND THE `<local@host>` SENTENCE ABOVE IS HISTORY, NOT CURRENT GUIDANCE — decision 165 ruling 3
+ * took that shape off the screen. Read the block directly below before copying it.
  */
-function emailMessageRef(seed: string): string {
-  return `<accept.${seed.slice(0, 8)}@mail.demo.test>`;
+/*
+ * 🔴 DECISION 165 RULING 3 — AND THE ANGLE BRACKETS WERE RIGHT ABOUT THE FORMAT AND WRONG
+ * ABOUT THE SCREEN.
+ *
+ * The walk read `<accept.0e7cd2c5@mail.demo.test>` under «الإثبات:». The brackets were not a
+ * slip: this field held an email MESSAGE reference, `evidenceType` beside it said
+ * `email_confirmation`, and RFC 5322 writes a Message-ID as `<id-left@id-right>` — so the value
+ * matched its own type, which is the rule the `recipient`/`method` pair above learned the hard
+ * way. What it did not match is a reader: beside an Arabic label, `<…>` reads as markup.
+ *
+ * ⛔ AND THE RENDER IS NOT WHERE THIS IS FIXED. `ClientDecisionSection.tsx` prints
+ * `decision.evidenceRef` AS STORED, which is correct — the field is `@IsString()` with a length
+ * bound and no format validation, so an office may type a real bracketed Message-ID, and
+ * stripping characters on the way to the screen would mangle it and misreport the record.
+ *
+ * ⛔ AND THE BRACKETS ARE NOT SIMPLY DROPPED, either: without them the value is a MAILBOX
+ * address, which is precisely the thing the paragraph above says a message reference is not.
+ *
+ * ⟶ SO THE SHAPE CHANGES WITH ITS TYPE, and both come from the screen rather than from here.
+ * `ClientDecisionSection`'s form DEFAULTS to `evidenceType: 'e-signature'`, and its own
+ * `cdEvidenceRefPlaceholder` names the three shapes this field accepts — «معرّف المستند /
+ * مغلف التوقيع الإلكتروني / مرجع البريد الإلكتروني» — whose SECOND is an e-signature envelope.
+ * An envelope id carries no bracket convention. ⚠️ And all three Arabic type labels already ship
+ * (`cdEvidenceESignature` «توقيع إلكتروني»), so no word is invented and none is left blank.
+ *
+ * The shape is `deliveryRecipient`'s courier branch, which already ships in this file: a prefix
+ * and eight uppercase characters of the record's own id — short, stable across a re-run,
+ * traceable, and ⛔ not unique-constrained, so nothing here needs a timestamp.
+ */
+function eSignatureEnvelopeRef(seed: string): string {
+  return `ESIG-${seed.slice(0, 8).toUpperCase()}`;
 }
 
 /** The delivery recipient, in the shape the `method` beside it implies. */
@@ -2987,10 +3019,11 @@ async function runFullPipeline(
     postAs(app, actors.sales.token, '/client-decisions', {
       opportunityId: opportunity.id,
       decision: 'ACCEPT',
-      evidenceType: 'email_confirmation',
-      // An email MESSAGE reference, which is what this field's own docblock asks for — see
-      // `emailMessageRef`. It used to be a mailbox address with a timestamp in it.
-      evidenceRef: emailMessageRef(opportunity.id),
+      // The pair, never one half: the type is the screen's own default and the reference is the
+      // shape that type implies — see `eSignatureEnvelopeRef` for why it is no longer the
+      // bracketed email message reference the walk read.
+      evidenceType: 'e-signature',
+      evidenceRef: eSignatureEnvelopeRef(opportunity.id),
     }),
   );
   if (!decisionOk) return undefined;
@@ -3044,6 +3077,23 @@ async function runFullPipeline(
        * DESCRIPTIONS, whole sentences about one event. A named peril is a term («حريق»,
        * «سرقة»), and slicing a noun out of her sentence to make one would be composing a word
        * she did not give. The expiry date beside them IS built, because a date is not a word.
+       *
+       * ⚠️ RE-MEASURED 2026-11-26 ON DECISION 165 RULING 3's OWN ASKING, AND THE ANSWER IS STILL
+       * «NO VOCABULARY» — with a SECOND trap found, closer to hand than decision 158's.
+       *
+       * A sweep of `translations/` and `seed-data/` for peril words returns three kinds of hit and
+       * not one vocabulary: the two LABELS over these very rows (`policySectionNamedPerils`), a
+       * negotiation PLACEHOLDER mentioning «استثناء الفيضان» inside an example sentence, and
+       * ⛔ the managed INSURANCE LINE names — «تأمين الحريق والأخطار الإضافية», «تأمين السرقة
+       * والسطو». A LINE IS NOT A PERIL, and slicing «الحريق» out of a line's name is the same
+       * composition as slicing it out of her claim sentence, one table further away.
+       *
+       * ⛔ AND THE SCHEMA ALREADY CARRIES A WRITTEN DECISION AGAINST BUILDING ONE. The docblock on
+       * `InsurerAgreement.insuranceLine` calls «a named sub-peril» free text stored for DISPLAY and
+       * says a managed catalogue for it is «the closed-list mistake one level down»: a second
+       * vocabulary with its own add-flow, invented before the shape is known. So these two rows
+       * stay an EMPTY CELL by design and not by omission, and `PolicyScheduleInputDto` accepting
+       * both is the office's room to type its own terms rather than a gap to be filled here.
        */
       schedule: { limits: coverage.limits, sumsInsured: coverage.sumsInsured },
       documents: [],
