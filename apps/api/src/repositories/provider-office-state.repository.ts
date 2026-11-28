@@ -148,6 +148,47 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'lastActivityAt',
 ] as const;
 
+/**
+ * 🔴 THE SELECT LIST, DERIVED FROM THE DECLARED COLUMNS — IT USED TO BE A SECOND COPY, AND THE
+ * COMMENT ON `PROVIDER_OFFICE_STATE_COLUMNS` CLAIMED IT COULD NOT BE.
+ *
+ * That constant's header says it is «kept as one list used for BOTH, so ‘what we select’ and
+ * ‘what we checked’ cannot diverge — which they would the first time somebody added a column to one
+ * of two lists». There really were two lists: `findAll` named its eighteen columns in a hand-written
+ * SQL string, and nothing compared the two.
+ *
+ * ⚠️ AND THAT IS EXACTLY WHAT HAPPENED, ON THE COMMIT THAT ADDED FOUR COLUMNS (the full walk §A
+ * items 10 and 11). The four names reached the constant, the row type and `assertViewShape` — so the
+ * per-call check passed, because it compares the CONSTANT to the VIEW and never the SELECT to
+ * either — while the SELECT still named eighteen. The rows came back without the fields,
+ * `JSON.stringify` DROPS an undefined key, and the payload simply had no `enteredUsers`. No error,
+ * no 500: a missing field that reads exactly like a field nobody added.
+ *
+ * `provider-office-state.e2e-spec.ts` caught it in CI, which is the only place it could be caught —
+ * the api e2e cannot run on the authoring machine (db-test credentials), and tsc cannot see across
+ * a raw query.
+ *
+ * ⟶ So the comment's claim is now TRUE rather than aspirational: there is one list, and the SELECT
+ *   is built from it. A column added to the constant is selected; one removed stops being selected;
+ *   and `assertViewShape` keeps the constant honest against the view.
+ *
+ * ⛔ `Prisma.raw` is safe HERE and would not be anywhere else: every element of
+ * `PROVIDER_OFFICE_STATE_COLUMNS` is a compile-time literal in an `as const` array in this file, so
+ * nothing from a request reaches it. The assertion below refuses any name that is not a plain
+ * identifier, so a future entry cannot smuggle SQL in through the quoting.
+ */
+const SELECT_LIST = Prisma.raw(
+  PROVIDER_OFFICE_STATE_COLUMNS.map((column) => {
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(column)) {
+      throw new Error(
+        `ProviderOfficeState: the declared column "${column}" is not a plain identifier, and this ` +
+          'list is interpolated into SQL. Every entry must be a bare camelCase name.',
+      );
+    }
+    return `"${column}"`;
+  }).join(', '),
+);
+
 @Injectable()
 export class ProviderOfficeStateRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -161,12 +202,7 @@ export class ProviderOfficeStateRepository {
   async findAll(): Promise<ProviderOfficeStateRow[]> {
     await this.assertViewShape();
     return this.prisma.client.$queryRaw<ProviderOfficeStateRow[]>(Prisma.sql`
-      SELECT
-        "organizationId", "legalName", "legalNameAr", "subdomain",
-        "organizationType", "brokerKind", "organizationStatus", "onboardedAt",
-        "licenseNumber", "licenseIssuedAt", "licenseExpiresAt",
-        "renewalRequestedAt", "mayNotIssue", "licensedBranches", "dormantLicensedBranches",
-        "users", "activeUsers", "lastActivityAt"
+      SELECT ${SELECT_LIST}
       FROM "ProviderOfficeState"
       ORDER BY "legalName" ASC
     `);
