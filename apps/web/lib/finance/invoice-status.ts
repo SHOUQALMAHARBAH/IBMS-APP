@@ -1,5 +1,5 @@
 import type { TranslationKey } from '../i18n/translations';
-import type { InvoiceStatus } from './invoice-api';
+import type { InvoiceStatus, ReceiptMethod } from './invoice-api';
 
 /**
  * The six invoice states, each with its label key. ONE map, because two screens now render it.
@@ -23,4 +23,22 @@ export const INVOICE_STATUS_LABEL_KEY: Record<InvoiceStatus, TranslationKey> = {
   REMITTED: 'financeInvoiceStatusRemitted',
   EXCEPTION_RAISED: 'financeInvoiceStatusExceptionRaised',
   EXCEPTION_RESOLVED: 'financeInvoiceStatusExceptionResolved',
+};
+
+/**
+ * 🔴 THE RECEIPT METHOD's four words — PROMOTED here with decision 167/13, not copied.
+ *
+ * It was a private const in `FinanceSection.tsx`, and the invoice screen renders the same select.
+ * ⛔ A second copy would be a second home for one vocabulary — the `CASE_STATUS_KEY` lesson from
+ * message 49 §23 — so it moved, and `FinanceSection` imports it from here.
+ *
+ * Its own original note stands: the select used to render the raw snake_case token
+ * (`bank_transfer`) as its option text, and these four keys were written for exactly this and
+ * never referenced.
+ */
+export const RECEIPT_METHOD_LABEL_KEY: Record<ReceiptMethod, TranslationKey> = {
+  bank_transfer: 'financeMethodBank',
+  cheque: 'financeMethodCheque',
+  card: 'financeMethodCard',
+  cash: 'financeMethodCash',
 };

@@ -10,6 +10,7 @@ import {
   sumMoney,
 } from '../../common/money.util';
 import { unanimousGroupName } from '../../common/group-name.util';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
 import type { ProfitabilityPolicyRow } from '../../repositories/profitability-policy.repository';
 
 /**
@@ -514,6 +515,80 @@ export interface InvoiceRow {
   createdAt: Date;
   /** Present on a with-cycle read (#32); absent on a bare `Invoice` fetch. */
   receipts?: InvoiceReceiptRow[];
+}
+
+/**
+ * `InvoiceRow` plus the three joins the finance table needs — decision 167/13.
+ *
+ * Declared here as a STRUCTURAL type rather than imported from the repository's Prisma payload,
+ * which is what keeps this file free of Prisma generics and lets a unit test build one by hand. The
+ * repository's `InvoiceWithNames` satisfies it, and `deriveInvoiceListRowView`'s call site is where
+ * the compiler checks that.
+ */
+export interface InvoiceListRow extends InvoiceRow {
+  customer: { id: string; legalName: string };
+  policy: {
+    id: string;
+    policyNumber: string | null;
+    /* `id` beside the pair sources: `resolveInsurerNamePair` answers about NAMES and its input type
+     * carries none, so the id is named here. The table filters by it without the screen resolving
+     * anything. */
+    insurer: Parameters<typeof resolveInsurerNamePair>[0] & { id: string };
+  } | null;
+}
+
+/**
+ * 🔴 ONE ROW OF THE FINANCE INVOICE TABLE — decision 167/13.
+ *
+ * `InvoiceView` and the three display fields below, which is why this EXTENDS rather than replaces:
+ * every figure a finance officer acts on is already derived there (`collectedAmount`,
+ * `outstandingAmount`, `netRemittance`, `fullyCollected`), and re-deriving any of them here would
+ * be a second answer to a money question.
+ *
+ * ⛔ THE THREE ARE DISPLAY ONLY AND NOTHING READS THEM TO DECIDE ANYTHING. They exist because the
+ * screen printed `customerId` and `policyId` as uuids, which is the whole of what decision 167/13
+ * is about.
+ *
+ * ⚠️ `policyNumber` AND THE INSURER PAIR ARE NULLABLE, AND NOT FOR THE SAME REASON.
+ * `Invoice.policyId` is nullable in the schema, so an invoice may have no policy at all and
+ * therefore no insurer — that is the case `recordRemittance` 422s on by name. And a policy's
+ * `policyNumber` is itself nullable until the insurer issues one. ⟶ A screen must render BOTH as
+ * an absence rather than assuming either.
+ */
+export interface InvoiceListRowView extends InvoiceView {
+  /** The customer's legal name. ⚠️ The LATIN one only: `legalNameAr` reaches 20 sites the owner
+   *  has ruled nothing about (message 50), so it stays off this payload. */
+  customerLegalName: string;
+  /** The insurer's number on the policy, or null where the policy has none yet. */
+  policyNumber: string | null;
+  /** The insurer behind the policy — the id so the table can filter by it without the screen
+   *  resolving anything, and the name pair resolved through `resolveInsurerNamePair` so one source
+   *  answers both scripts (decision 150). Null where the invoice carries no policy. */
+  insurerId: string | null;
+  insurerName: string | null;
+  insurerNameAr: string | null;
+}
+
+export function deriveInvoiceListRowView(
+  row: InvoiceListRow,
+): InvoiceListRowView {
+  /*
+   * ONE SOURCE CHOSEN AND BOTH NAMES READ FROM IT — `resolveInsurerNamePair`, never two
+   * COALESCEs. That is the rule `insurerIdentity` learned the hard way and recorded: a per-field
+   * `??` renders one row's Latin name beside another row's Arabic one the first time a source is
+   * half-populated.
+   */
+  const pair = row.policy?.insurer
+    ? resolveInsurerNamePair(row.policy.insurer)
+    : null;
+  return {
+    ...deriveInvoiceView(row),
+    customerLegalName: row.customer.legalName,
+    policyNumber: row.policy?.policyNumber ?? null,
+    insurerId: row.policy?.insurer?.id ?? null,
+    insurerName: pair?.name ?? null,
+    insurerNameAr: pair?.nameAr ?? null,
+  };
 }
 
 export function deriveInvoiceView(row: InvoiceRow): InvoiceView {

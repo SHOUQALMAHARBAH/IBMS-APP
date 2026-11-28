@@ -18,6 +18,39 @@
 export const FINANCE = {
   AR: {
     // ---- Client accounting (#33) ----------------------------------------
+    /*
+     * 🔴 DECISION 167/13 — THE FINANCE INVOICE SCREEN. Ahmad records a receipt and later a
+     * remittance, and until now the only place to do either was the finance block inside
+     * `/opportunities/[id]`, which finance is refused on.
+     *
+     * ⛔ NOT ONE WORD IS INVENTED, and the two the owner gave are BYTE-EXACT from her own row:
+     * «الفواتير», «تسجيل قبض» and «تسجيل توريد» — sliced from
+     * `docs/decision-167-walk-answers-17.md` row ١٦٧/١٣ and re-sliced at test time by
+     * `decision-167.strings.test.ts`.
+     *
+     * Every other word is SLICED from a key already shipping on the finance surface, named here and
+     * pinned byte-for-byte by the same test:
+     *
+     *   invColCustomer  <- caColClient              invColCollected <- financeCollectedLabel
+     *   invColPolicy    <- policyPolicyNumberLabel  invColRemitted  <- financeRemittedLabel
+     *   invColInsurer   <- iaColInsurer             invColStatus    <- financeStatusLabel
+     *   invColTotal     <- financeTotalLabel        invColDue       <- financeDueDateLabel
+     *
+     * ⛔ THEIR OWN KEYS RATHER THAN A SECOND RENDER OF THOSE — decision 157 ruling 2: one key
+     * serving two screens is one key that cannot move, and a reword for the ageing report would
+     * silently change this table.
+     */
+    invHeading: 'الفواتير',
+    invRecordReceiptButton: 'تسجيل قبض',
+    invRecordRemittanceButton: 'تسجيل توريد',
+    invColCustomer: 'العميل',
+    invColPolicy: 'رقم الوثيقة',
+    invColInsurer: 'شركة التأمين',
+    invColTotal: 'المجموع المستحق',
+    invColCollected: 'المُحصَّل',
+    invColRemitted: 'تم تحويله إلى المؤمِّن',
+    invColStatus: 'الحالة',
+    invColDue: 'تاريخ الاستحقاق',
     caHeading: 'حسابات العملاء',
     caIntro:
       'الذمم المدينة موزّعة بأعمارها حسب العميل — كل فاتورة قسط لم تُحصَّل بالكامل بعد، مقسّمة إلى شرائح 30 و60 و90 يوماً بالقياس إلى التاريخ المرجعي. والصفوف مرتّبة من الأسوأ أولاً (الأقدم ديناً أولاً).',
@@ -201,6 +234,19 @@ export const FINANCE = {
     brResumeReconciled: 'مسوّاة',
   },
   EN: {
+    // The English mirror of the invoice screen's words, sliced from the same shipping keys. The
+    // Arabic is the owner's and is pinned; see the Arabic block's header.
+    invHeading: 'Invoices',
+    invRecordReceiptButton: 'Record a receipt',
+    invRecordRemittanceButton: 'Record a remittance',
+    invColCustomer: 'Client',
+    invColPolicy: 'Policy number',
+    invColInsurer: 'Insurer',
+    invColTotal: 'Total due',
+    invColCollected: 'Collected',
+    invColRemitted: 'Remitted to insurer',
+    invColStatus: 'Status',
+    invColDue: 'Due date',
     caHeading: 'Client accounting',
     caIntro:
       'Accounts receivable aged by customer — every premium invoice that has not yet been collected in full, split into 30 / 60 / 90-day buckets against the reference date. Rows are ordered worst-first (oldest debt first).',

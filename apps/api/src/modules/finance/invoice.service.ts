@@ -25,13 +25,16 @@ import type { CreateInvoiceDto } from './dto/create-invoice.dto';
 import type { ListInvoicesQueryDto } from './dto/list-invoices-query.dto';
 import {
   computeInvoiceFigures,
+  deriveInvoiceListRowView,
   deriveInvoiceView,
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
   INVOICE_MAX_DUE_DAYS_AHEAD,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
+  type InvoiceListRowView,
   type InvoiceView,
 } from './finance.config';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -279,16 +282,78 @@ export class InvoiceService {
     return deriveInvoiceView(invoice);
   }
 
-  async list(query: ListInvoicesQueryDto): Promise<InvoiceView[]> {
-    if (!query.policyId && !query.customerId) {
+  /**
+   * 🔴 THREE QUESTIONS, AND THE THIRD IS NEW — DECISION 167/13.
+   *
+   * `policyId` → that policy's invoices · `customerId` → that customer's · neither → the office's
+   * list, filtered and paginated.
+   *
+   * ## What the third branch replaced, and why the old refusal was not a reason
+   *
+   * This used to 400 on «neither» with the sentence *«Scope the read with policyId or customerId
+   * (a book-wide invoice list is the Process 33 ageing report)»*. Measured 2026-11-28: the ageing
+   * report is **one row per CUSTOMER** — an outstanding total, an invoice COUNT, an oldest due date
+   * and buckets — and `/insurer-accounting/payables` is one row per INSURER. Neither carries an
+   * invoice id, so neither can be the surface a finance officer uses to find the invoice they are
+   * recording a receipt against. ⟶ The refusal answered a REPORTING question with a reporting
+   * answer, and decision 167/13 asks an OPERATIONAL one.
+   *
+   * ⚠️ The old sentence is quoted above rather than deleted, because a reader who meets the new
+   * branch deserves to know what it used to refuse and on what grounds.
+   *
+   * ## ⛔ BOTH scopes together is still refused
+   *
+   * Two different questions; answering one silently would be worse than refusing. `/policies` makes
+   * the same refusal for the same reason, and this mirrors it rather than inventing a precedence.
+   */
+  async list(
+    query: ListInvoicesQueryDto,
+  ): Promise<Paginated<InvoiceView | InvoiceListRowView>> {
+    if (query.policyId && query.customerId) {
       throw new BadRequestException(
-        'Scope the read with policyId or customerId (a book-wide invoice list is the Process 33 ageing report).',
+        'Give policyId or customerId, not both — they are two different questions and answering one silently would be worse than refusing.',
       );
     }
-    const rows = query.policyId
-      ? await this.invoices.findManyByPolicyId(query.policyId)
-      : await this.invoices.findManyByCustomerId(query.customerId as string);
-    return rows.map(deriveInvoiceView);
+
+    if (query.policyId || query.customerId) {
+      /*
+       * THE TWO SCOPED BRANCHES ARE UNCHANGED, down to the shape of the rows they return.
+       * `FinanceSection` reads `?policyId=` and expects `InvoiceView`, and widening these to carry
+       * display names would add three joins to a read that renders none of them.
+       *
+       * `wholeSet` rather than a page: both are bounded by construction (one policy, one customer),
+       * and the envelope exists so every branch of this route answers in ONE shape. `/policies`
+       * does exactly this, and its own comment records why: a caller that has to ask which shape it
+       * got is a caller that will get it wrong somewhere.
+       */
+      const rows = query.policyId
+        ? await this.invoices.findManyByPolicyId(query.policyId)
+        : await this.invoices.findManyByCustomerId(query.customerId as string);
+      return wholeSet(rows.map(deriveInvoiceView));
+    }
+
+    /*
+     * THE BOOK-WIDE BRANCH. `open` defaults to TRUE — the screen's purpose is the work still
+     * outstanding, and a finance officer opening it wants what is collectable, not every invoice
+     * the office ever raised. An explicit `open=false` asks for everything.
+     *
+     * ⛔ The filter is applied IN THE QUERY, never after the read: letting the page size decide
+     * what the caller sees is the recorded `DpoWorkspaceService` defect.
+     */
+    const window = pageWindow(query.page, query.pageSize);
+    const { rows, total } = await this.invoices.findPageWithNames({
+      insurerId: query.insurerId,
+      openOnly: query.open !== 'false',
+      search: query.search,
+      skip: window.skip,
+      take: window.take,
+    });
+    return {
+      items: rows.map(deriveInvoiceListRowView),
+      total,
+      page: window.page,
+      pageSize: window.pageSize,
+    };
   }
 
   /** Resolve the commission rate for an invoice: prefer the governed

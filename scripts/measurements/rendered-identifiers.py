@@ -347,7 +347,12 @@ def self_test():
 # above the real count stops being a ratchet and silently re-admits what it just paid for.
 # 10 -> 7 on 2026-11-25: OWNER DECISION 163 RULING 1 removed three at once (the opportunity's
 # title, its programme link and its list card). The DOWN direction below demanded it by name.
-RENDERED_IDENTIFIER_BUDGET = 7
+# 7 -> 6 on 2026-11-28: DECISION 167/13 took the raw `invoiceId` off `/bank-reconciliation`'s
+# exception table, where it had been a bare uuid with nothing in the product able to resolve one
+# for a reader. It names the POLICY now, looked up among the invoices already on the screen, and
+# an exception whose invoice is not among them renders an ABSENCE rather than the id. The DOWN
+# direction demanded this by name on the commit that earned it, for the eleventh batch running.
+RENDERED_IDENTIFIER_BUDGET = 6
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

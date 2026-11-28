@@ -84,7 +84,10 @@ export type WorkflowEntityType =
  *     `endorsementSectionHeading` — TWO SOURCES, because that extensions key's English says
  *     *extensions* rather than endorsements. There is still no `/endorsements` screen; an endorsement
  *     is reached through a policy.
- *   * `Invoice` → «الفواتير» / "Invoices" from `caColInvoices`. There is still no `/invoices` screen.
+ *   * `Invoice` → «الفواتير» / "Invoices" from `caColInvoices`. ⚠️ CORRECTED 2026-11-28: there
+ *     IS an `/invoices` screen now (decision 167/13), and it carries her own «الفواتير» in
+ *     `invHeading`. This label still comes from `caColInvoices` and need not change — but the
+ *     sentence saying no such screen exists had stopped being true.
  *
  * **THE THREE ARE THEIR OWN KEYS, NOT POINTERS AT THOSE SOURCES.** A pointer would make an entity's
  * label hostage to a table column's wording or to a nav entry's second noun. And the values were
@@ -129,7 +132,7 @@ export const WORKFLOW_ENTITY_LABEL = {
   Claim: 'claimsQueueHeading',
   Complaint: 'complaintsHeading',
   RenewalCase: 'renRenewalCases',
-  // No `/invoices` screen; from `caColInvoices`.
+  // ⚠️ `/invoices` EXISTS since decision 167/13; this label still comes from `caColInvoices`.
   Invoice: 'workflowEntityInvoice',
   DataSubjectRequest: 'dsrHeading',
   IncidentReport: 'incHeading',
