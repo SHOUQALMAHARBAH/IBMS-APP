@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { toProviderOfficeStateView } from './provider-office-state.service';
 import type { ProviderOfficeStateRow } from '../../repositories/provider-office-state.repository';
 import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
@@ -293,5 +295,121 @@ describe('item (j): the view carries office state and nothing else', () => {
     expect(view.dormantLicensedBranches).toBe(1);
     expect(view.activeUsers).toBe(8);
     expect(view.lastActivityAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+});
+
+/**
+ * 🔴 THE EXACT KEY SET IN THE e2e IS THE DTO's FIELD LIST — AND IT WAS A SECOND COPY OF IT.
+ * The full walk §A item 10, after CI said so twice.
+ *
+ * ## What happened
+ *
+ * `provider-office-state.e2e-spec.ts` asserts `Object.keys(row).sort()` against a written-out list.
+ * That is the RIGHT shape — it is the only thing that catches a field ADDED to a cross-office
+ * payload without an argument, which a pile of `toHaveProperty` calls cannot.
+ *
+ * But it is a hand-maintained copy of `ProviderOfficeStateView`'s fields, and this batch replaced
+ * `isCurrentlyLapsed` with `standing`. The old name came out of that list and the new one went only
+ * into the present-half loop beside it — so the list said 21 keys where the payload has 22, and
+ * **CI step 27 was the only thing that could say so**, because the api e2e does not run on the
+ * authoring machine (db-test `ibms_app` credentials).
+ *
+ * ⚠️ AND IT TOOK TWO RED RUNS, because the first failure masked it: «missing `enteredUsers`» and
+ * «the exact key set disagrees» are the same list being wrong in two directions at once, and fixing
+ * the first is what uncovered the second.
+ *
+ * ## ⛔ Why the e2e cannot just import the field names
+ *
+ * `ProviderOfficeStateView` is a TypeScript interface. It has no runtime representation, so there is
+ * nothing to iterate. The copy is forced; what is NOT forced is leaving it unchecked.
+ *
+ * ⟶ So this compares the two SOURCE TEXTS, in the unit suite, which runs in both places. It is
+ *   the same remedy applied one layer down in `provider-office-state.repository.ts`, where the
+ *   SELECT had drifted from the declared column list for the same reason — and the same lesson:
+ *   when an exact-set assertion fails, COMPUTE the two lists rather than reading them, because the
+ *   failure cannot tell you which side is wrong.
+ */
+describe('item (j): the e2e key set and the DTO are one list', () => {
+  const SERVICE = join(__dirname, 'provider-office-state.service.ts');
+  const E2E = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'test',
+    'provider-office-state.e2e-spec.ts',
+  );
+
+  /** The DTO's TOP-LEVEL field names. Depth-tracked, because `standing` is a nested object and its
+   *  own `status` / `mayPractise` are not payload keys. */
+  function dtoFields(): string[] {
+    const source = readFileSync(SERVICE, 'utf8');
+    const start = source.indexOf('export interface ProviderOfficeStateView {');
+    expect(start, 'ProviderOfficeStateView was not found').toBeGreaterThan(-1);
+    const body = source.slice(start, source.indexOf('\n}\n', start));
+    const names: string[] = [];
+    let depth = 0;
+    for (const line of body.split('\n').slice(1)) {
+      const match = /^\s*([A-Za-z][A-Za-z0-9]*)\??:/.exec(line);
+      if (match && depth === 0) names.push(match[1]);
+      depth += (line.match(/\{/g) ?? []).length;
+      depth -= (line.match(/\}/g) ?? []).length;
+    }
+    return [...new Set(names)].sort();
+  }
+
+  /** The names inside the e2e's `Object.keys(row).sort()` expectation. */
+  function assertedKeys(): string[] {
+    const source = readFileSync(E2E, 'utf8');
+    const start = source.indexOf('expect(Object.keys(row).sort()).toEqual([');
+    expect(start, 'the exact key set was not found in the e2e').toBeGreaterThan(
+      -1,
+    );
+    const block = source.slice(start, source.indexOf(']);', start));
+    return [...block.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]).sort();
+  }
+
+  it('both lists were located and neither is empty', () => {
+    expect(dtoFields().length).toBeGreaterThan(15);
+    expect(assertedKeys().length).toBeGreaterThan(15);
+  });
+
+  it("the e2e asserts EXACTLY the DTO's fields — both directions", () => {
+    const dto = dtoFields();
+    const asserted = assertedKeys();
+    expect(
+      asserted.filter((key) => !dto.includes(key)),
+      'the e2e asserts keys the DTO does not declare — the assertion would fail on the wire',
+    ).toEqual([]);
+    expect(
+      dto.filter((field) => !asserted.includes(field)),
+      'the DTO declares fields the e2e does not assert — this is the direction that failed in CI twice, and it is the one a cross-office payload cannot afford: a field added without an argument goes unnoticed',
+    ).toEqual([]);
+  });
+
+  it('and the asserted list is SORTED, because it is compared against a sorted one', () => {
+    const asserted = assertedKeys();
+    expect(asserted).toEqual([...asserted].sort());
+  });
+
+  it('⛔ and the three renewal BITS are not payload keys at all', () => {
+    /*
+     * They are on the repository ROW (read from the view) and are INPUTS to the derivation — the
+     * provider is sent the derived `standing`, never the facts behind it. This asserts the
+     * narrowing the migration argues for, on the shape rather than in a comment.
+     */
+    const dto = dtoFields();
+    for (const bit of [
+      'renewalProofOnRecord',
+      'renewalReferenceOnRecord',
+      'renewalDeclarationOnRecord',
+    ]) {
+      expect(
+        dto,
+        `${bit} reached the provider payload; it is an input to the standing derivation and nothing more`,
+      ).not.toContain(bit);
+    }
+    // NON-VACUOUS: the derived field it feeds really is there.
+    expect(dto).toContain('standing');
   });
 });

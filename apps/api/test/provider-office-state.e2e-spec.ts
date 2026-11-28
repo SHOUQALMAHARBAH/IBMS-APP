@@ -411,6 +411,20 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
       'renewalDueBy',
       'renewalFiledOnTime',
       'renewalRequestedAt',
+      /*
+       * 🔴 THE SIX-STATE STANDING — and this list is where my own correction went WRONG once.
+       *
+       * The full walk §A item 10 replaced `isCurrentlyLapsed` with `standing`. I removed the old
+       * name from here and added the new one only to the PRESENT-HALF loop below, so this exact set
+       * said 21 keys where the payload has 22. CI's step 27 is what said so, twice — and the second
+       * reading was the useful one: the first failure («missing `enteredUsers`») masked this, and
+       * fixing that uncovered it.
+       *
+       * ⟶ An EXACT key set is the right shape and it is the one that catches a field ADDED without
+       *   an argument. What it cannot do is tell you which side is wrong, so when it fails, compute
+       *   the two lists rather than reading them.
+       */
+      'standing',
       'subdomain',
       'users',
     ]);
