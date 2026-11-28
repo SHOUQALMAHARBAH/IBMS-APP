@@ -116,6 +116,10 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
   let placementUserId: string;
   let rfqId: string;
   let insurerId: string;
+  /* ADDED with the full walk §A item 6. The recommendation picker calls `?opportunityId=`, which
+   * is a DIFFERENT repository method from the `?rfqId=` branch this file exercised, so proving one
+   * said nothing about the other — and the picker's branch was the broken one. */
+  let opportunityId: string;
   const suffix = Math.random().toString(36).slice(2, 8);
 
   beforeAll(async () => {
@@ -160,6 +164,7 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
     });
     rfqId = rfq.id;
     insurerId = insurer.id;
+    opportunityId = opportunity.id;
   });
 
   afterAll(async () => {
@@ -267,9 +272,16 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
       .get(`/quotations?rfqId=${rfqId}`)
       .set(bearer(placementToken))
       .expect(200);
+    interface Insurer {
+      name?: string;
+      nameAr?: string | null;
+      legalName?: string;
+    }
     interface Chain {
       insurerId: string;
-      insurer: { name?: string; nameAr?: string | null };
+      insurer: Insurer;
+      current: { insurer: Insurer };
+      versions: { insurer: Insurer }[];
     }
     const chainRows = chains.body as Chain[];
     expect(chainRows.length).toBeGreaterThan(0);
@@ -278,6 +290,54 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
         chain.insurer.name,
         'a quotation chain must name the insurer that quoted',
       ).toBeTruthy();
+
+      /*
+       * 🔴 THE FULL WALK §A ITEM 6 — AND THE VERSIONS MUST NAME IT TOO, WHICH THE ASSERTION
+       * ABOVE COULD NOT SEE.
+       *
+       * The chain's own `insurer` was flattened in message 45 §2. `current` and `versions[]` were
+       * not — they went out as the raw Prisma join, carrying `legalName` and no `name`. So
+       * `RecommendationSection.tsx`'s picker, which reads `chain.current.insurer`, printed
+       * «— JOD 1,100.000 · 15% عمولة» with no insurer for months, with this very test green.
+       *
+       * ⛔ BOTH DIRECTIONS. The presence of `name` is asserted AND the absence of `legalName`,
+       * because a spread that flattened on top of the raw row would satisfy the first half while
+       * still shipping the office's internal column names to every caller.
+       */
+      expect(
+        chain.current.insurer.name,
+        'the CURRENT version must name its insurer — the recommendation picker reads this field',
+      ).toBeTruthy();
+      expect(
+        chain.current.insurer.legalName,
+        'the current version still carries the raw Prisma join; it must be flattened through insurerIdentity()',
+      ).toBeUndefined();
+      expect(chain.versions.length).toBeGreaterThan(0);
+      for (const version of chain.versions) {
+        expect(version.insurer.name).toBeTruthy();
+        expect(version.insurer.legalName).toBeUndefined();
+      }
+    }
+
+    /*
+     * ⚠️ AND BY `?opportunityId=`, WHICH IS THE CALL THE PICKER ACTUALLY MAKES. The assertions
+     * above run over `?rfqId=`, the only branch this file ever exercised — and
+     * `listQuotationsForOpportunity` is what `RecommendationSection.tsx` calls. The two branches
+     * are different repository methods, so proving one says nothing about the other.
+     */
+    const opportunityChains = await request(app.getHttpServer())
+      .get(`/quotations?opportunityId=${opportunityId}`)
+      .set(bearer(placementToken))
+      .expect(200);
+    const opportunityRows = opportunityChains.body as Chain[];
+    expect(
+      opportunityRows.length,
+      'the opportunity branch returned nothing, so the assertions below are vacuous',
+    ).toBeGreaterThan(0);
+    for (const chain of opportunityRows) {
+      expect(chain.insurer.name).toBeTruthy();
+      expect(chain.current.insurer.name).toBeTruthy();
+      expect(chain.current.insurer.legalName).toBeUndefined();
     }
   });
 

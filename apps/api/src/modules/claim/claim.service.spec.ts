@@ -1446,6 +1446,57 @@ describe('ClaimService assessment (Process 26)', () => {
       expect(view.adjuster?.surveyCompletedAt).toEqual(new Date(SURVEY_AT));
     });
 
+    /*
+     * 🔴 THE FULL WALK §A ITEM 1 — A STAMP IS ACCEPTED WHILE THE CLAIM IS
+     * `UNDER_ASSESSMENT`, AND THAT IS NOW A LOAD-BEARING PREMISE RATHER THAN AN
+     * INCIDENTAL ONE.
+     *
+     * `ClaimCard.tsx` used to hide the two stamp buttons at `UNDER_ASSESSMENT`, so a claim
+     * submitted with one stamp recorded had no control left anywhere: the verdict needs
+     * both stamps. The screen was fixed to show them for every status this route accepts
+     * — which means the screen now DEPENDS on this route accepting them here.
+     *
+     * The route already did: `recordAdjusterProgress` refuses only once
+     * `isAssessmentConcluded` is true (the three outcomes, SETTLED, CLOSED), and
+     * `UNDER_ASSESSMENT` is none of those. But nothing asserted it, so a later tightening
+     * of this guard would have silently re-broken the screen with every suite green.
+     *
+     * ⛔ This is NOT a test that the verdict gate is satisfiable without both stamps —
+     * `decideAssessment` still demands both, and its own specs below pin that.
+     */
+    it('accepts a stamp while the claim is UNDER_ASSESSMENT — the premise ClaimCard relies on', async () => {
+      const { service } = await documentedClaim();
+      // One stamp, then submit: exactly the state the owner's own database was left in.
+      await service.recordAdjusterProgress(
+        'claim-1',
+        { surveyCompletedAt: SURVEY_AT },
+        claims(),
+      );
+      const submitted = await service.submitForAssessment('claim-1', claims());
+      expect(submitted.status).toBe('UNDER_ASSESSMENT');
+      expect(submitted.assessment.adjusterWorkComplete).toBe(false);
+
+      // The second stamp is still accepted HERE, which is the only way out.
+      const view = await service.recordAdjusterProgress(
+        'claim-1',
+        { investigationCompletedAt: INVESTIGATION_AT },
+        claims(),
+      );
+      expect(view.status).toBe('UNDER_ASSESSMENT');
+      expect(view.assessment.investigationCompletedAt).toEqual(
+        new Date(INVESTIGATION_AT),
+      );
+      expect(view.assessment.adjusterWorkComplete).toBe(true);
+
+      // And the verdict is now reachable — the dead end is gone end to end.
+      const decided = await service.decideAssessment(
+        'claim-1',
+        { outcome: 'APPROVED' },
+        claims(),
+      );
+      expect(decided.status).toBe('APPROVED');
+    });
+
     it('is a no-op when re-sent with the identical value, a 409 on a different one', async () => {
       const { service } = await documentedClaim();
       await service.recordAdjusterProgress(

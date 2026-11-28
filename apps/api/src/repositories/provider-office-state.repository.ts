@@ -44,6 +44,19 @@ export interface ProviderOfficeStateRow {
   licenseIssuedAt: Date | null;
   licenseExpiresAt: Date | null;
   renewalRequestedAt: Date | null;
+  /*
+   * THE THREE RENEWAL BITS — the full walk §A item 10. Decision 128's four conditions need five
+   * licence fields and this view carried two, so the provider screen could not tell a licence
+   * genuinely under renewal from one that merely filed on time and stopped. Three PRESENCE TESTS
+   * close that, and they are bits on purpose: not the proof document, not the Central Bank's
+   * reference number, and not the declaring employee's name or date — see the migration's
+   * argument and the ban list below.
+   *
+   * FALSE, never null, where there is no term: the service reads them only inside a term.
+   */
+  renewalProofOnRecord: boolean;
+  renewalReferenceOnRecord: boolean;
+  renewalDeclarationOnRecord: boolean;
   /** The one regulatory fact — derived in the view, because `RegulatoryAction` is tenant-scoped and
    *  unreachable from another office by RLS. See `PROVIDER_OFFICE_STATE_COLUMNS` below. */
   mayNotIssue: boolean;
@@ -51,6 +64,20 @@ export interface ProviderOfficeStateRow {
   dormantLicensedBranches: number;
   users: number;
   activeUsers: number;
+  /*
+   * THE FULL WALK §A ITEM 11 — HOW MANY ACCOUNTS HAVE EVER BEEN USED.
+   *
+   * The SAME predicate `resolveInvitationTarget` tests (`lastLoginAt IS NOT NULL OR
+   * passwordUpdatedAt IS NOT NULL`), so the screen's re-invite control and the route it calls
+   * cannot disagree. ⚠️ `lastActivityAt` below is NOT that predicate — it is a MAX over
+   * `UserSession`, null for somebody who set their password and never completed a session — which
+   * is why it could not be reused.
+   *
+   * A COUNT, of the same class as `users` and `activeUsers`. ⛔ Not `lastLoginAt` and not
+   * `passwordUpdatedAt`: when a named individual in another office last signed in is that office's
+   * record. The migration bans both by name.
+   */
+  enteredUsers: number;
   /** An OFFICE-level MAX, never a person's. NULL when nobody has ever signed in. */
   lastActivityAt: Date | null;
 }
@@ -75,7 +102,26 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'licenseExpiresAt',
   'renewalRequestedAt',
   /*
-   * THE ONE NEW FACT — register entry 97, closed by the owner's decision.
+   * THE THREE RENEWAL BITS — the full walk §A item 10, decision 167/17.
+   *
+   * *Has the proof been filed*, *did the Central Bank issue a reference*, *has anybody sworn the
+   * standing declaration.* Facts about the renewal of a licence the PROVIDER ITSELF REGISTERED, of
+   * the same class as `licenseNumber`, `licenseExpiresAt` and `renewalRequestedAt` three lines up
+   * — which register entry 97 calls, in terms, «the provider's own registration record».
+   *
+   * ⛔ AND THEY ARE BITS, WHICH IS THE WHOLE NARROWING. Not the proof document id, not the
+   * reference number itself, and not `actorNameShown` / `declaredAt`: the person who swore it is an
+   * employee of ANOTHER office and that is their office's record. `/regulatory-compliance` prints
+   * both names to the office that owns them; the provider gets neither. The migration bans all four
+   * by name.
+   *
+   * The argument for growing this list is in the migration, because this list IS the boundary.
+   */
+  'renewalProofOnRecord',
+  'renewalReferenceOnRecord',
+  'renewalDeclarationOnRecord',
+  /*
+   * THE ONE REGULATORY FACT — register entry 97, closed by the owner's decision.
    *
    * *This office may not issue.* Nothing behind it: not the decision reference, not the basis, not
    * the effective date, not the suspended-until date, not the letter, not the kind. A sanction's
@@ -96,8 +142,52 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'dormantLicensedBranches',
   'users',
   'activeUsers',
+  /* THE FULL WALK §A ITEM 11 — see the row type. A count, the route's own predicate, no person
+   * named and no date exposed. */
+  'enteredUsers',
   'lastActivityAt',
 ] as const;
+
+/**
+ * 🔴 THE SELECT LIST, DERIVED FROM THE DECLARED COLUMNS — IT USED TO BE A SECOND COPY, AND THE
+ * COMMENT ON `PROVIDER_OFFICE_STATE_COLUMNS` CLAIMED IT COULD NOT BE.
+ *
+ * That constant's header says it is «kept as one list used for BOTH, so ‘what we select’ and
+ * ‘what we checked’ cannot diverge — which they would the first time somebody added a column to one
+ * of two lists». There really were two lists: `findAll` named its eighteen columns in a hand-written
+ * SQL string, and nothing compared the two.
+ *
+ * ⚠️ AND THAT IS EXACTLY WHAT HAPPENED, ON THE COMMIT THAT ADDED FOUR COLUMNS (the full walk §A
+ * items 10 and 11). The four names reached the constant, the row type and `assertViewShape` — so the
+ * per-call check passed, because it compares the CONSTANT to the VIEW and never the SELECT to
+ * either — while the SELECT still named eighteen. The rows came back without the fields,
+ * `JSON.stringify` DROPS an undefined key, and the payload simply had no `enteredUsers`. No error,
+ * no 500: a missing field that reads exactly like a field nobody added.
+ *
+ * `provider-office-state.e2e-spec.ts` caught it in CI, which is the only place it could be caught —
+ * the api e2e cannot run on the authoring machine (db-test credentials), and tsc cannot see across
+ * a raw query.
+ *
+ * ⟶ So the comment's claim is now TRUE rather than aspirational: there is one list, and the SELECT
+ *   is built from it. A column added to the constant is selected; one removed stops being selected;
+ *   and `assertViewShape` keeps the constant honest against the view.
+ *
+ * ⛔ `Prisma.raw` is safe HERE and would not be anywhere else: every element of
+ * `PROVIDER_OFFICE_STATE_COLUMNS` is a compile-time literal in an `as const` array in this file, so
+ * nothing from a request reaches it. The assertion below refuses any name that is not a plain
+ * identifier, so a future entry cannot smuggle SQL in through the quoting.
+ */
+const SELECT_LIST = Prisma.raw(
+  PROVIDER_OFFICE_STATE_COLUMNS.map((column) => {
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(column)) {
+      throw new Error(
+        `ProviderOfficeState: the declared column "${column}" is not a plain identifier, and this ` +
+          'list is interpolated into SQL. Every entry must be a bare camelCase name.',
+      );
+    }
+    return `"${column}"`;
+  }).join(', '),
+);
 
 @Injectable()
 export class ProviderOfficeStateRepository {
@@ -112,12 +202,7 @@ export class ProviderOfficeStateRepository {
   async findAll(): Promise<ProviderOfficeStateRow[]> {
     await this.assertViewShape();
     return this.prisma.client.$queryRaw<ProviderOfficeStateRow[]>(Prisma.sql`
-      SELECT
-        "organizationId", "legalName", "legalNameAr", "subdomain",
-        "organizationType", "brokerKind", "organizationStatus", "onboardedAt",
-        "licenseNumber", "licenseIssuedAt", "licenseExpiresAt",
-        "renewalRequestedAt", "mayNotIssue", "licensedBranches", "dormantLicensedBranches",
-        "users", "activeUsers", "lastActivityAt"
+      SELECT ${SELECT_LIST}
       FROM "ProviderOfficeState"
       ORDER BY "legalName" ASC
     `);

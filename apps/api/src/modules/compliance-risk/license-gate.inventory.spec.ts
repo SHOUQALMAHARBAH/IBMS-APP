@@ -60,8 +60,19 @@ const THIS_MODULE = join(API_SRC, 'modules', 'compliance-risk');
  * RLS. `RegulatoryAction` carries `organizationId`, so it is tenant-scoped like everything else and
  * the view exposes none of it.
  *
- * So that screen can derive an office's standing from the TERM DATES ONLY. It cannot see that the
- * CBJ suspended another office, and it will show such an office as holding a current term.
+ * So that screen derives an office's standing WITHOUT THE ACTS. It cannot see that the CBJ
+ * suspended another office, and `mayNotIssue` — one derived bit, the owner's 2026-10-21 ruling —
+ * is the whole of what it is told about that half.
+ *
+ * ⚠️ CORRECTED WITH THE FULL WALK §A ITEM 10: this said «from the TERM DATES ONLY», which was
+ * true and was also the defect. Decision 128 needs FIVE licence fields and the view carried two,
+ * so a term past its expiry that had merely filed on time read as not-lapsed and the screen
+ * printed «ساري» for it. The view now carries three renewal BITS as well — proof on record,
+ * reference on record, declaration on record — and this service calls the SAME
+ * `deriveLicenseStanding` the gate reads. Measured on the owner's database 2026-11-28, one office
+ * disagreeing. ⛔ The acts are still absent, by `NO_ACTS_VISIBLE_HERE`, so one state remains
+ * invisible here: `ENDED_BY_ACT` reads as RENEWAL_PENDING where the office's own screen reads
+ * EXPIRED. That is this exemption, unchanged in kind.
  *
  * FIXING IT IS A CROSS-OFFICE DISCLOSURE DECISION, NOT A REFACTOR: putting a regulator decision in
  * that view would tell every holder of `provider.office-state.read` that a competitor has been

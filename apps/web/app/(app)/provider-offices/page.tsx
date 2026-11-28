@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 import { ApiError } from '../../../lib/auth/api-client';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
@@ -35,9 +36,13 @@ import {
  * and a table that looks like the others but contains competitors' data is the kind of thing
  * somebody screenshots into an email. So the screen states what it is before the first row.
  *
- * ## The three licence states are three states
+ * ## The standing is the licence screen's own, and `null` is a state
  *
- * `isCurrentlyLapsed` is `null` when an office holds NO licence term, and that is not the same as
+ * `standing` is the SIX-VALUE derivation `/regulatory-compliance` prints and the issuance gate
+ * enforces — it replaced an `isCurrentlyLapsed` boolean whose negation this screen printed as
+ * «ساري» for four different renewal states. See the standing cell below.
+ *
+ * `standing` is `null` when the organization holds NO licence term, and that is not the same as
  * lapsed: item (c) made absence BLOCK new business under art. 21/a/9, and an office with nothing on
  * record is further from compliant than one whose licence merely ran out. A screen that collapsed
  * them would tell a provider a licence lapsed when none was ever recorded.
@@ -46,7 +51,7 @@ import {
  *
  * The view's filter widened from `BROKERAGE_OFFICE` to the two registered types, so that item (و)'s
  * invite control could live on the organization row for both. An insurance company has no broker
- * licence BY NATURE, and the mapper turns that into `isCurrentlyLapsed === null` — which for an
+ * licence BY NATURE, and the mapper turns that into `standing === null` — which for an
  * office means "no term on record" and blocks new business under art. 21/a/9.
  *
  * Rendered unbranched, this screen would report a registered insurance company as being in
@@ -93,6 +98,37 @@ const warningStyle: CSSProperties = {
   border: '1px solid var(--border-default)',
   padding: '0.4rem 0.6rem',
 };
+
+/**
+ * 🔴 THE FULL WALK §A ITEM 10 / DECISION 167/17 — ONE WORD PER STANDING, AND THE MAP IS TOTAL.
+ *
+ * `satisfies Record<..., TranslationKey>` over the api's own union, so a seventh standing is a TYPE
+ * ERROR here rather than a BLANK CELL on a cross-office dashboard. That is decision 148's lesson
+ * exactly: `ENUM_LABEL.DocumentCategory` carried 13 keys for 16 members, `translate()` returned
+ * `undefined` and React rendered nothing — and the comment beside it claimed the compiler was
+ * checking coverage when `satisfies Labels<string>` proves nothing of the kind.
+ *
+ * ⛔ THREE OF THE SIX REUSE THIS SCREEN'S EXISTING KEYS and three are new ones carrying the
+ * licence screen's own text, sliced from it. Not one new word — see the header on the new keys in
+ * `translations/compliance-risk.ts`.
+ *
+ * ⚠️ SUSPENDED AND CANCELLED ARE UNREACHABLE HERE and are mapped anyway, because the union is
+ * closed and a partial map is the defect above. The provider's derivation is given no regulatory
+ * acts (register entry 97, the owner's 2026-10-21 ruling), and only an act produces either status;
+ * `providerOfficesMayNotIssue` beside the cell is the one bit that reports that half.
+ * `provider-standing-words.test.ts` pins both the slices and the unreachability.
+ */
+const PROVIDER_STANDING_LABEL = {
+  NO_TERM_ON_RECORD: 'providerOfficesNoTermOnRecord',
+  ACTIVE: 'providerOfficesInGoodStanding',
+  RENEWAL_PENDING: 'providerOfficesStandingRenewalPending',
+  EXPIRED: 'providerOfficesLapsed',
+  SUSPENDED: 'providerOfficesStandingSuspended',
+  CANCELLED: 'providerOfficesStandingCancelled',
+} satisfies Record<
+  NonNullable<ProviderOfficeState['standing']>['status'],
+  TranslationKey
+>;
 
 function day(iso: string | null): string {
   return iso === null ? '—' : iso.slice(0, 10);
@@ -326,27 +362,47 @@ export default function ProviderOfficesPage() {
                 </td>
                 <td style={cell}>{isOffice ? day(office.licenseExpiresAt) : '—'}</td>
                 <td style={cell} data-standing={office.subdomain}>
-                  {/* FOUR states now. For an OFFICE: three, and `null` means no term on record,
-                      which blocks new business under art. 21/a/9 and is a different fact from a
-                      lapsed licence. For an INSURANCE COMPANY: NONE OF THEM — a company has no
-                      broker licence by nature, so rendering the office states here would report a
-                      registered company as being in regulatory default. That is the false finding
-                      the view's old BROKERAGE_OFFICE filter existed to prevent. */}
+                  {/*
+                    🔴 THE FULL WALK §A ITEM 10 / DECISION 167/17 — THE SAME STANDING WORD THE
+                    LICENCE SCREEN PRINTS, FROM THE SAME FUNCTION.
+
+                    This read a four-way branch over `isCurrentlyLapsed`, the DATE-ONLY lapse, and
+                    named its negation «ساري». Past expiry that boolean is `!renewalFiledOnTime`,
+                    so `false` covered FOUR renewal states — NO_PROOF, AWAITING_DECLARATION,
+                    ENDED_BY_ACT and UNDER_STUDY — and three of those are EXPIRED with
+                    `mayPractise: false`. Measured on the owner's database 2026-11-28: office B's
+                    licence expired 2025-12-31 and this cell read «ساري» while
+                    `/regulatory-compliance` read «قيدَ التجديد».
+
+                    `compliance-risk.ts` states the rule decision 128 set, and it is quoted there:
+                    «ساري» belongs to a term INSIDE its printed dates and to nothing else.
+
+                    An INSURANCE COMPANY still takes NONE of the states — a company has no broker
+                    licence by nature, so rendering them would report a registered company as being
+                    in regulatory default, the false finding the view's old BROKERAGE_OFFICE filter
+                    existed to prevent. And `standing == null` is LOOSE on purpose, the lesson
+                    `/regulatory-compliance`'s own cell paid for: a field the api stopped sending
+                    arrives as `undefined`, and a strict `=== null` would send it into the label map
+                    and take the whole table down.
+                  */}
                   {!isOffice
                     ? t('providerOfficesLicenceNotApplicable')
-                    : office.isCurrentlyLapsed === null
+                    : office.standing == null
                       ? t('providerOfficesNoTermOnRecord')
-                      : office.isCurrentlyLapsed
-                        ? t('providerOfficesLapsed')
-                        : t('providerOfficesInGoodStanding')}
+                      : t(PROVIDER_STANDING_LABEL[office.standing.status])}
                   {/*
                     THE ONE REGULATORY FACT — register entry 97, closed. *This office may not
                     issue.*
 
-                    BESIDE the term states rather than folded into them, and that is the decision:
-                    `isCurrentlyLapsed` is the term ARITHMETIC and this is a REGULATOR'S ACT.
-                    Collapsing them would make a suspension on a perfectly current licence read as
-                    an expiry, which is a false statement about why the office is stopped.
+                    BESIDE the standing rather than folded into it, and that is the decision: the
+                    standing is derived from the TERM and its renewal, and this is a REGULATOR'S
+                    ACT. Collapsing them would make a suspension on a perfectly current licence
+                    read as an expiry, which is a false statement about why the office is stopped.
+
+                    ⚠️ AND IT IS THE ONLY WAY THAT HALF CAN BE REPORTED HERE. The provider's
+                    standing is derived with NO ACTS — register entry 97 — so `standing.status`
+                    can never be SUSPENDED or CANCELLED however suspended the office is. This line
+                    is the one bit the owner granted for it.
 
                     Nothing behind it is here, and nothing should be: not the decision reference,
                     the basis, the dates, the letter or the kind. The provider neither corrects a
@@ -393,14 +449,96 @@ export default function ProviderOfficesPage() {
                     : day(office.lastActivityAt)}
                 </td>
                 <td style={cell} data-administrator={office.subdomain}>
-                  {/* THE INVITATION STATE, which was previously answerable only by querying the
-                      database. `users > 0` is the honest test: the invite route itself refuses once
-                      the organization has ANY account, so "has an account" and "cannot be invited"
-                      are the same fact and must not be two different sentences. */}
+                  {/*
+                    THE INVITATION STATE, which was previously answerable only by querying the
+                    database.
+
+                    🔴 THE FULL WALK §A ITEM 11 — THIS TESTED `users > 0`, AND THE COMMENT
+                    EXPLAINING WHY HAD STOPPED BEING TRUE.
+
+                    It said «`users > 0` is the honest test: the invite route itself refuses once the
+                    organization has ANY account, so ‘has an account’ and ‘cannot be invited’ are the
+                    same fact». They are not, and have not been since `resolveInvitationTarget`
+                    gained its REINVITE branch: the route refuses once somebody has ENTERED.
+
+                    So the state a missing provider mailbox leaves — account created, invitation
+                    never delivered, nobody able to sign in — read «له حساب» with NO control, while
+                    the api would have accepted the re-invite its own error message recommends
+                    («أعد الدعوة — تُصدر رابطاً جديداً ولا تُنشئ حساباً ثانياً»). Measured on the
+                    owner's dev database 2026-11-28: one office sits in exactly that state.
+
+                    ⟶ THREE STATES NOW, and the middle one is keyed on the ROUTE'S OWN PREDICATE
+                      (`enteredUsers`), so the control cannot be a 403. ⛔ `lastActivityAt === null`
+                      would NOT do: it is a session MAX and is null for somebody who set their
+                      password through the link and never signed in, which the route counts as
+                      entered.
+
+                    ⛔ NOT ONE NEW WORD. The column takes `providerOfficesInviteFailed`
+                    («لم تُرسل الدعوة» / «The invitation was not sent»), which already ships as a
+                    standalone phrase for exactly this fact, and the control keeps
+                    `providerOfficesInviteOpen` — the SAME label, because it is the same act on the
+                    same route, inviting the first administrator, and that account is still the first
+                    administrator. ⚠️ «إعادة إرسال الدعوة» itself ships NOWHERE; a label that
+                    distinguishes a repeat from a first attempt is hers to give.
+                  */}
                   {office.users > 0 ? (
-                    <span data-has-administrator={office.subdomain}>
-                      {t('providerOfficesHasAdministrator')}
-                    </span>
+                    <>
+                      <span data-has-administrator={office.subdomain}>
+                        {t('providerOfficesHasAdministrator')}
+                      </span>
+                      {/*
+                        🔴 THE WAY BACK IN, AND THE COLUMN'S WORD IS UNCHANGED — THE FULL WALK
+                        §A ITEM 11.
+
+                        ⚠️ MY FIRST VERSION OF THIS PRINTED «لم تُرسل الدعوة» HERE AND THAT WAS A
+                        FACT THE SCREEN DOES NOT KNOW. `enteredUsers === 0` means nobody has used
+                        the account — which is equally true of an invitation that ARRIVED and has
+                        not been opened yet. `invitation.outcome` is returned by the POST and shown
+                        in the banner; it is stored nowhere and is not on this list's payload, so a
+                        row cannot say whether delivery failed. The existing test caught it: the
+                        row stopped saying «has an account» for an office that has one.
+
+                        ⟶ So the column says the thing that IS known — an account exists — and
+                          the «last used» column two cells to the left already reads «lم يُستخدم
+                          بعد» / «never used» for exactly these offices. What was missing was never
+                          the sentence; it was the CONTROL.
+
+                        ⚠️ AND A SENTENCE FOR «an account exists and nobody has entered it» IS AN
+                        EMPTY ARABIC CELL, reported rather than composed. So is
+                        «إعادة إرسال الدعوة»: the control keeps `providerOfficesInviteOpen`, which is
+                        the same act on the same route — that account IS still the first
+                        administrator — and a label distinguishing a repeat from a first attempt is
+                        hers to give.
+
+                        ⛔ `office.users === 1` AS WELL AS `canInvite`, matching the route's branch
+                        exactly rather than nearly: `resolveInvitationTarget` returns REINVITE only
+                        for EXACTLY ONE never-entered account and refuses with two or more, because
+                        «choosing WHICH of several to keep is not a decision this route can make».
+                        Offered on `enteredUsers === 0` alone it could only 409.
+                      */}
+                      {canInvite &&
+                      office.enteredUsers === 0 &&
+                      office.users === 1 ? (
+                        <>
+                          {' '}
+                          <button
+                            type="button"
+                            data-invite-open={office.subdomain}
+                            onClick={() =>
+                              inviteFor?.organizationId ===
+                              office.organizationId
+                                ? setInviteFor(null)
+                                : openInvite(office)
+                            }
+                          >
+                            {inviteFor?.organizationId ===
+                            office.organizationId
+                              ? t('providerOfficesInviteCancel')
+                              : t('providerOfficesInviteOpen')}
+                          </button>
+                        </>
+                      ) : null}
+                    </>
                   ) : (
                     <>
                       <span data-no-account={office.subdomain}>

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { INSURANCE_LINE_NAME_INCLUDE } from './insurance-line-names';
 import type { Prisma, Quotation } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NormalizedQuotationTerms } from '../modules/quotation/quotation.config';
@@ -8,6 +9,19 @@ const RFQ_CONTEXT_SELECT = {
   id: true,
   opportunityId: true,
   insuranceLine: true,
+  /*
+   * 🔴 THE FULL WALK §A ITEM 6 — THE LINE'S ARABIC NAME, which this read never sent.
+   *
+   * The recommended-quote picker on `/opportunities/[id]` lists one option per chain, and an
+   * opportunity carries one RFQ PER LINE — so two options can differ by nothing but the line. It
+   * printed the stored English string in an otherwise Arabic form.
+   *
+   * ⛔ The screen cannot resolve it: `GET /insurance-lines` is gated on five codes and
+   * `quotation.read` is none of them, so the name travels WITH the record. That is the mechanism
+   * `insurance-line-names.ts` records and the one `recommendation.service.ts` already uses on this
+   * very screen's other half — ⛔ not a second lookup, and ⛔ no gate widened.
+   */
+  ...INSURANCE_LINE_NAME_INCLUDE,
 } as const;
 
 /** A quotation row with the insurer's identity and its RFQ's context

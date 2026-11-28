@@ -71,10 +71,14 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
   // CONVERTED_TO_PROSPECT must also create the linked Prospect row (backlog
   // Part C #2) — the generic transition endpoint rejects this target
   // directly (lead.service.ts), so this move goes to the qualification
-  // screen instead of a plain status-change button. leadFullName is only a
-  // display-prefill hint for that screen's form (see prospects/new/page.tsx).
+  // screen instead of a plain status-change button.
+  //
+  // 🔴 THE FULL WALK §A ITEM 8 — THE ID ONLY. This used to append
+  // `&leadFullName=${lead.fullName}`, putting a person's name in the address bar, the browser
+  // history and the referrer of everything the next page loads. The destination reads the record
+  // by id through `lead.list.read`, which is the same code this board already holds.
   function goToProspectConversion(lead: Lead) {
-    const params = new URLSearchParams({ leadId: lead.id, leadFullName: lead.fullName });
+    const params = new URLSearchParams({ leadId: lead.id });
     router.push(`/prospects/new?${params.toString()}`);
   }
 
