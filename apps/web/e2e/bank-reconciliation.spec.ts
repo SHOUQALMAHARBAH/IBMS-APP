@@ -68,8 +68,18 @@ test("lists open exceptions with the exact variance amount", async ({
   await expect(page.getByRole("cell", { name: "5000.000" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Open", exact: true })).toBeVisible();
 
-  // Finance sees the detect form + the per-row actions
-  await expect(page.getByLabel("Statement lines")).toBeVisible();
+  /*
+   * 🔴 CORRECTED, NOT DELETED — DECISION 167/13 / MESSAGE B §1 ITEM 2.
+   *
+   * This asserted `getByLabel("Statement lines")`, the TEXTAREA that asked a finance officer to
+   * paste `invoiceId, amount` lines — with a literal uuid as its placeholder. It was right about
+   * the screen as it stood, and the screen it described is the defect: there was no way for an
+   * officer to obtain those uuids.
+   *
+   * ⟶ The insurer is PICKED now and its open invoices listed, so what is asserted is the picker.
+   *   The per-row actions assertion is unchanged.
+   */
+  await expect(page.getByLabel("Insurer")).toBeVisible();
   await expect(page.getByRole("button", { name: "Investigate" })).toBeVisible();
 });
 

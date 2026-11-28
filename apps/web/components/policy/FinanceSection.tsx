@@ -5,12 +5,7 @@ import {
   createInvoice,
   downloadInvoiceDocument,
   listInvoicesForPolicy,
-  recordReceipt,
-  recordRemittance,
-  reconcileInvoice,
-  RECEIPT_METHOD_OPTIONS,
   type Invoice,
-  type ReceiptMethod,
 } from "../../lib/finance/invoice-api";
 import {
   listPoliciesForOpportunity,
@@ -23,20 +18,9 @@ import {
   quoteFieldStyle,
 } from "../quotation/quotation.styles";
 import { useLanguage } from "../../lib/i18n/language-context";
+import { InvoiceCollectionControls } from '../finance/InvoiceCollectionControls';
 import { formatDate, formatMoney } from "../../lib/i18n/format";
-import type { TranslationKey } from "../../lib/i18n/translations";
 import { INVOICE_STATUS_LABEL_KEY } from '../../lib/finance/invoice-status';
-
-/** The select rendered the raw snake_case token (`bank_transfer`) as its own
- *  option text. These four keys were written for exactly this and never
- *  referenced — the same defect `POLICY_STATUS_LABEL_KEY` exists to prevent. */
-
-const RECEIPT_METHOD_LABEL_KEY: Record<ReceiptMethod, TranslationKey> = {
-  bank_transfer: "financeMethodBank",
-  cheque: "financeMethodCheque",
-  card: "financeMethodCard",
-  cash: "financeMethodCash",
-};
 
 interface Props {
   opportunityId: string;
@@ -44,6 +28,14 @@ interface Props {
   canInvoice: boolean;
   /** Finance — drive the collection cycle (receipt / reconcile / remittance). */
   canCollect: boolean;
+  /**
+   * 🔴 `remittance.record` — ADDED with decision 167/13, and it closes a dead control.
+   *
+   * `canCollect` is `receipt.record`, and the remit route requires a DIFFERENT code. This screen
+   * gated all three controls on the one boolean, so a holder of `receipt.record` alone was shown a
+   * remit button that could only 403 — the dead control `frontend-ux-directive.md` rules out.
+   */
+  canRemit: boolean;
 }
 
 /** The section only makes sense once a policy exists with an issued premium —
@@ -52,6 +44,7 @@ export function FinanceSection({
   opportunityId,
   canInvoice,
   canCollect,
+  canRemit,
 }: Props) {
   const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null>(null);
@@ -62,9 +55,6 @@ export function FinanceSection({
   const [taxAmount, setTaxAmount] = useState("0.000");
   const [feesAmount, setFeesAmount] = useState("0.000");
   const [dueDate, setDueDate] = useState("");
-  const [receiptMethod, setReceiptMethod] = useState<string>(
-    RECEIPT_METHOD_OPTIONS[0],
-  );
   /*
    * ROW 21 — REQUIRED. Owner decision, 2026-11-07.
    *
@@ -86,8 +76,6 @@ export function FinanceSection({
    * enforces it. Reported rather than fixed, because making these a real form is a change to five
    * controls and not to one.
    */
-  const [instalmentAmount, setInstalmentAmount] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -366,120 +354,36 @@ export function FinanceSection({
         </div>
       ) : null}
 
-      {invoice && canCollect && invoice.status === "INVOICED" ? (
-        <div
-          style={{
-            display: "grid",
-            gap: "0.5rem",
-            maxWidth: "22rem",
-            marginTop: "0.75rem",
-          }}
-        >
-          <label>
-            {t("financeReceivedViaLabel")}
-            <select
-              value={receiptMethod}
-              onChange={(e) => setReceiptMethod(e.target.value)}
-              style={{ width: "100%" }}
-            >
-              {RECEIPT_METHOD_OPTIONS.map((m) => (
-                <option key={m} value={m}>
-                  {t(RECEIPT_METHOD_LABEL_KEY[m])}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t("financeInstalmentAmountLabel")}
-            <input
-              value={instalmentAmount}
-              onChange={(e) => setInstalmentAmount(e.target.value)}
-              inputMode="decimal"
-              required
-              aria-required="true"
-              /* The outstanding balance, which is now INFORMATION rather than a default: with the
-                 field required, a blank cannot be submitted, so showing the balance tells the
-                 officer what is owed without offering to assume it. */
-              placeholder={invoice.outstandingAmount}
-              style={{ width: "100%" }}
-            />
-          </label>
-          <label>
-            {t("financePaymentReferenceLabel")}
-            <input
-              value={paymentReference}
-              onChange={(e) => setPaymentReference(e.target.value)}
-              required
-              aria-required="true"
-              style={{ width: "100%" }}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              void runStep(async () => {
-                const result = await recordReceipt(invoice.id, {
-                  // No fallback. A blank amount cannot reach the server, because the button above
-                  // is disabled until one is typed — see the state declaration for the decision.
-                  amount: instalmentAmount.trim(),
-                  method: receiptMethod,
-                  // Mandatory: it is the idempotency key. Without it a
-                  // double-click books the client's payment twice.
-                  reference: paymentReference.trim(),
-                });
-                setInstalmentAmount("");
-                setPaymentReference("");
-                return result;
-              }, t("financeCreateError"))
-            }
-            disabled={
-              busy ||
-              paymentReference.trim().length === 0 ||
-              instalmentAmount.trim().length === 0
-            }
-            style={buttonStyle}
-          >
-            {t("financeRecordCollectionButton")}
-          </button>
-        </div>
-      ) : null}
+      {/*
+        🔴 THE THREE COLLECTION CONTROLS MOVED TO `InvoiceCollectionControls` — DECISION 167/13.
+        «ريوز النماذج»: the owner's condition is that the finance invoice screen reuses the forms
+        and strings this component already shipped, as a SHARED component, so the two screens cannot
+        drift. This is the other call site.
 
-      {invoice && canCollect && invoice.status === "COLLECTED" ? (
-        <button
-          type="button"
-          onClick={() =>
-            void runStep(
-              () => reconcileInvoice(invoice.id),
-              t("financeCreateError"),
-            )
-          }
-          disabled={busy}
-          style={{ ...buttonStyle, marginTop: "0.75rem" }}
-        >
-          {t("financeReconcileButton")}
-        </button>
-      ) : null}
+        ⛔ NOT ONE WORD CHANGED HERE. The three label keys are passed in, so this screen keeps
+        «تسجيل تحصيل», «تسوية الأموال المستلمة» and «تحويل {amount} إلى المؤمِّن» — including the
+        AMOUNT on the remit button, which decision 167/13's plain «تسجيل توريد» does not carry and
+        which she did not ask to remove from a control that moves money.
 
-      {invoice && canCollect && invoice.status === "RECONCILED" ? (
-        <button
-          type="button"
-          onClick={() =>
-            void runStep(
-              () => recordRemittance(invoice.id),
-              t("financeCreateError"),
-            )
-          }
-          disabled={busy}
-          style={{ ...buttonStyle, marginTop: "0.75rem" }}
-        >
-          {t("financeRemitButton", {
-            amount: formatMoney(
-              invoice.netRemittance,
-              language,
-              invoice.currency,
-            ),
-          })}
-        </button>
+        🔴 AND THE REMIT CONTROL IS GATED ON ITS OWN CODE NOW. It read `canCollect`, which this
+        screen's parent computes from `receipt.record` — while the route requires
+        `remittance.record`. A holder of one and not the other saw a button that could only 403.
+        Measured 2026-11-28: the demo seed's FINANCE role holds both, so it never bit there; a real
+        new office holds neither until it grants them (decision 131), so a custom role reaches it.
+        `canRemit` is threaded from the page beside `canCollect`.
+      */}
+      {invoice ? (
+        <InvoiceCollectionControls
+          invoice={invoice}
+          canRecordReceipt={canCollect}
+          canRecordRemittance={canRemit}
+          onDone={load}
+          busy={busy}
+          run={runStep}
+          receiptLabelKey="financeRecordCollectionButton"
+          reconcileLabelKey="financeReconcileButton"
+          remitLabelKey="financeRemitButton"
+        />
       ) : null}
     </section>
   );

@@ -188,10 +188,19 @@ async function mockScreen(page: Page, entries: unknown[]) {
     "http://localhost:4000/recommendations?opportunityId=opp-1",
     "http://localhost:4000/commission/agreements**",
     "http://localhost:4000/consent-records**",
-    "http://localhost:4000/invoices**",
   ]) {
     await page.route(url, (route) => route.fulfill({ status: 200, json: [] }));
   }
+  /* DECISION 167/13 — `GET /invoices` answers in an ENVELOPE on every branch now, as `/policies`
+     does. ⛔ The screen is NOT made defensive about it: a `?? []` would hide a wire shape the api
+     is asserted to send (the message-47 §33 lesson), so the FIXTURE is what was wrong — it crashed
+     the opportunity page into «This page couldn't load». */
+  await page.route("http://localhost:4000/invoices**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { items: [], total: 0, page: 0, pageSize: 50 },
+    }),
+  );
   await page.route(
     "http://localhost:4000/policies?opportunityId=opp-1",
     (route) => route.fulfill({ status: 200, json: paged([POLICY]) }),

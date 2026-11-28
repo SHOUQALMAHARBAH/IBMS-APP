@@ -151,6 +151,17 @@ export default function OpportunityDetailPage() {
   const canDisburseRefund = hasPermission(user, 'refund.disburse');
   const canInvoice = hasPermission(user, 'invoice.create');
   const canCollect = hasPermission(user, 'receipt.record');
+  /*
+   * 🔴 DECISION 167/13 — `remittance.record` IS ITS OWN CODE, and this screen used to gate the
+   * remit button on `canCollect` above.
+   *
+   * `POST /invoices/:id/remittance` requires `remittance.record`; the receipt and the reconcile
+   * step require `receipt.record`. Measured 2026-11-28: the demo seed's FINANCE role holds both, so
+   * it never bit there — and a real new office holds NEITHER until it grants them (decision 131),
+   * so a custom role with one and not the other reaches it the day an office defines one, and sees
+   * a button that can only 403.
+   */
+  const canRemit = hasPermission(user, 'remittance.record');
   const canCalculateCommission = hasPermission(user, 'commission.calculate');
   const canApproveOverride = hasPermission(user, 'commission-override.approve');
   const canNotifyClaim = hasPermission(user, 'claim.notify');
@@ -333,6 +344,7 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canInvoice={canInvoice}
             canCollect={canCollect}
+            canRemit={canRemit}
           />
 
           <CommissionSection

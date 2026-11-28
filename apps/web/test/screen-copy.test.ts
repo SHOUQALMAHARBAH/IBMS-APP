@@ -222,7 +222,7 @@ describe('every screen speaks both languages (rule 6)', () => {
    opportunity's title, its programme link and its list card all printed eight characters of a
    uuid. The gate's DOWN direction demanded this figure BY NAME, which is the tenth batch
    running that it has caught its own author. */
-const RENDERED_IDENTIFIER_BUDGET = 7;
+const RENDERED_IDENTIFIER_BUDGET = 6;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

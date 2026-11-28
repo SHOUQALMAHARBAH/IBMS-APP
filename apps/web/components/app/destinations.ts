@@ -256,6 +256,20 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
     icon: 'coins',
     items: [
       {
+        /*
+         * DECISION 167/13 — the finance invoice screen. FIRST in the group and beside
+         * `/client-accounting`, which carries the same code: the two are the operational and the
+         * reporting view of the same book, and this is the one a finance officer opens to work.
+         *
+         * ⛔ `client-accounting.read` is what the SCREEN and the ROUTE enforce, never widened to
+         * match the link — the ROW 30 rule below: a link whose only function is to tell somebody
+         * no is worse than no link.
+         */
+        href: '/invoices',
+        labelKey: 'navInvoices',
+        permissions: ['client-accounting.read'],
+      },
+      {
         href: '/client-accounting',
         labelKey: 'navClientAccounting',
         permissions: ['client-accounting.read'],

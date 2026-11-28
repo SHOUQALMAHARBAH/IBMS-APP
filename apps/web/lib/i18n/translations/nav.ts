@@ -32,6 +32,10 @@ export const NAV = {
     navRfqs: 'طلبات عروض الأسعار',
     navPolicies: 'الوثائق',
     navClaimsAnalytics: 'تحليلات المطالبات',
+    /* DECISION 167/13 — «الفواتير», her own word, sliced from row ١٦٧/١٣ and pinned by
+     * `decision-167.strings.test.ts` alongside `invHeading`. ⛔ Its own key rather than a second
+     * render of `invHeading`: a nav label and a page title are two sites (decision 157 ruling 2). */
+    navInvoices: 'الفواتير',
     navClientAccounting: 'حسابات العملاء',
     navInsurerAccounting: 'حسابات شركات التأمين',
     navCommissionRates: 'معدلات العمولة',
@@ -186,6 +190,7 @@ export const NAV = {
     navRfqs: 'RFQs',
     navPolicies: 'Policies',
     navClaimsAnalytics: 'Claims analytics',
+    navInvoices: 'Invoices',
     navClientAccounting: 'Client accounting',
     navInsurerAccounting: 'Insurer accounting',
     navCommissionRates: 'Commission rates',

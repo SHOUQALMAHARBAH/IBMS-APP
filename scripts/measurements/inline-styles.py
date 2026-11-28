@@ -51,7 +51,12 @@ SITE = re.compile(r"style=\{\{")
 # unfocusable scroller around a focusable one is batch 3's keyboard trap one level out, and
 # axe is silent because the outer div rarely overflows. 16 more sites across 9 files still
 # do it — counted, not swept.
-SCREEN_BUDGET = 1057
+# 1057 -> 1055 on 2026-11-28: DECISION 167/13. `/bank-reconciliation`'s textarea (a monospace
+# `style={{}}` plus its wrapper) went with the uuid-paste form it belonged to, and the three
+# collection forms moved out of `FinanceSection` into `components/finance/InvoiceCollectionControls`
+# — which is OUTSIDE these roots' screen count only for the wrapper that went, not for the forms
+# themselves. The DOWN direction demanded this by name on the commit that earned it.
+SCREEN_BUDGET = 1055
 # 1099 -> 1083: the sixteen redundant table scrollers (finding 7). `Table` has carried its own
 # `overflow-x: auto` with `tabIndex={0}` since batch 3, so an UNFOCUSABLE wrapper around it was
 # batch 3's keyboard trap one level out — and axe cannot see it, because it raises

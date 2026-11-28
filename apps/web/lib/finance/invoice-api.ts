@@ -75,8 +75,75 @@ export interface CreateInvoiceInput {
   dueDate: string;
 }
 
-export function listInvoicesForPolicy(policyId: string): Promise<Invoice[]> {
-  return apiGet(`/invoices?policyId=${encodeURIComponent(policyId)}`);
+/**
+ * 🔴 ONE ROW OF THE FINANCE INVOICE TABLE — decision 167/13.
+ *
+ * `Invoice` plus the three display fields the server resolves, because the table needs names where
+ * the invoice carries uuids. ⛔ Nothing reads them to decide anything.
+ *
+ * ⚠️ `policyNumber` AND THE INSURER FIELDS ARE NULLABLE, for two different reasons.
+ * `Invoice.policyId` is nullable in the schema — such an invoice has no policy and therefore no
+ * insurer, which is the case the remittance route 422s on by name — and a policy's number is
+ * itself null until the insurer issues one. A screen must render BOTH as an absence.
+ */
+export interface InvoiceListRow extends Invoice {
+  customerLegalName: string;
+  policyNumber: string | null;
+  insurerId: string | null;
+  insurerName: string | null;
+  insurerNameAr: string | null;
+}
+
+/** The envelope every branch of `GET /invoices` answers in, matching `/policies`. */
+export interface PaginatedInvoices<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * 🔴 THE OFFICE'S INVOICE LIST — decision 167/13, and the branch that used to 400.
+ *
+ * `GET /invoices` with no policy/customer scope used to refuse, on the grounds that «a book-wide
+ * invoice list is the Process 33 ageing report». It is not: that report is one row per CUSTOMER
+ * with an invoice COUNT and no invoice id, so it could not be the surface a finance officer uses to
+ * find the invoice they are collecting on.
+ *
+ * `open` defaults to TRUE on the server — the screen's purpose is the work still outstanding — so
+ * it is sent only to ASK FOR EVERYTHING, which keeps the common request's URL short and lets the
+ * server's own default decide.
+ */
+export function listInvoices(
+  params: {
+    insurerId?: string;
+    search?: string;
+    page?: number;
+    includeSettled?: boolean;
+  } = {},
+): Promise<PaginatedInvoices<InvoiceListRow>> {
+  const qs = new URLSearchParams();
+  if (params.insurerId) qs.set('insurerId', params.insurerId);
+  if (params.search) qs.set('search', params.search);
+  // Sent only past the first page, for the reason `listPolicies` records: the common request keeps
+  // the URL it has always had.
+  if (params.page) qs.set('page', String(params.page));
+  if (params.includeSettled) qs.set('open', 'false');
+  const suffix = qs.toString();
+  return apiGet(`/invoices${suffix ? `?${suffix}` : ''}`);
+}
+
+export async function listInvoicesForPolicy(
+  policyId: string,
+): Promise<Invoice[]> {
+  /* Scoped to one policy, so a handful of rows come back — but the endpoint returns the same
+     envelope on EVERY branch now (decision 167/13), and unwrapping it here keeps that detail out of
+     the caller that only ever wanted the rows. `listPoliciesForOpportunity` does exactly this, for
+     the same reason. */
+  const page: PaginatedInvoices<Invoice> = await apiGet(
+    `/invoices?policyId=${encodeURIComponent(policyId)}`,
+  );
+  return page.items;
 }
 
 export function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
