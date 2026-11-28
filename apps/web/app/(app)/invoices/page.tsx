@@ -110,7 +110,17 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (!user || !canRead) return;
-    void load();
+    /*
+     * ⚠️ THE ASYNC IIFE IS NOT DECORATION — `react-hooks/set-state-in-effect` refused
+     * `void load()` here, and CI's whole-workspace lint is where it surfaced because I had linted
+     * only the files I changed. `load` calls `setPage`, so a direct call makes that a SYNCHRONOUS
+     * setState in an effect body; inside the IIFE it is a callback, which is the shape the rule
+     * asks for and the shape every sibling screen already uses (`/bank-reconciliation`,
+     * `/client-accounting`, `/customers/[id]`).
+     */
+    void (async () => {
+      await load();
+    })();
   }, [user, canRead, load]);
 
   /** The caller-owned runner the shared controls take. Mirrors `FinanceSection.runStep` so the two

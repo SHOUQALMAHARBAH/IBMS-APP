@@ -417,7 +417,15 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .get(`/invoices?policyId=${policyId}`)
       .set(bearer(fin.accessToken))
       .expect(200);
-    expect((listed.body as InvoiceBody[]).map((r) => r.id)).toEqual([inv.id]);
+    /*
+     * ⚠️ THE ENVELOPE — corrected with decision 167/13. This read
+     * `(listed.body as InvoiceBody[]).map(...)` against a bare array; every branch of the route now
+     * answers in ONE shape (`/policies`' own rule), so a caller never has to ask which it got. The
+     * id asserted is unchanged.
+     */
+    expect(
+      (listed.body as { items: InvoiceBody[] }).items.map((r) => r.id),
+    ).toEqual([inv.id]);
 
     // exactly one CREATE Invoice audit row for this invoice
     const auditRows = await prisma.auditLogEntry.findMany({
@@ -430,9 +438,52 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     expect(auditRows).toHaveLength(1);
     expect(JSON.stringify(auditRows[0]?.afterValue)).toContain('115350.000');
 
-    // a book-wide read (no scope) is a 400 — that is Process 33's report
-    await request(app.getHttpServer())
+    /*
+     * 🔴 CORRECTED IN BOTH DIRECTIONS, NOT DELETED — DECISION 167/13.
+     *
+     * This asserted that a book-wide read is a 400, «that is Process 33's report». It was right
+     * about the route as it stood, and measured 2026-11-28 that report is **one row per CUSTOMER**
+     * with an invoice COUNT and no invoice id — so it could not be the surface a finance officer
+     * uses to find the invoice they are collecting on. The refusal answered a REPORTING question;
+     * decision 167/13 asks an OPERATIONAL one, and `/invoices` is the screen it put there.
+     *
+     * ⟶ So the book-wide read ANSWERS now, with the office's own invoices and the display names
+     *   a table needs — and the refusal that REMAINS is the one that was always the real
+     *   ambiguity: both scopes at once.
+     */
+    const bookWide = await request(app.getHttpServer())
       .get('/invoices')
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const page = bookWide.body as {
+      items: (InvoiceBody & {
+        customerLegalName?: string;
+        policyNumber?: string | null;
+        insurerName?: string | null;
+      })[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+    expect(page.items.map((r) => r.id)).toContain(inv.id);
+    expect(page.total).toBeGreaterThan(0);
+
+    /*
+     * ⛔ AND EVERY ROW NAMES ITS CUSTOMER, which is the whole of decision 167/13: no uuid is
+     * typed or shown. Asserted ON THE WIRE, because the web interface is hand-copied over HTTP and
+     * TypeScript cannot see across it — the lesson #80 paid for twice.
+     */
+    const mine = page.items.find((r) => r.id === inv.id);
+    expect(
+      mine?.customerLegalName,
+      'the row must NAME its customer',
+    ).toBeTruthy();
+    expect(mine?.policyNumber, 'the row must NAME its policy').toBeTruthy();
+    expect(mine?.insurerName, 'the row must NAME its insurer').toBeTruthy();
+
+    // ⛔ BOTH SCOPES AT ONCE IS STILL REFUSED — two different questions.
+    await request(app.getHttpServer())
+      .get(`/invoices?policyId=${policyId}&customerId=${customerId}`)
       .set(bearer(fin.accessToken))
       .expect(400);
   });
@@ -621,7 +672,9 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .get(`/invoices?policyId=${policyId}`)
       .set(bearer(fin.accessToken))
       .expect(200);
-    expect(listed.body as InvoiceBody[]).toHaveLength(1);
+    // ⚠️ The ENVELOPE — decision 167/13. CI's first run had not reached this one; a grep over
+    // `apps/api/test` for the route found it, which is the check that should have come first.
+    expect((listed.body as { items: InvoiceBody[] }).items).toHaveLength(1);
   });
 
   it('runs the full collection cycle: receipt -> reconcile -> remittance, with a client-funds ledger entry at each money movement (Part C #32)', async () => {
