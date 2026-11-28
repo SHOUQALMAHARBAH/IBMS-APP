@@ -101,6 +101,64 @@ export type InvoiceWithNames = Prisma.InvoiceGetPayload<{
  * ⛔ Declared HERE rather than in the DTO, so «which statuses are open» is a repository fact and
  * the query cannot disagree with a screen's idea of it.
  */
+/** The scope a book-wide invoice read is narrowed by — decision 167/13. */
+export interface InvoiceListFilter {
+  insurerId?: string;
+  openOnly: boolean;
+  search?: string;
+  skip: number;
+  take: number;
+}
+
+/**
+ * ONE `where`, BUILT ONCE AND USED BY BOTH THE PAGE AND THE COUNT.
+ *
+ * `buildPolicyListWhere`'s own shape, for its own reason: the two queries can never disagree about
+ * what is being counted, because there is only one description of it. ⛔ That is what makes a
+ * transaction unnecessary here — see `findPageWithNames`.
+ *
+ * ⚠️ AND THE FILTER IS WHAT DECIDES VISIBILITY, never the page size: every clause is part of the
+ * query, so the window bounds the MATCHING rows rather than the rows scanned. That is the standing
+ * rule from the `DpoWorkspaceService` defect.
+ */
+export function buildInvoiceListWhere(
+  filter: InvoiceListFilter,
+): Prisma.InvoiceWhereInput {
+  return {
+    ...(filter.openOnly ? { status: { in: [...OPEN_INVOICE_STATUSES] } } : {}),
+    /*
+     * THE INSURER GOES THROUGH THE POLICY. `Invoice` has no insurer column, so this is a nested
+     * relation filter — and an invoice with `policyId: null` therefore matches no insurer, which is
+     * correct: such an invoice has no insurer to remit to.
+     */
+    ...(filter.insurerId ? { policy: { insurerId: filter.insurerId } } : {}),
+    /* `search` matches the policy number and the customer's legal name. ⛔ Not the invoice id: a
+       uuid is not something anybody types from a piece of paper. */
+    ...(filter.search
+      ? {
+          OR: [
+            {
+              policy: {
+                policyNumber: {
+                  contains: filter.search,
+                  mode: 'insensitive' as const,
+                },
+              },
+            },
+            {
+              customer: {
+                legalName: {
+                  contains: filter.search,
+                  mode: 'insensitive' as const,
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
 export const OPEN_INVOICE_STATUSES = [
   'INVOICED',
   'COLLECTED',
@@ -201,55 +259,43 @@ export class InvoiceRepository {
    * ⛔ Not the invoice id. A uuid is not something anybody types from a piece of paper, and the
    * whole point of decision 167/13 is that no id is typed or shown.
    */
-  async findPageWithNames(filter: {
-    insurerId?: string;
-    openOnly: boolean;
-    search?: string;
-    skip: number;
-    take: number;
-  }): Promise<{ rows: InvoiceWithNames[]; total: number }> {
-    const where: Prisma.InvoiceWhereInput = {
-      ...(filter.openOnly
-        ? { status: { in: [...OPEN_INVOICE_STATUSES] } }
-        : {}),
-      ...(filter.insurerId ? { policy: { insurerId: filter.insurerId } } : {}),
-      ...(filter.search
-        ? {
-            OR: [
-              {
-                policy: {
-                  policyNumber: {
-                    contains: filter.search,
-                    mode: 'insensitive' as const,
-                  },
-                },
-              },
-              {
-                customer: {
-                  legalName: {
-                    contains: filter.search,
-                    mode: 'insensitive' as const,
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-
-    const [rows, total] = await this.prisma.client.$transaction([
-      this.prisma.client.invoice.findMany({
-        where,
-        include: INVOICE_LIST_INCLUDE,
-        // NEWEST FIRST, and `id` breaks the tie: `createdAt` is not unique, and an unstable
-        // secondary order makes a row appear on two pages or on none — the under-specified
-        // selection shape that took CI red in message 48 §3.
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: filter.skip,
-        take: filter.take,
-      }),
-      this.prisma.client.invoice.count({ where }),
-    ]);
+  async findPageWithNames(filter: InvoiceListFilter): Promise<{
+    rows: InvoiceWithNames[];
+    total: number;
+  }> {
+    /*
+     * 🔴 TWO CALLS OVER ONE `where` BUILDER — ⛔ NOT `$transaction`, AND CERTAINLY NOT ITS
+     * ARRAY FORM.
+     *
+     * The first version of this read `$transaction([findMany, count])`, reasoning that the page and
+     * its total had to be one atomic read. `tenant-scope.extension.ts` refuses that form BY NAME:
+     *
+     *   «The array form of $transaction is not supported under tenant isolation: its operations
+     *    are built before the transaction opens, so app.current_org_id cannot be set for them.»
+     *
+     * ⚠️ WHICH IS NOT A STYLE RULE. Those operations would have run with NO tenant scope at all —
+     * a cross-office read on a finance screen. The extension threw a 500 and CI's step 27 caught it;
+     * ⛔ nothing was reached for to work around it.
+     *
+     * ⟶ `/policies` already answers this question and does NOT use a transaction either: it keeps
+     *   `findManyForActor` and `countForActor` as two methods over `buildPolicyListWhere`, and its
+     *   own comment states the guarantee — «counts on the SAME `where` the page query runs, so the
+     *   two can never disagree about what is being counted». **The shared builder is what makes them
+     *   agree, not atomicity.** A row inserted between the two calls can at worst make `total` one
+     *   larger than the page proves, which a paginated list is already honest about.
+     */
+    const where = buildInvoiceListWhere(filter);
+    const rows = await this.prisma.client.invoice.findMany({
+      where,
+      include: INVOICE_LIST_INCLUDE,
+      // NEWEST FIRST, and `id` breaks the tie: `createdAt` is not unique, and an unstable
+      // secondary order makes a row appear on two pages or on none — the under-specified
+      // selection shape that took CI red in message 48 §3.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: filter.skip,
+      take: filter.take,
+    });
+    const total = await this.prisma.client.invoice.count({ where });
     return { rows, total };
   }
 
