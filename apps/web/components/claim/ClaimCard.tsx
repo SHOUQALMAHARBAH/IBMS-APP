@@ -432,70 +432,98 @@ function ClaimAssessment({
 
       {canAssess && !decided ? (
         <div style={{ maxWidth: '30rem' }}>
-          {claim.status !== 'UNDER_ASSESSMENT' ? (
-            <>
-              <div style={quoteFieldStyle}>
-                <label htmlFor={`asmt-when-${claim.id}`}>
-                  {t('claimCompletionDateLabel')}
-                </label>
-                <input
-                  id={`asmt-when-${claim.id}`}
-                  type="date"
-                  value={when}
-                  onChange={(ev) => setWhen(ev.target.value)}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  disabled={busy || instant().length === 0 || !!a.surveyCompletedAt}
-                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
-                  onClick={() =>
-                    void run(() =>
-                      recordAdjusterProgress(claim.id, {
-                        surveyCompletedAt: instant(),
-                      }),
-                    )
-                  }
-                >
-                  {t('claimSurveyButton')}
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    instant().length === 0 ||
-                    !!a.investigationCompletedAt
-                  }
-                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
-                  onClick={() =>
-                    void run(() =>
-                      recordAdjusterProgress(claim.id, {
-                        investigationCompletedAt: instant(),
-                      }),
-                    )
-                  }
-                >
-                  {t('claimInvestigationButton')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || !a.readyForAssessment}
-                  title={
-                    a.readyForAssessment
-                      ? undefined
-                      : t('claimCompleteDocsFirst')
-                  }
-                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
-                  onClick={() =>
-                    void run(() => submitClaimForAssessment(claim.id))
-                  }
-                >
-                  {t('claimSubmitButton')}
-                </button>
-              </div>
-            </>
-          ) : (
+          {/*
+            🔴 THE FULL WALK §A ITEM 1 — THE TWO STAMPS USED TO DISAPPEAR AT
+            `UNDER_ASSESSMENT`, AND THE VERDICT BELOW THEM NEEDS BOTH OF THEM.
+
+            The fork here read `claim.status !== 'UNDER_ASSESSMENT' ? <stamps + submit> :
+            <verdict>`. So a claim submitted for assessment with only ONE stamp recorded had
+            no control left on any screen: the verdict button is disabled on
+            `adjusterWorkComplete`, which is both stamps, and the two stamp buttons were on
+            the other side of the fork. Reproduced on the owner's own database — one claim
+            at `UNDER_ASSESSMENT`, survey stamped 2026-11-25, investigation null.
+
+            ⛔ AND THE SERVER IS NOT WHAT CHANGED, BECAUSE THE SERVER WAS ALREADY RIGHT.
+            `recordAdjusterProgress` refuses only once the assessment is CONCLUDED
+            (`isAssessmentConcluded` — the three outcomes plus SETTLED and CLOSED), so
+            `REGISTERED`, `DOCUMENTATION_IN_PROGRESS` and `UNDER_ASSESSMENT` every one accept
+            a stamp. The screen disagreed with the route it calls, and the screen was wrong.
+
+            ⛔ THE OTHER AVAILABLE FIX — making `submitForAssessment` require both stamps
+            — WAS NOT TAKEN, for three measured reasons. It would be a NEW refusal on a
+            route that accepts the call today. It would leave every already-submitted claim
+            permanently dead: `WORKFLOW_TRANSITIONS.Claim` is a forward-only DAG and the only
+            way out of `UNDER_ASSESSMENT` is a verdict, which needs the stamps. And it
+            inverts the order of the real act — the loss adjuster surveys AFTER being
+            appointed and the file passed for assessment. The both-stamps rule is itself
+            recorded as drafted and unsourced at the verdict gate in `claim.service.ts`, and
+            a second gate built on an unsourced one widens it rather than sourcing it.
+
+            ⟶ So the stamps render for every status the server accepts them at, and only
+            the two TERMINAL controls fork: submit before `UNDER_ASSESSMENT`, verdict at it.
+          */}
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`asmt-when-${claim.id}`}>
+              {t('claimCompletionDateLabel')}
+            </label>
+            <input
+              id={`asmt-when-${claim.id}`}
+              type="date"
+              value={when}
+              onChange={(ev) => setWhen(ev.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={busy || instant().length === 0 || !!a.surveyCompletedAt}
+              style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+              onClick={() =>
+                void run(() =>
+                  recordAdjusterProgress(claim.id, {
+                    surveyCompletedAt: instant(),
+                  }),
+                )
+              }
+            >
+              {t('claimSurveyButton')}
+            </button>
+            <button
+              type="button"
+              disabled={
+                busy || instant().length === 0 || !!a.investigationCompletedAt
+              }
+              style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+              onClick={() =>
+                void run(() =>
+                  recordAdjusterProgress(claim.id, {
+                    investigationCompletedAt: instant(),
+                  }),
+                )
+              }
+            >
+              {t('claimInvestigationButton')}
+            </button>
+            {/* The one control that really does belong to a single status: a file already
+                under assessment cannot be submitted for assessment again, and the route
+                refuses it (`it must be DOCUMENTATION_IN_PROGRESS`). */}
+            {claim.status !== 'UNDER_ASSESSMENT' ? (
+              <button
+                type="button"
+                disabled={busy || !a.readyForAssessment}
+                title={
+                  a.readyForAssessment ? undefined : t('claimCompleteDocsFirst')
+                }
+                style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                onClick={() =>
+                  void run(() => submitClaimForAssessment(claim.id))
+                }
+              >
+                {t('claimSubmitButton')}
+              </button>
+            ) : null}
+          </div>
+          {claim.status === 'UNDER_ASSESSMENT' ? (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <select
                 aria-label={t('claimVerdictLabel')}
@@ -526,7 +554,7 @@ function ClaimAssessment({
                 {t('claimRecordVerdictButton')}
               </button>
             </div>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

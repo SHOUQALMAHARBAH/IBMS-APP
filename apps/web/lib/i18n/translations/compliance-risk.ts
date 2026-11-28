@@ -146,6 +146,38 @@ export const COMPLIANCE_RISK = {
     providerOfficesUsersValue: '{active} نشط من {total}',
     providerOfficesNeverUsed: 'لم يُستخدم بعد',
     providerOfficesColAdministrator: 'المسؤول الأول',
+    /*
+     * 🔴 THE FULL WALK §A ITEM 10 / DECISION 167/17 — THE PROVIDER SCREEN'S STANDING WORD NOW
+     * MATCHES THE LICENCE SCREEN'S, AND THESE THREE ARE THE STATES IT COULD NOT NAME.
+     *
+     * It printed a four-way branch over the DATE-ONLY lapse and called its negation «ساري». Past
+     * expiry that boolean is `!renewalFiledOnTime`, which is `false` for FOUR renewal states —
+     * three of them EXPIRED with `mayPractise: false` — so an office that filed on time and then
+     * stopped was called «ساري». Measured on the owner's database 2026-11-28: office B reads
+     * «قيدَ التجديد» on `/regulatory-compliance` and read «ساري» here.
+     *
+     * ⛔ NOT ONE NEW WORD. All three are SLICED from the licence screen's own shipping values
+     * (`rcStandingRenewalPending`, `rcStandingSuspended`, `rcStandingCancelled`) and pinned
+     * byte-for-byte against them by `provider-standing-words.test.ts`. The other three states reuse
+     * this screen's existing keys: ACTIVE takes `providerOfficesInGoodStanding` («ساري»), EXPIRED
+     * takes `providerOfficesLapsed`, and NO_TERM_ON_RECORD takes `providerOfficesNoTermOnRecord`.
+     *
+     * ⛔ AND THEY ARE THEIR OWN KEYS RATHER THAN A SECOND RENDER OF THE `rcStanding*` ONES —
+     * decision 157 ruling 2. One key serving two screens is one key that cannot move: a reword for
+     * the office's own licence screen would silently change a cross-office dashboard nobody was
+     * looking at.
+     *
+     * ⚠️ SUSPENDED AND CANCELLED CANNOT BE REACHED ON THIS SCREEN TODAY and are here anyway.
+     * The provider's derivation is given NO ACTS — register entry 97, the owner's 2026-10-21
+     * ruling — and only a `RegulatoryAction` produces either status, so `mayNotIssue` is the one
+     * bit that reports that half. They exist because the status is a CLOSED SIX-VALUE UNION and a
+     * partial map renders a BLANK CELL, which is the defect decision 148 and
+     * `declared-vocabulary.test.ts` exist to stop. `provider-standing-words.test.ts` asserts the
+     * map is total, and the unreachability is asserted rather than asserted-in-a-comment.
+     */
+    providerOfficesStandingRenewalPending: 'قيدَ التجديد',
+    providerOfficesStandingSuspended: 'موقوف',
+    providerOfficesStandingCancelled: 'ملغى',
     providerOfficesHasAdministrator: 'له حساب',
     providerOfficesNoAccountYet: 'لا يوجد حساب — لا يستطيع أحد الدخول',
     providerOfficesInviteOpen: 'دعوة المسؤول الأول',
@@ -828,6 +860,11 @@ export const COMPLIANCE_RISK = {
     providerOfficesUsersValue: '{active} active of {total}',
     providerOfficesNeverUsed: 'never used',
     providerOfficesColAdministrator: 'First administrator',
+    // The English mirror of the three standing words, sliced from the licence screen's own
+    // English halves for the same reason the Arabic is. See the Arabic block's header.
+    providerOfficesStandingRenewalPending: 'Renewal pending',
+    providerOfficesStandingSuspended: 'Suspended',
+    providerOfficesStandingCancelled: 'Cancelled',
     providerOfficesHasAdministrator: 'has an account',
     providerOfficesNoAccountYet: 'no account — nobody can sign in',
     providerOfficesInviteOpen: 'Invite the first administrator',

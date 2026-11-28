@@ -44,6 +44,19 @@ export interface ProviderOfficeStateRow {
   licenseIssuedAt: Date | null;
   licenseExpiresAt: Date | null;
   renewalRequestedAt: Date | null;
+  /*
+   * THE THREE RENEWAL BITS — the full walk §A item 10. Decision 128's four conditions need five
+   * licence fields and this view carried two, so the provider screen could not tell a licence
+   * genuinely under renewal from one that merely filed on time and stopped. Three PRESENCE TESTS
+   * close that, and they are bits on purpose: not the proof document, not the Central Bank's
+   * reference number, and not the declaring employee's name or date — see the migration's
+   * argument and the ban list below.
+   *
+   * FALSE, never null, where there is no term: the service reads them only inside a term.
+   */
+  renewalProofOnRecord: boolean;
+  renewalReferenceOnRecord: boolean;
+  renewalDeclarationOnRecord: boolean;
   /** The one regulatory fact — derived in the view, because `RegulatoryAction` is tenant-scoped and
    *  unreachable from another office by RLS. See `PROVIDER_OFFICE_STATE_COLUMNS` below. */
   mayNotIssue: boolean;
@@ -51,6 +64,20 @@ export interface ProviderOfficeStateRow {
   dormantLicensedBranches: number;
   users: number;
   activeUsers: number;
+  /*
+   * THE FULL WALK §A ITEM 11 — HOW MANY ACCOUNTS HAVE EVER BEEN USED.
+   *
+   * The SAME predicate `resolveInvitationTarget` tests (`lastLoginAt IS NOT NULL OR
+   * passwordUpdatedAt IS NOT NULL`), so the screen's re-invite control and the route it calls
+   * cannot disagree. ⚠️ `lastActivityAt` below is NOT that predicate — it is a MAX over
+   * `UserSession`, null for somebody who set their password and never completed a session — which
+   * is why it could not be reused.
+   *
+   * A COUNT, of the same class as `users` and `activeUsers`. ⛔ Not `lastLoginAt` and not
+   * `passwordUpdatedAt`: when a named individual in another office last signed in is that office's
+   * record. The migration bans both by name.
+   */
+  enteredUsers: number;
   /** An OFFICE-level MAX, never a person's. NULL when nobody has ever signed in. */
   lastActivityAt: Date | null;
 }
@@ -75,7 +102,26 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'licenseExpiresAt',
   'renewalRequestedAt',
   /*
-   * THE ONE NEW FACT — register entry 97, closed by the owner's decision.
+   * THE THREE RENEWAL BITS — the full walk §A item 10, decision 167/17.
+   *
+   * *Has the proof been filed*, *did the Central Bank issue a reference*, *has anybody sworn the
+   * standing declaration.* Facts about the renewal of a licence the PROVIDER ITSELF REGISTERED, of
+   * the same class as `licenseNumber`, `licenseExpiresAt` and `renewalRequestedAt` three lines up
+   * — which register entry 97 calls, in terms, «the provider's own registration record».
+   *
+   * ⛔ AND THEY ARE BITS, WHICH IS THE WHOLE NARROWING. Not the proof document id, not the
+   * reference number itself, and not `actorNameShown` / `declaredAt`: the person who swore it is an
+   * employee of ANOTHER office and that is their office's record. `/regulatory-compliance` prints
+   * both names to the office that owns them; the provider gets neither. The migration bans all four
+   * by name.
+   *
+   * The argument for growing this list is in the migration, because this list IS the boundary.
+   */
+  'renewalProofOnRecord',
+  'renewalReferenceOnRecord',
+  'renewalDeclarationOnRecord',
+  /*
+   * THE ONE REGULATORY FACT — register entry 97, closed by the owner's decision.
    *
    * *This office may not issue.* Nothing behind it: not the decision reference, not the basis, not
    * the effective date, not the suspended-until date, not the letter, not the kind. A sanction's
@@ -96,6 +142,9 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'dormantLicensedBranches',
   'users',
   'activeUsers',
+  /* THE FULL WALK §A ITEM 11 — see the row type. A count, the route's own predicate, no person
+   * named and no date exposed. */
+  'enteredUsers',
   'lastActivityAt',
 ] as const;
 

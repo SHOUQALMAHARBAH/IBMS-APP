@@ -32,6 +32,7 @@ import type { CaptureQuotationDto } from './dto/capture-quotation.dto';
 import type { ReviseQuotationDto } from './dto/revise-quotation.dto';
 import type { ListQuotationsQueryDto } from './dto/list-quotations-query.dto';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 
 /** One insurer's full quotation history on one RFQ line — the shape every
  * quotation read returns. `current` is the live version (`isCurrentVersion`);
@@ -39,18 +40,55 @@ import { insurerIdentity } from '../../repositories/insurer-identity';
  * the same chain projected round-by-round (Part C #15 — round 0 is the
  * opening quote, each later round carries the premium delta + which terms
  * moved). */
+/**
+ * 🔴 THE FULL WALK §A ITEM 6 — A VERSION NAMES ITS INSURER TOO, AND THIS IS THE FIFTH SITE
+ * OF A DEFECT FIXED FOUR TIMES.
+ *
+ * The chain's own `insurer` was flattened in message 45 §2 and the comment below records it. What
+ * was NOT flattened is the insurer inside each VERSION — `current` and `versions[]` were passed
+ * through as raw `QuotationWithContext`, so they carried `legalName` / `legalNameAr` /
+ * `insurerMaster` / `insuranceCompany` and no `name` at all.
+ *
+ * `RecommendationSection.tsx` reads `chains.map((c) => c.current)` and calls
+ * `insurerDisplayName(q.insurer, language)`, which returns `insurer.name`. So the recommended-quote
+ * picker rendered «— JOD 1,100.000 · 15% عمولة» with no insurer: `undefined` renders as
+ * NOTHING in React, so three options printed an empty name rather than failing.
+ *
+ * ⚠️ AND NOTHING CAUGHT IT FOR THE SAME REASON NOTHING CAUGHT THE FOURTH SITE.
+ * `quotation.e2e-spec.ts` asserts `chain.insurer.name` and stops there — the nested field is
+ * never read — and both Playwright fixtures build `current.insurer` from the FLATTENED shape they
+ * wish for. A mock that supplies what the api does not send is the authority this repository keeps
+ * paying for; `rfq.spec.ts`'s own header warns about it, in the file that does it.
+ *
+ * ⟶ So the type is the fix rather than the mapper: `current` and `versions` now DECLARE a
+ *   resolved insurer, exactly as `comparison.service.ts` declares its embedded quotation's, and the
+ *   compiler names every site that has to flatten.
+ */
+export type QuotationVersionView = Omit<QuotationWithContext, 'insurer'> & {
+  insurer: ReturnType<typeof insurerIdentity>;
+};
+
 export interface QuotationChainView {
   rfqId: string;
   insurerId: string;
   insuranceLine: string;
+  /** THE FULL WALK §A ITEM 6 — the line's Arabic name, or `null` where none is known, in which
+   *  case the screen renders the stored English string. ⛔ Never a place to invent one. */
+  insuranceLineAr: string | null;
   /** The RESOLVED identity, not the Prisma join. Declaring this as
    *  `QuotationWithContext['insurer']` is what hid the defect: the API type said
    *  "whatever Prisma returns" while the web type said "what I wish it returned",
    *  and neither side ever met the other. */
   insurer: ReturnType<typeof insurerIdentity>;
-  current: QuotationWithContext;
-  versions: QuotationWithContext[];
+  current: QuotationVersionView;
+  versions: QuotationVersionView[];
   history: NegotiationRound[];
+}
+
+/** One version, with its insurer resolved. The same one-source-both-names resolution the chain's
+ *  own identity uses — ⛔ never a second pairing written here. */
+function versionView(row: QuotationWithContext): QuotationVersionView {
+  return { ...row, insurer: insurerIdentity(row.insurer) };
 }
 
 const P2002 = 'P2002';
@@ -260,14 +298,19 @@ export class QuotationService {
         rfqId: head.rfqId,
         insurerId: head.insurerId,
         insuranceLine: head.rfq.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(head.rfq),
         // Flattened, not raw. This carried the Prisma join straight to the wire,
         // so `insurer.name` was undefined and `QuotationsSection.tsx` rendered a
         // blank insurer on every chain. Same defect as the comparison had, same
         // cause: Part I §5 moved identity onto `InsurerMaster` and the views that
         // did not go through `insurerIdentity()` silently stopped naming anybody.
         insurer: insurerIdentity(head.insurer),
-        current: ordered.find((v) => v.isCurrentVersion) ?? head,
-        versions: ordered,
+        // THE FULL WALK §A ITEM 6 — these two were the raw join. See `QuotationVersionView`.
+        current: versionView(ordered.find((v) => v.isCurrentVersion) ?? head),
+        versions: ordered.map(versionView),
+        // ⛔ `buildNegotiationHistory` takes the RAW rows, deliberately: a `NegotiationRound` names
+        // no insurer at all (the chain already does, once) and it reads premiums and term fields,
+        // which flattening does not touch.
         history: buildNegotiationHistory(ordered),
       });
     }

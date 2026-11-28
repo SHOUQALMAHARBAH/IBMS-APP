@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -72,6 +72,25 @@ function ProfileField({
    *  label, and `getByRole(name)` matches substrings, so without this an
    *  assertion about the national-ID row can pass off the phone row's button. */
   fieldKey,
+  /**
+   * 🔴 THE FULL WALK §A ITEM 7 — THE JUSTIFICATION PANEL RENDERS HERE, UNDER THE ROW WHOSE
+   * BUTTON OPENED IT.
+   *
+   * The walk reported that «كشف» beside a masked phone or email «fires no request» for the
+   * manager and the sales account. Measured: pressing it correctly fires no request — it opens a
+   * reason panel, and `POST /customers/:id/reveal-field` is sent by «تأكيد الكشف» afterwards.
+   * The server permits both fields under `customer.360-view.read`, which both accounts hold, so
+   * there was never a refusal to see.
+   *
+   * WHAT WAS WRONG IS WHERE THE PANEL APPEARED. It was a sibling AFTER the whole `</Card>`, below
+   * a grid of up to fifteen rows — so on an ordinary window the press changed nothing a reader
+   * could see, which is indistinguishable from a dead control.
+   *
+   * ⛔ MOVED, NOT SCROLLED TO — the ruling message 51 §2 set for the art. 15/d question: a
+   * scroll-on-appearance moves the page under a mouse that was not told to expect it, and for a
+   * keyboard user the viewport jumps while focus stays on the button they just pressed.
+   */
+  children,
 }: {
   label: string;
   value: string | null | undefined;
@@ -79,6 +98,7 @@ function ProfileField({
   onReveal?: () => void;
   revealLabel: string;
   fieldKey?: string;
+  children?: ReactNode;
 }) {
   return (
     <div data-field={fieldKey}>
@@ -96,6 +116,7 @@ function ProfileField({
           </Button>
         ) : null}
       </div>
+      {children}
     </div>
   );
 }
@@ -193,6 +214,46 @@ export default function CustomerProfilePage() {
     } catch (err) {
       setRevealError(err instanceof ApiError ? err.message : t('customerRevealError'));
     }
+  }
+
+  /**
+   * 🔴 THE FULL WALK §A ITEM 7 — THE JUSTIFICATION PANEL, FOR THE ONE FIELD THAT ASKED FOR IT.
+   *
+   * It used to render ONCE, as a sibling after the whole `</Card>` — below a grid of up to fifteen
+   * rows. So pressing «كشف» on the phone or the email changed nothing a reader could see, which
+   * reads exactly like a dead control, and that is what the walk reported as «fires no request».
+   *
+   * ⛔ MOVED rather than scrolled to (message 51 §2's ruling), and ⛔ not duplicated: it is still
+   * ONE panel over one `revealTarget`, rendered under whichever row owns that target. Two panels
+   * would be two inputs bound to one `revealReason`.
+   *
+   * ⛔ AND NOT ONE WORD CHANGED — the label, the input, the confirm button and the error are the
+   * spans that already shipped, moved.
+   */
+  function revealPanelFor(field: RevealableField) {
+    if (revealTarget !== field) return null;
+    return (
+      <div style={repeatableRowStyle}>
+        <label htmlFor="reveal-reason">
+          {t('customerRevealJustificationLabel', { field: revealTarget })}
+        </label>
+        <input
+          id="reveal-reason"
+          value={revealReason}
+          onChange={(e) => setRevealReason(e.target.value)}
+          style={{ width: '100%', padding: '0.4rem', marginTop: '0.4rem' }}
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          style={{ marginTop: 'var(--space-2)' }}
+          onClick={() => void handleReveal(revealTarget)}
+        >
+          {t('customerRevealConfirmButton')}
+        </Button>
+        {revealError ? <ErrorState title={revealError} /> : null}
+      </div>
+    );
   }
 
   if (isLoading || !user) return null;
@@ -302,7 +363,9 @@ export default function CustomerProfilePage() {
                       : undefined
                   }
                   revealLabel={t('customerProfileFieldReveal')}
-                />
+                >
+                  {revealPanelFor('nationalId')}
+                </ProfileField>
                 {/* THE TWO SCREENING DISCRIMINATORS, rendered for the first time.
                     `Customer.dateOfBirth` and `.nationality` have been on the wire
                     and in the web's own type since the columns shipped, and no
@@ -357,7 +420,9 @@ export default function CustomerProfilePage() {
               revealed={revealed.contactPhone}
               onReveal={() => setRevealTarget('contactPhone')}
               revealLabel={t('customerProfileFieldReveal')}
-            />
+            >
+              {revealPanelFor('contactPhone')}
+            </ProfileField>
             <ProfileField
               label={t('customerFieldContactEmail')}
               value={customer.contactEmail}
@@ -365,7 +430,9 @@ export default function CustomerProfilePage() {
               revealed={revealed.contactEmail}
               onReveal={() => setRevealTarget('contactEmail')}
               revealLabel={t('customerProfileFieldReveal')}
-            />
+            >
+              {revealPanelFor('contactEmail')}
+            </ProfileField>
             {/* CORPORATE ONLY. These three were rendered on an INDIVIDUAL's page as
                 three empty rows, and they are the very three the brief believed had
                 no form field: «سجلت عميل ك فرد وهيك طلعلي زي – عند هذول الحقول لأني
@@ -426,30 +493,6 @@ export default function CustomerProfilePage() {
             </div>
           </Card>
 
-          {revealTarget ? (
-            <div style={repeatableRowStyle}>
-              <label htmlFor="reveal-reason">
-                {t('customerRevealJustificationLabel', { field: revealTarget })}
-              </label>
-              <input
-                id="reveal-reason"
-                value={revealReason}
-                onChange={(e) => setRevealReason(e.target.value)}
-                style={{ width: '100%', padding: '0.4rem', marginTop: '0.4rem' }}
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                style={{ marginTop: 'var(--space-2)' }}
-                onClick={() => void handleReveal(revealTarget)}
-              >
-                {t('customerRevealConfirmButton')}
-              </Button>
-              {revealError ? (
-                <ErrorState title={revealError} />
-              ) : null}
-            </div>
-          ) : null}
 
           {/* Correcting the three contact fields. Placed directly under the profile
             * it edits, and it reloads through the same `load` the page already uses,

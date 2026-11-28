@@ -102,6 +102,22 @@ export function listLeads(filter: ListLeadsFilter = {}): Promise<Lead[]> {
   return apiGet(`/leads${qs ? `?${qs}` : ''}`);
 }
 
+/**
+ * 🔴 THE FULL WALK §A ITEM 8 — ONE LEAD, READ BY ID, SO THE NAME NEED NOT TRAVEL IN A URL.
+ *
+ * `/prospects/new` took `?leadId=…&leadFullName=<the person's name>` as a display prefill. A URL is
+ * the least private place a name can sit: it is in the browser history, in the referrer header of
+ * anything the next page loads, and in the address bar of a shared screen — and this one is a
+ * customer's name on a screen a broker demonstrates to an audience.
+ *
+ * `GET /leads/:id` is gated on `lead.list.read`, the SAME code `listLeads` carries — so ⛔ no code
+ * was minted and no gate widened: anybody who could see the name on the pipeline board to put it in
+ * the URL can read the record it came from.
+ */
+export function getLead(leadId: string): Promise<Lead> {
+  return apiGet(`/leads/${encodeURIComponent(leadId)}`);
+}
+
 export function transitionLead(leadId: string, toStatus: LeadStatus): Promise<LeadTransitionResult> {
   return apiPost(`/leads/${leadId}/transition`, { toStatus });
 }

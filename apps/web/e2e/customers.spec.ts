@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
-import { expectAbsentWithin } from "./support/anchored";
+import { expectAbsentWithin, expectNone } from "./support/anchored";
 import {
   expectLayoutOnlyControl,
   useTheme,
@@ -917,6 +917,64 @@ test("Compliance holds the national-ID reveal and gets the real value", async ({
     .fill("KYC identity verification against the passport on file");
   await page.getByRole("button", { name: "Confirm reveal" }).click();
   await expect(page.getByText("9901012345")).toBeVisible();
+});
+
+/*
+ * 🔴 THE FULL WALK §A ITEM 7 — «كشف» BESIDE A MASKED PHONE OR EMAIL.
+ *
+ * The walk reported it «fires no request» for the manager and the sales account. Measured: that is
+ * CORRECT behaviour — the button opens a justification panel, and `POST :id/reveal-field` is sent
+ * by «تأكيد الكشف» afterwards. The server permits both contact fields under
+ * `customer.360-view.read`, which both accounts hold, so there was never a refusal to see.
+ *
+ * WHAT WAS WRONG IS WHERE THE PANEL APPEARED. It was a sibling AFTER the whole `</Card>`, below a
+ * grid of up to fifteen rows — so pressing the button changed nothing a reader could see, which is
+ * indistinguishable from a dead control.
+ *
+ * ⟶ So the assertion is about POSITION and not existence: a `toBeVisible()` on the panel passed
+ *   against the defect for months. It is now asserted to be INSIDE the row whose button opened it,
+ *   and the other revealable rows are asserted NOT to carry one — which is what makes it the row's
+ *   panel rather than a panel that happens to be on the page.
+ */
+test("the reveal justification opens inside the row whose button was pressed", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockCustomerProfile(page);
+
+  await page.goto("/customers/cust-1");
+  await expect(
+    page.getByRole("heading", { name: "Ahmad Al-Fulani" }),
+  ).toBeVisible();
+
+  const phoneRow = page.locator('[data-field="contactPhone"]');
+  const emailRow = page.locator('[data-field="contactEmail"]');
+
+  // NOTHING OPEN TO BEGIN WITH, so the assertion below is about the press and not the page.
+  await expectNone(
+    phoneRow.getByLabel(/Justification for revealing/),
+    phoneRow,
+  );
+
+  await phoneRow.getByRole("button", { name: "Reveal", exact: true }).click();
+
+  // INSIDE THE PHONE ROW — this is the fix. A page-wide lookup passed before it.
+  await expect(
+    phoneRow.getByLabel(/Justification for revealing contactPhone/),
+  ).toBeVisible();
+  await expect(
+    phoneRow.getByRole("button", { name: "Confirm reveal" }),
+  ).toBeVisible();
+
+  /*
+   * ⛔ AND NOT IN THE EMAIL ROW. One panel over one `revealTarget`: two would be two inputs bound
+   * to one piece of state. Anchored on the email row itself, which is OUTSIDE the set asserted
+   * absent, so a blank page cannot satisfy it.
+   */
+  await expectNone(
+    emailRow.getByLabel(/Justification for revealing/),
+    emailRow,
+  );
 });
 
 test("customer list and profile screens have no serious/critical accessibility violations @a11y", async ({

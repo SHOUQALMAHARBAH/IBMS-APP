@@ -35,10 +35,24 @@ const BASE: ProviderOfficeStateRow = {
   licenseIssuedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
   renewalRequestedAt: null,
+  /*
+   * THE THREE RENEWAL BITS, ALL FALSE IN THE BASE — the full walk §A item 10.
+   *
+   * FALSE is the non-widening direction: absent must never mean permitted. A base that carried
+   * them TRUE would make every case below look like a licence under renewal, and the one test
+   * that matters — a timely filing with no proof is still EXPIRED — would pass against a
+   * derivation that ignored them entirely.
+   */
+  renewalProofOnRecord: false,
+  renewalReferenceOnRecord: false,
+  renewalDeclarationOnRecord: false,
   licensedBranches: 4,
   dormantLicensedBranches: 1,
   users: 10,
   activeUsers: 8,
+  /* THE FULL WALK §A ITEM 11. Eight of the ten have been used in the base, so the re-invite state
+   * below is a DEPARTURE from it rather than the default — the non-widening direction. */
+  enteredUsers: 8,
   lastActivityAt: new Date('2026-10-01T00:00:00.000Z'),
 };
 
@@ -62,36 +76,51 @@ describe('item (j): the three licence states', () => {
       NOW,
       INSTRUMENT_LICENCE_FIGURES,
     );
-    expect(view.isCurrentlyLapsed).toBeNull();
+    expect(view.standing).toBeNull();
     expect(view.renewalDueBy).toBeNull();
     expect(view.renewalFiledOnTime).toBeNull();
   });
 
-  it('a term inside its period is NOT lapsed', () => {
-    expect(
-      toProviderOfficeStateView(BASE, NOW, INSTRUMENT_LICENCE_FIGURES)
-        .isCurrentlyLapsed,
-    ).toBe(false);
+  it('a term inside its period is ACTIVE — the one state entitled to «ساري»', () => {
+    const view = toProviderOfficeStateView(
+      BASE,
+      NOW,
+      INSTRUMENT_LICENCE_FIGURES,
+    );
+    // Decision 128's own words, quoted in `compliance-risk.ts`: «ساري» belongs to a term INSIDE
+    // its printed dates and to nothing else. This is that term.
+    expect(view.standing?.status).toBe('ACTIVE');
+    expect(view.standing?.mayPractise).toBe(true);
   });
 
-  it('a term past its expiry with NO renewal filed IS lapsed', () => {
+  it('a term past its expiry with NO renewal filed is EXPIRED and may not practise', () => {
     const view = toProviderOfficeStateView(
       BASE,
       new Date('2027-02-01T00:00:00.000Z'),
       INSTRUMENT_LICENCE_FIGURES,
     );
-    expect(view.isCurrentlyLapsed).toBe(true);
+    expect(view.standing?.status).toBe('EXPIRED');
+    expect(view.standing?.mayPractise).toBe(false);
   });
 
-  it('A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED — the renewal-pending rule', () => {
-    /*
-     * THE CASE THAT DISTINGUISHES THE RULE FROM A COMPARISON, and the reason a naive
-     * `expiresAt <= now` plant survived the e2e.
-     *
-     * After expiry, an office that applied for renewal on time stays valid pending the decision
-     * until the CBJ's decision issues (item (d)). A comparison answers "lapsed"; the rule answers
-     * "not lapsed". One of those tells a provider to chase an office that is compliant.
-     */
+  /*
+   * 🔴 CORRECTED IN BOTH DIRECTIONS, NOT DELETED — AND THIS TEST USED TO ASSERT THE DEFECT.
+   *
+   * It read «A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED» and pinned
+   * `isCurrentlyLapsed: false` on exactly this input — so it demanded the answer that made
+   * `/provider-offices` print «ساري» for a lapsed office, and it would have passed forever.
+   *
+   * It was TRUE of the field it named. `isBrokerLicenseCurrentlyLapsed` really is
+   * `!renewalFiledOnTime` past expiry, and that function is the date-only rule decision 128
+   * REPLACED — `license-standing.config.ts` forbids reinstating it in a standing derivation in its
+   * own words. What was wrong was a screen printing a standing word for it.
+   *
+   * ⟶ So the filing alone is now asserted to be NOT ENOUGH, which is decision 128: four
+   *   conditions, and a timely filing is one. The two halves below are the two sides of that edge,
+   *   and `renewalFiledOnTime` is still asserted TRUE in both — the filing fact did not change,
+   *   only what may be concluded from it alone.
+   */
+  it('a timely renewal filing ALONE does not lift the expiry — no proof means EXPIRED', () => {
     const view = toProviderOfficeStateView(
       {
         ...BASE,
@@ -101,8 +130,78 @@ describe('item (j): the three licence states', () => {
       new Date('2027-02-01T00:00:00.000Z'),
       INSTRUMENT_LICENCE_FIGURES,
     );
-    expect(view.isCurrentlyLapsed).toBe(false);
     expect(view.renewalFiledOnTime).toBe(true);
+    expect(view.standing?.status).toBe('EXPIRED');
+    expect(view.standing?.mayPractise).toBe(false);
+  });
+
+  it('filed on time, proof and declaration on record is RENEWAL_PENDING and MAY practise', () => {
+    /*
+     * OFFICE B's OWN STATE, measured on the owner's database 2026-11-28: term expiring
+     * 2025-12-31, filed 2025-11-01, proof and reference on record, declaration sworn 2026-11-25.
+     * `deriveRenewalUnderStudy` answers UNDER_STUDY and the standing is RENEWAL_PENDING with
+     * `mayPractise: true` — so the new-business block is lifted BY RIGHT under decision 128, and
+     * decision 167/17's first branch is the one that holds.
+     *
+     * This is the case the provider screen could not reach before: the view carried two of
+     * decision 128's five licence fields and the other three were invisible to it.
+     */
+    const view = toProviderOfficeStateView(
+      {
+        ...BASE,
+        renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
+        renewalProofOnRecord: true,
+        renewalReferenceOnRecord: true,
+        renewalDeclarationOnRecord: true,
+      },
+      new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
+    );
+    expect(view.renewalFiledOnTime).toBe(true);
+    expect(view.standing?.status).toBe('RENEWAL_PENDING');
+    expect(view.standing?.mayPractise).toBe(true);
+  });
+
+  it('proof without the declaration is still EXPIRED — AWAITING_DECLARATION', () => {
+    // The third of the four states a `false` date-only lapse used to cover. Decision 136(ب)'s
+    // sentence lives on the office's own screen; here it means the office may not issue yet, and
+    // the provider must not be told its licence is «ساري».
+    const view = toProviderOfficeStateView(
+      {
+        ...BASE,
+        renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
+        renewalProofOnRecord: true,
+        renewalReferenceOnRecord: true,
+        renewalDeclarationOnRecord: false,
+      },
+      new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
+    );
+    expect(view.standing?.status).toBe('EXPIRED');
+    expect(view.standing?.mayPractise).toBe(false);
+  });
+
+  it('a proof with no reference number is NO_PROOF — both bits are read, not just one', () => {
+    /*
+     * ⚠️ THE REFERENCE BIT IS A SEPARATE COLUMN AND THIS IS WHY. `deriveRenewalUnderStudy` fails
+     * condition 2 when EITHER the proof document or the reference number is missing, so a single
+     * «proof on record» bit would have made a filing with no Central Bank reference read as fully
+     * proven. Without this case the third column could be deleted and every other test here would
+     * still pass.
+     */
+    const view = toProviderOfficeStateView(
+      {
+        ...BASE,
+        renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
+        renewalProofOnRecord: true,
+        renewalReferenceOnRecord: false,
+        renewalDeclarationOnRecord: true,
+      },
+      new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
+    );
+    expect(view.standing?.status).toBe('EXPIRED');
+    expect(view.standing?.mayPractise).toBe(false);
   });
 
   it('a term past its expiry with a LATE renewal IS lapsed', () => {
@@ -117,7 +216,8 @@ describe('item (j): the three licence states', () => {
       new Date('2027-02-01T00:00:00.000Z'),
       INSTRUMENT_LICENCE_FIGURES,
     );
-    expect(view.isCurrentlyLapsed).toBe(true);
+    expect(view.standing?.status).toBe('EXPIRED');
+    expect(view.standing?.mayPractise).toBe(false);
     expect(view.renewalFiledOnTime).toBe(false);
   });
 
@@ -162,6 +262,32 @@ describe('item (j): the view carries office state and nothing else', () => {
         `ProviderOfficeStateView has a field named \`${key}\`, which looks like personal, customer or money data. This is a CROSS-OFFICE read.`,
       ).toBe(false);
     }
+    /*
+     * ⛔ AND NO KEY NAMES THE DECLARING PERSON OR WHAT WAS FILED — the full walk §A item 10.
+     *
+     * The three renewal columns are BITS, and this is the shape-level half of the migration's ban:
+     * `actorNameShown` and `declaredAt` belong to an employee of ANOTHER office, and the proof
+     * document id and the Central Bank's reference number are that office's record. The regex above
+     * would not catch any of the four, so they are named.
+     */
+    const payload = JSON.stringify(view);
+    for (const banned of [
+      'actorNameShown',
+      'declaredAt',
+      'renewalProofDocumentId',
+      'renewalReferenceNumber',
+      'standingActDecisionRef',
+      'renewalUnderStudy',
+    ]) {
+      expect(
+        payload.includes(banned),
+        `the provider payload carries \`${banned}\`, which is another office's record and not the provider's. See the migration's ban list.`,
+      ).toBe(false);
+    }
+    // NON-VACUOUS: the derived standing really is on the payload, so the sweep above is run over
+    // something rather than over an object the mapper failed to build.
+    expect(view.standing?.status).toBe('ACTIVE');
+
     // And it is not vacuous: the office-state fields really are there.
     expect(view.licensedBranches).toBe(4);
     expect(view.dormantLicensedBranches).toBe(1);

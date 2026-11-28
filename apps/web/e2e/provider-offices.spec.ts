@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { expectAbsentWithin } from './support/anchored';
+import { expectAbsentWithin, expectNone } from './support/anchored';
 
 /**
  * MODULE 0 ITEM (j) — the provider dashboard screen.
@@ -39,14 +39,26 @@ const ME_BASE = {
  * organization entirely. So the codes are given directly, which is the same reason
  * `mockAuthWithCodes` exists in `roles.spec.ts`.
  */
-async function mockAuth(page: Page, permissions: string[]) {
+async function mockAuth(
+  page: Page,
+  permissions: string[],
+  /* ADDED with the full walk §A item 10. This file had no Arabic path at all, and the standing
+   * word the walk read — «ساري» on an expired licence — is the ARABIC one: the presenter shows
+   * that half (decision 161 ruling 4), so an EN-only spec cannot see the defect that was reported. */
+  languagePreference: 'AR' | 'EN' = 'EN',
+) {
   await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ['PLATFORM_OPERATOR'], permissions },
+      json: {
+        ...ME_BASE,
+        roles: ['PLATFORM_OPERATOR'],
+        permissions,
+        languagePreference,
+      },
     }),
   );
 }
@@ -67,10 +79,10 @@ const OFFICES = [
     licenseIssuedAt: '2024-01-01T00:00:00.000Z',
     licenseExpiresAt: '2028-12-31T00:00:00.000Z',
     renewalRequestedAt: null,
-    isCurrentlyLapsed: false,
+    standing: { status: 'ACTIVE', mayPractise: true },
     // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
-    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
-    // term arithmetic and this is a regulator's act.
+    // this fixture; one test below sets it true. NOT the standing's sibling: that is derived from
+    // the term and its renewal, and this is a regulator's act.
     mayNotIssue: false,
     renewalDueBy: '2028-11-16T00:00:00.000Z',
     renewalFiledOnTime: null,
@@ -78,6 +90,7 @@ const OFFICES = [
     dormantLicensedBranches: 2,
     users: 12,
     activeUsers: 9,
+    enteredUsers: 9,
     lastActivityAt: '2026-10-10T00:00:00.000Z',
   },
   {
@@ -93,10 +106,10 @@ const OFFICES = [
     licenseIssuedAt: '2025-03-01T00:00:00.000Z',
     licenseExpiresAt: '2025-12-31T00:00:00.000Z',
     renewalRequestedAt: null,
-    isCurrentlyLapsed: true,
+    standing: { status: 'EXPIRED', mayPractise: false },
     // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
-    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
-    // term arithmetic and this is a regulator's act.
+    // this fixture; one test below sets it true. NOT the standing's sibling: that is derived from
+    // the term and its renewal, and this is a regulator's act.
     mayNotIssue: false,
     renewalDueBy: '2025-11-16T00:00:00.000Z',
     renewalFiledOnTime: null,
@@ -104,6 +117,7 @@ const OFFICES = [
     dormantLicensedBranches: 0,
     users: 3,
     activeUsers: 3,
+    enteredUsers: 3,
     lastActivityAt: null,
   },
   {
@@ -121,10 +135,10 @@ const OFFICES = [
     licenseExpiresAt: null,
     licenseStatus: null,
     renewalRequestedAt: null,
-    isCurrentlyLapsed: null,
+    standing: null,
     // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
-    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
-    // term arithmetic and this is a regulator's act.
+    // this fixture; one test below sets it true. NOT the standing's sibling: that is derived from
+    // the term and its renewal, and this is a regulator's act.
     mayNotIssue: false,
     renewalDueBy: null,
     renewalFiledOnTime: null,
@@ -132,6 +146,7 @@ const OFFICES = [
     dormantLicensedBranches: 0,
     users: 1,
     activeUsers: 1,
+    enteredUsers: 1,
     lastActivityAt: null,
   },
   {
@@ -152,10 +167,10 @@ const OFFICES = [
     licenseIssuedAt: '2026-10-19T00:00:00.000Z',
     licenseExpiresAt: '2027-10-19T00:00:00.000Z',
     renewalRequestedAt: null,
-    isCurrentlyLapsed: false,
+    standing: { status: 'ACTIVE', mayPractise: true },
     // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
-    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
-    // term arithmetic and this is a regulator's act.
+    // this fixture; one test below sets it true. NOT the standing's sibling: that is derived from
+    // the term and its renewal, and this is a regulator's act.
     mayNotIssue: false,
     renewalDueBy: '2027-09-04T00:00:00.000Z',
     renewalFiledOnTime: null,
@@ -163,6 +178,7 @@ const OFFICES = [
     dormantLicensedBranches: 4,
     users: 0,
     activeUsers: 0,
+    enteredUsers: 0,
     lastActivityAt: null,
   },
   {
@@ -187,10 +203,10 @@ const OFFICES = [
     licenseExpiresAt: null,
     licenseStatus: null,
     renewalRequestedAt: null,
-    isCurrentlyLapsed: null,
+    standing: null,
     // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
-    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
-    // term arithmetic and this is a regulator's act.
+    // this fixture; one test below sets it true. NOT the standing's sibling: that is derived from
+    // the term and its renewal, and this is a regulator's act.
     mayNotIssue: false,
     renewalDueBy: null,
     renewalFiledOnTime: null,
@@ -198,6 +214,7 @@ const OFFICES = [
     dormantLicensedBranches: 0,
     users: 0,
     activeUsers: 0,
+    enteredUsers: 0,
     lastActivityAt: null,
   },
 ];
@@ -232,7 +249,7 @@ test('says it crosses office boundaries BEFORE the first row', async ({
 
 test('renders the THREE licence states as three states', async ({ page }) => {
   /*
-   * `isCurrentlyLapsed === null` means no term on record, which item (c) made BLOCK new business
+   * `standing === null` means no term on record, which item (c) made BLOCK new business
    * under art. 21/a/9 — a different and worse fact than a lapsed licence. A screen that collapsed
    * the two would tell a provider a licence expired when none was ever recorded, and would hide the
    * worse state behind the milder one.
@@ -252,6 +269,79 @@ test('renders the THREE licence states as three states', async ({ page }) => {
   // It names the article, not merely the fact — a provider chasing an office needs to know which
   // rule they are chasing under.
   await expect(noTerm).toContainText('21/a/9');
+});
+
+/*
+ * 🔴 THE FULL WALK §A ITEM 10 / DECISION 167/17 — AN OFFICE UNDER RENEWAL IS NOT «IN FORCE».
+ *
+ * The walk found office B's licence — expiry 2025-12-31, today being 2026-11-27 — rendering
+ * «ساري» / «in force» on this screen. Measured on the owner's database before anything was
+ * changed (`scripts/measurements/licence-standing-two-screens.ts`): the office had filed on time
+ * with proof on record and a declaration sworn on 2026-11-25, so `deriveRenewalUnderStudy`
+ * answered UNDER_STUDY and the standing is RENEWAL_PENDING with `mayPractise: true`.
+ *
+ * ⟶ So the BLOCK was right — lifted by decision 128 — and the WORD was wrong, which is
+ *   decision 167/17's first branch. This pins the word.
+ *
+ * ⚠️ AND IT IS ITS OWN FIXTURE, not a sixth row in `OFFICES`. That array is asserted
+ * positionally by several tests and by the invite walk; adding a row to it would move what those
+ * read without saying so.
+ */
+const OFFICE_UNDER_RENEWAL = [
+  {
+    ...OFFICES[0],
+    organizationId: 'org-b',
+    subdomain: 'hayat',
+    legalName: 'Al-Hayat Insurance Office',
+    legalNameAr: 'مكتب الحياة للتأمينات',
+    licenseNumber: 'تجريبي/002',
+    licenseIssuedAt: '2023-01-01T00:00:00.000Z',
+    // PAST, which is the whole point: the old cell printed «in force» for exactly this row.
+    licenseExpiresAt: '2025-12-31T00:00:00.000Z',
+    renewalRequestedAt: '2025-11-01T00:00:00.000Z',
+    renewalDueBy: '2025-11-16T00:00:00.000Z',
+    renewalFiledOnTime: true,
+    standing: { status: 'RENEWAL_PENDING', mayPractise: true },
+    mayNotIssue: false,
+  },
+];
+
+test('an office PAST ITS EXPIRY but under renewal reads «Renewal pending», never «in force»', async ({
+  page,
+}) => {
+  await mockAuth(page, ['provider.office-state.read']);
+  await mockOffices(page, OFFICE_UNDER_RENEWAL);
+  await page.goto('/provider-offices');
+
+  const standing = page.locator('[data-standing="hayat"]');
+  // THE WORD THE LICENCE SCREEN PRINTS, which is what decision 167/17 asks for.
+  await expect(standing).toContainText('Renewal pending');
+  /*
+   * ⛔ AND NOT THE OLD ONE. This is the assertion that actually fails on a revert: a
+   * `toContainText('Renewal pending')` alone would still pass on a cell that printed both, and the
+   * defect was a cell printing the WRONG one.
+   */
+  await expect(standing).not.toContainText('in force');
+  // ⚠️ The expiry date is STILL SHOWN on the row, and must be: the office really is past its
+  // printed dates, and hiding that to make the standing look tidier would withdraw the provider's
+  // own registration record (the migration's own argument). Read off the ROW that owns the
+  // standing cell, because the expiry `<td>` carries no hook of its own.
+  const row = page.locator('tr', { has: page.locator('[data-standing="hayat"]') });
+  await expect(row).toContainText('2025-12-31');
+});
+
+test('the standing in Arabic is «قيدَ التجديد» — the licence screen’s own word', async ({
+  page,
+}) => {
+  await mockAuth(page, ['provider.office-state.read'], 'AR');
+  await mockOffices(page, OFFICE_UNDER_RENEWAL);
+  await page.goto('/provider-offices');
+
+  const standing = page.locator('[data-standing="hayat"]');
+  await expect(standing).toContainText('قيدَ التجديد');
+  // ⛔ The word decision 128 reserves for a term inside its printed dates is ABSENT. The Arabic
+  // half is the one the walk read and the one the presenter will show.
+  await expect(standing).not.toContainText('ساري');
 });
 
 test('shows the dormant count BESIDE the total, never instead of it', async ({
@@ -359,7 +449,20 @@ function mockOfficesAroundInvitation(page: Page) {
       status: 200,
       json: state.invited
         ? OFFICES.map((o) =>
-            o.subdomain === 'aqaba' ? { ...o, users: 1, activeUsers: 1 } : o,
+            o.subdomain === 'aqaba'
+              ? /*
+                 * 🔴 THE FULL WALK §A ITEM 11 — `enteredUsers: 0`, AND THAT IS THE REAL
+                 * POST-INVITE STATE RATHER THAN A CONVENIENT ONE.
+                 *
+                 * The invite creates the account with NO usable password: it signs in by opening
+                 * the link. So immediately after an invitation `users` is 1 and `enteredUsers` is
+                 * 0 — nobody has signed in and nobody has set a password. This fixture said
+                 * `users: 1, activeUsers: 1` and nothing about entry, which under the old
+                 * `users > 0` test read as «has an account» and hid the fact that the invitation
+                 * may never have arrived.
+                 */
+                { ...o, users: 1, activeUsers: 1, enteredUsers: 0 }
+              : o,
           )
         : OFFICES,
     }),
@@ -367,14 +470,85 @@ function mockOfficesAroundInvitation(page: Page) {
   return { state, ready };
 }
 
+/*
+ * 🔴 THE FULL WALK §A ITEM 11 — AN ACCOUNT NOBODY HAS ENTERED CAN BE INVITED AGAIN.
+ *
+ * With no provider mailbox connected the invite creates the OFFICE_ADMINISTRATOR, reports that the
+ * invitation was not sent, and tells the operator to re-invite. The route accepts that —
+ * `resolveInvitationTarget` returns REINVITE for exactly one never-entered account, and
+ * `InvitationChannelService` kills every earlier token and issues one fresh link. The SCREEN hid
+ * the control behind `users === 0`, so the one state the route was built for had no way in.
+ *
+ * ⚠️ AND THE STATE IS REAL, not a constructed one: measured on the owner's dev database
+ * 2026-11-28, one office carries 1 account and 0 entered.
+ */
+const OFFICE_AWAITING_ITS_INVITE = OFFICES.map((o) =>
+  o.subdomain === 'amman'
+    ? { ...o, users: 1, activeUsers: 1, enteredUsers: 0 }
+    : o,
+);
+
+test('an account nobody has ever entered says the invitation was not sent, and offers it again', async ({
+  page,
+}) => {
+  await mockAuth(page, INVITE_CODES);
+  await mockOffices(page, OFFICE_AWAITING_ITS_INVITE);
+  await page.goto('/provider-offices');
+
+  /*
+   * THE WAY BACK IN EXISTS — the same control and the same route, a fresh link and not a second
+   * account. This is the whole of the fix: the control was hidden behind `users === 0`, so the one
+   * state `resolveInvitationTarget`'s REINVITE branch exists for had no way in.
+   */
+  await expect(page.locator('[data-invite-open="amman"]')).toBeVisible();
+
+  /*
+   * ⛔ AND THE COLUMN STILL SAYS «has an account», WHICH IS THE PART THAT MUST NOT CHANGE.
+   *
+   * ⚠️ My first version asserted «The invitation was not sent» here, and it was wrong: the screen
+   * cannot know that. `enteredUsers === 0` is equally true of an invitation that ARRIVED and has
+   * not been opened, and `invitation.outcome` is stored nowhere and is not on this payload. The
+   * account does exist, so saying so is the honest half — and the «last used» column already reads
+   * «never used» for exactly these rows.
+   */
+  await expect(page.locator('[data-has-administrator="amman"]')).toContainText(
+    'has an account',
+  );
+});
+
+test('an account somebody HAS entered is not re-invitable — the route would refuse it', async ({
+  page,
+}) => {
+  /*
+   * NON-VACUITY for the test above, and the rule it must not break. `resolveInvitationTarget`
+   * answers 409 once anybody has entered — «this route bootstraps an empty organization once and
+   * deliberately does not become a standing provider capability to add accounts to a live one» —
+   * so offering the control there would be a 403 waiting to happen, which is the dead control
+   * `frontend-ux-directive.md` rules out.
+   */
+  await mockAuth(page, INVITE_CODES);
+  await mockOffices(page);
+  await page.goto('/provider-offices');
+
+  const administrator = page.locator('[data-has-administrator="amman"]');
+  await expect(administrator).toBeVisible();
+  // NO CONTROL. Anchored on the cell's own sentence, which is OUTSIDE the set asserted absent, so
+  // a blank page cannot satisfy it.
+  await expectNone(page.locator('[data-invite-open="amman"]'), administrator);
+});
+
 test('the row SAYS whether an organization has an administrator', async ({
   page,
 }) => {
   /*
    * Before this, the only way to learn that a registered office had nobody in it was to query the
-   * database — which is how the gap survived two batches. The row answers it now, and the two
-   * sentences are different facts: "has an account" is also "cannot be invited", because the invite
-   * route itself refuses once the organization holds any account.
+   * database — which is how the gap survived two batches. The row answers it now.
+   *
+   * ⚠️ CORRECTED WITH THE FULL WALK §A ITEM 11. This said «‘has an account’ is also ‘cannot be
+   * invited’, because the invite route itself refuses once the organization holds any account».
+   * That stopped being true when `resolveInvitationTarget` gained its REINVITE branch: the route
+   * refuses once somebody has ENTERED. So the row has THREE states, and the test below covers the
+   * middle one.
    */
   await mockAuth(page, INVITE_CODES);
   await mockOffices(page);

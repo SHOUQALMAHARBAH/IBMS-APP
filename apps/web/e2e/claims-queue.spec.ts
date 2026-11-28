@@ -293,6 +293,131 @@ test("the queue renders in Arabic with translated status labels", async ({
   ).toHaveText("قيد التقييم");
 });
 
+/*
+ * 🔴 THE FULL WALK §A ITEM 1 — THE STUCK CLAIM, REPRODUCED.
+ *
+ * The owner's walk left claim `AR-2026-7781` at `UNDER_ASSESSMENT` with the survey stamped
+ * and the investigation not. `ClaimCard.tsx` hid both stamp buttons at that status while the
+ * verdict button is disabled until BOTH are recorded — so the screen offered nothing, and
+ * the claim could not move in any direction.
+ *
+ * ⚠️ AND THIS FILE ALREADY RENDERED THE DEAD END ON EVERY RUN. `CLAIM` above is
+ * `UNDER_ASSESSMENT` with both stamps null, driven by a CLAIMS_OFFICER who holds
+ * `claim.assess` — a state even more stuck than the owner's. Nobody asserted the controls,
+ * so nine tests walked past it.
+ *
+ * ⟶ The fixture here carries ONE stamp, which is the owner's state exactly rather than a
+ * tidier version of it: a zero-stamp claim would also pass against a fix that only ever
+ * showed the FIRST stamp button.
+ */
+const ONE_STAMP_CLAIM = {
+  ...CLAIM,
+  adjuster: {
+    ...CLAIM.adjuster,
+    surveyCompletedAt: "2026-11-25T00:00:00.000Z",
+  },
+  assessment: {
+    ...CLAIM.assessment,
+    surveyCompletedAt: "2026-11-25T00:00:00.000Z",
+    // Still false, and that is the whole defect: the verdict needs both.
+    adjusterWorkComplete: false,
+  },
+};
+
+test("a claim under assessment with one stamp can still record the other", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await page.route(DETAIL_URL, (route) =>
+    route.fulfill({ status: 200, json: ONE_STAMP_CLAIM }),
+  );
+  await page.goto("/claims/clm-1");
+  await expect(
+    page.getByRole("heading", { name: "Claim CLM-2026-0007" }),
+  ).toBeVisible();
+
+  // THE FIX. The missing stamp is reachable — the route accepts it at this status, and the
+  // screen now agrees with the route.
+  const investigation = page.getByRole("button", {
+    name: "Mark investigation complete",
+  });
+  await expect(investigation).toBeVisible();
+
+  /*
+   * AND IT BECOMES PRESSABLE ONCE THE DATE IS GIVEN, which is what makes this a route back rather
+   * than a rendered-but-dead control.
+   *
+   * ⚠️ MEASURED, AND MY FIRST VERSION OF THIS ASSERTION WAS WRONG. It read
+   * `expect(investigation).toBeEnabled()` on the claim as loaded, with a comment claiming the date
+   * field defaults to today. It does not — `useState('')` — and the two stamp buttons are disabled
+   * on `instant().length === 0`, which is correct: the stamp RECORDS a completion date, and a
+   * button that submits an empty one would be the worse control. So the date is filled first, and
+   * the before/after pair is the real assertion.
+   */
+  await expect(investigation).toBeDisabled();
+  await page.getByLabel("Completion date (adjuster survey / investigation)").fill("2026-11-26");
+  await expect(investigation).toBeEnabled();
+
+  // The stamp ALREADY recorded stays disabled — it is write-once on the server (409 on a
+  // different value), so offering it again would be a control that can only fail.
+  await expect(
+    page.getByRole("button", { name: "Mark survey complete" }),
+  ).toBeDisabled();
+
+  // The verdict is on the screen and correctly withheld, WITH its reason — so the reader is
+  // told what is missing rather than facing a dead button.
+  const verdict = page.getByRole("button", { name: "Record verdict" });
+  await expect(verdict).toBeVisible();
+  await expect(verdict).toBeDisabled();
+  await expect(verdict).toHaveAttribute(
+    "title",
+    "Record the adjuster survey + investigation first.",
+  );
+
+  // ⛔ AND SUBMIT IS GONE, which is the half that really does belong to one status: the
+  // route refuses a second submission, so the control must not exist here. Anchored on the
+  // verdict button rather than on the page, so an empty render cannot satisfy it.
+  await expectNone(
+    page.getByRole("button", { name: "Submit for assessment" }),
+    verdict,
+  );
+});
+
+test("a claim still in documentation keeps submit and offers both stamps", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await page.route(DETAIL_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...CLAIM,
+        status: "DOCUMENTATION_IN_PROGRESS",
+      },
+    }),
+  );
+  await page.goto("/claims/clm-1");
+
+  // NON-VACUITY for the test above: the earlier status is unchanged by this fix, keeping its
+  // submit control and both stamps. Without this, moving `submit` behind a status check could
+  // have removed it everywhere and the first test would still pass.
+  const submit = page.getByRole("button", { name: "Submit for assessment" });
+  await expect(submit).toBeVisible();
+  // Both stamps are offered here and neither is recorded, so both become pressable once the date
+  // is given — the same date gate as the test above, for the same reason.
+  await page.getByLabel("Completion date (adjuster survey / investigation)").fill("2026-11-26");
+  await expect(
+    page.getByRole("button", { name: "Mark survey complete" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Mark investigation complete" }),
+  ).toBeEnabled();
+  await expectNone(
+    page.getByRole("button", { name: "Record verdict" }),
+    submit,
+  );
+});
+
 test("claims queue screens have no serious/critical accessibility violations @a11y", async ({
   page,
 }) => {

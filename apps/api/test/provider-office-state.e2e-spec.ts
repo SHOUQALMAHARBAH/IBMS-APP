@@ -59,12 +59,13 @@ interface OfficeRow {
   organizationId: string;
   legalName: string;
   licenseNumber: string | null;
-  isCurrentlyLapsed: boolean | null;
+  standing: { status: string; mayPractise: boolean } | null;
   renewalDueBy: string | null;
   licensedBranches: number;
   dormantLicensedBranches: number;
   users: number;
   activeUsers: number;
+  enteredUsers: number;
   lastActivityAt: string | null;
 }
 
@@ -313,6 +314,20 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
       'commission',
       'paidUpCapital',
       'fullName',
+      /*
+       * THE FULL WALK §A ITEM 10 — the four the renewal bits could have reached for and did not.
+       *
+       * The view grew by three booleans so the provider could tell four renewal states apart. It
+       * did NOT grow by the proof document, the Central Bank's reference number, or the declaring
+       * employee's name and date: the first two are the office's own record and the last two name a
+       * person in ANOTHER office. The migration bans all four by column name; this is the same ban
+       * on the wire, where a service-side mapper could reintroduce them without touching SQL.
+       */
+      'renewalProofDocumentId',
+      'renewalReferenceNumber',
+      'actorNameShown',
+      'declaredAt',
+      'renewalUnderStudy',
     ]) {
       expect(
         Object.prototype.hasOwnProperty.call(row, banned),
@@ -326,8 +341,15 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
       'dormantLicensedBranches',
       'users',
       'activeUsers',
+      // THE FULL WALK §A ITEM 11 — the re-invite control reads it, and the route's own predicate is
+      // what it counts. Absent, the control is hidden in the one state the route exists for.
+      'enteredUsers',
       'lastActivityAt',
-      'isCurrentlyLapsed',
+      // THE FULL WALK §A ITEM 10 — this read `isCurrentlyLapsed`, the DATE-ONLY lapse whose
+      // negation this screen printed as «ساري» for four different renewal states. The payload
+      // carries the six-state standing now, and ⛔ not both: two standings on one payload is the
+      // defect rather than the cure.
+      'standing',
     ]) {
       expect(
         Object.prototype.hasOwnProperty.call(row, expected),
@@ -373,7 +395,7 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
       'activeUsers',
       'brokerKind',
       'dormantLicensedBranches',
-      'isCurrentlyLapsed',
+      'enteredUsers',
       'lastActivityAt',
       'legalName',
       'legalNameAr',
@@ -495,7 +517,21 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
     ).toBeGreaterThan(0);
 
     for (const office of withTerm) {
-      expect(typeof office.isCurrentlyLapsed).toBe('boolean');
+      /*
+       * THE SIX-STATE STANDING, and the two things worth asserting over a real database: that it
+       * is present wherever a term is, and that its status is one the screen's map covers. A
+       * `typeof === 'object'` would pass on `{}`, which renders a blank standing column.
+       */
+      expect(office.standing).not.toBeNull();
+      expect([
+        'NO_TERM_ON_RECORD',
+        'ACTIVE',
+        'RENEWAL_PENDING',
+        'EXPIRED',
+        'SUSPENDED',
+        'CANCELLED',
+      ]).toContain(office.standing?.status);
+      expect(typeof office.standing?.mayPractise).toBe('boolean');
       // Art. 11's 45-day deadline is derived too, and is present whenever a term is.
       expect(office.renewalDueBy).toBeTruthy();
     }

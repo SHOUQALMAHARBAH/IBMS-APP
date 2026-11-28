@@ -66,14 +66,42 @@ test("clicking Convert to prospect on a QUALIFIED lead navigates to the qualific
   await page.route("http://localhost:4000/leads", (route) =>
     route.fulfill({ status: 200, json: [QUALIFIED_LEAD] }),
   );
+  // §A item 8 — the destination reads the lead BY ID now, so the single-record route has to be
+  // mocked. ⚠️ Named with the exact id rather than a wildcard: a glob over the leads path would
+  // also match the list route above, and Playwright takes the LAST matching handler — which would
+  // serve an array where the screen expects one record.
+  // (Written as line comments on purpose: a glob containing a star-slash closes a block comment,
+  //  which is how the first version of this broke the whole file's parse.)
+  await page.route("http://localhost:4000/leads/lead-1", (route) =>
+    route.fulfill({ status: 200, json: QUALIFIED_LEAD }),
+  );
 
   await page.goto("/leads");
   await page
     .getByRole("button", { name: `Convert to prospect — ${QUALIFIED_LEAD.fullName}` })
     .click();
 
-  await expect(page).toHaveURL(/\/prospects\/new\?leadId=lead-1&leadFullName=/);
-  await expect(page.getByLabel("Company name")).toHaveValue(QUALIFIED_LEAD.fullName);
+  /*
+   * 🔴 THE FULL WALK §A ITEM 8 — CORRECTED IN BOTH DIRECTIONS, AND THIS ASSERTION PINNED THE
+   * DEFECT.
+   *
+   * It read `toHaveURL(/\?leadId=lead-1&leadFullName=/)` — so it DEMANDED the customer's name be
+   * in the query string, and would have passed forever. The name now travels in the record: the
+   * destination reads `GET /leads/:id` on `lead.list.read`, the same code this board holds.
+   *
+   * ⛔ BOTH DIRECTIONS. The id is still there and the NAME IS NOT, because a `toHaveURL` on the
+   * id alone would pass on a URL that carried both.
+   */
+  await expect(page).toHaveURL(/\/prospects\/new\?leadId=lead-1$/);
+  await expect(page.url()).not.toContain("leadFullName");
+  await expect(page.url()).not.toContain(
+    encodeURIComponent(QUALIFIED_LEAD.fullName),
+  );
+  // AND THE PREFILL STILL WORKS, from the record. Without this the change could have been made by
+  // simply dropping the prefill, which would pass the two assertions above and lose the feature.
+  await expect(page.getByLabel("Company name")).toHaveValue(
+    QUALIFIED_LEAD.fullName,
+  );
 });
 
 test("submitting the qualification form creates the prospect and redirects to its profile", async ({
@@ -87,7 +115,9 @@ test("submitting the qualification form creates the prospect and redirects to it
     route.fulfill({ status: 200, json: PROSPECT }),
   );
 
-  await page.goto("/prospects/new?leadId=lead-1&leadFullName=Ready%20Trading%20Co.%20Contact");
+  // §A item 8: the id only. The prefill now comes from `GET /leads/:id`, and this test fills the
+  // field itself anyway, so it needs no prefill and must not depend on one.
+  await page.goto("/prospects/new?leadId=lead-1");
   await expect(page.getByRole("heading", { name: "Qualify prospect" })).toBeVisible();
   await page.getByLabel("Company name").fill("Ready Trading Co.");
   await page.getByRole("button", { name: "Convert to prospect" }).click();
@@ -196,7 +226,7 @@ test("prospects list and profile screens have no serious/critical accessibility 
 test("the qualification form's fields are reachable via keyboard", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
 
-  await page.goto("/prospects/new?leadId=lead-1&leadFullName=Test%20Lead");
+  await page.goto("/prospects/new?leadId=lead-1");
   const companyNameInput = page.getByLabel("Company name");
   await companyNameInput.focus();
   await expect(companyNameInput).toBeFocused();

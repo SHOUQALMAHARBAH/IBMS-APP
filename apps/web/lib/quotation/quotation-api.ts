@@ -67,6 +67,10 @@ export interface QuotationChain {
   rfqId: string;
   insurerId: string;
   insuranceLine: string;
+  /** THE FULL WALK §A item 6 — the line's Arabic name, sent WITH the record because
+   *  `GET /insurance-lines` is gated on five codes and `quotation.read` is none of them.
+   *  `null` means no Arabic name is known and the stored English string is shown. */
+  insuranceLineAr: string | null;
   insurer: QuotationInsurer;
   current: QuotationVersion;
   versions: QuotationVersion[];

@@ -211,7 +211,21 @@ export function RecommendationSection({
     }
   }
 
-  const currentQuotes = chains.map((c) => c.current);
+  /*
+   * 🔴 THE FULL WALK §A ITEM 6 — THE OPTION NAMED NO INSURER, AND THE CALL WAS ALWAYS RIGHT.
+   *
+   * The option below has called `insurerDisplayName(q.insurer, language)` since message 45 §2. What
+   * was wrong was the WIRE: `GET /quotations` flattened the CHAIN's insurer and passed `current`
+   * and `versions[]` through as the raw Prisma join, so `q.insurer.name` was `undefined` — and
+   * `undefined` renders as NOTHING in React, so the option read «— JOD 1,100.000 · 15% عمولة»
+   * rather than failing. Fixed in `quotation.service.ts`; nothing here needed to change for it.
+   *
+   * THE LINE IS PAIRED WITH THE CHAIN, not with the version, which is why this is a pair rather
+   * than `chains.map((c) => c.current)` as before: an opportunity carries ONE RFQ PER LINE, so two
+   * options can differ by nothing but the line, and `insuranceLine`/`insuranceLineAr` live on the
+   * chain while the premium and the commission live on its current version.
+   */
+  const currentQuotes = chains.map((c) => ({ chain: c, quote: c.current }));
 
   return (
     <section>
@@ -303,9 +317,12 @@ export function RecommendationSection({
                 onChange={(e) => setQuotationId(e.target.value)}
               >
                 <option value="">{t("recSelectQuoteOption")}</option>
-                {currentQuotes.map((q) => (
+                {currentQuotes.map(({ chain, quote: q }) => (
                   <option key={q.id} value={q.id}>
-                    {insurerDisplayName(q.insurer, language)} —{" "}
+                    {insurerDisplayName(q.insurer, language)}
+                    {" — "}
+                    {lineDisplayName(chain, language)}
+                    {" — "}
                     {formatMoney(q.premium, language, q.currency)}
                     {q.commissionRatePercent
                       ? t("recCommissionSuffix", {
@@ -349,6 +366,33 @@ export function RecommendationSection({
                 />
               </div>
             ))}
+            {/*
+              ⚠️ THE FULL WALK §A ITEM 6, SECOND HALF — THIS BUTTON STILL DOES NOT SAY WHY IT IS
+              DISABLED, AND THAT IS AN EMPTY ARABIC CELL RATHER THAN AN OVERSIGHT.
+
+              The gate is `!quotationId || rationale.trim().length < 10`, and the second half is
+              the one a reader cannot guess: the form looks complete with a nine-character
+              rationale. The house pattern for saying so is a `title` on the disabled control —
+              `ClaimCard.tsx` does exactly that with `claimCompleteDocsFirst`.
+
+              ⛔ NO SENTENCE WAS COMPOSED, because none ships whose whole text is true here.
+              Measured across the dictionary, the three nearest are
+              `discardReasonHint` / `dutyModeReasonHint` / `coiRegDisclosureHint` — each opens
+              «{min} أحرف على الأقل.» and then says something FALSE of a recommendation
+              rationale (that the reason stays on a withdrawn record, that it is kept in the audit
+              trail answering «who decided this», or that it names a conflict of interest). Slicing
+              the first clause out of one of them is composing a sentence out of part of another,
+              which decision 125 forbids — the same refusal decision 163 ruling 5 made about
+              «تم إنشاء الدور», and the sentence the owner then gave was not the one that would
+              have been assembled.
+
+              `pwRuleMinLength` («12 حرفاً على الأقل») is a whole sentence and still cannot be
+              reused: its number is baked in, and «حرفاً» is the singular form Arabic takes after
+              12 where 10 needs the plural «أحرف». A number word is hers.
+
+              ⟶ Reported as an empty cell with those four keys named, so the next session does not
+                re-derive the search.
+            */}
             <button
               type="button"
               disabled={busy || !quotationId || rationale.trim().length < 10}
